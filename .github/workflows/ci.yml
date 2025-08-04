@@ -23,7 +23,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip list  # Shows what's actually installed (for debugging)
 
       - name: Run tests
         run: pytest
