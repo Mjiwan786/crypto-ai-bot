@@ -112,6 +112,7 @@ prawcore
 prometheus_client
 propcache
 protobuf
+psutil
 pyasn1
 pyasn1_modules
 pybase64
@@ -128,6 +129,8 @@ pyportfolioopt
 pyproject_hooks
 pyreadline3
 pytest
+pytest-asyncio
+pytest-mock
 python-dateutil
 python-dotenv
 pytz
