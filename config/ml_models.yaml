@@ -1,0 +1,9 @@
+# ml_models.yaml
+momentum_model:
+  type: xgboost
+  version: 2.3.0
+  registry_path: models/registry/momentum/v2.3.0
+  rollback_version: 2.2.1
+  version_control: true
+  git_sha: a1b2c3d
+

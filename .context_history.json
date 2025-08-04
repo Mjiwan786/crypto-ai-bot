@@ -1,0 +1,106 @@
+[
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 12:12:21.426970+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 12:13:21.438561+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:24:46.962298+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:25:47.008099+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:26:47.027057+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:27:47.035539+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:28:47.047375+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:29:47.056240+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:30:47.071911+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:31:47.090061+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:32:47.107991+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:33:47.121192+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  },
+  {
+    "role": "signal",
+    "content": "{\"action\":\"hold\",\"price\":null,\"strength\":0.0,\"timestamp\":\"2025-07-30T12:12:20.176412Z\"}",
+    "timestamp": "2025-07-30 23:34:47.130690+00:00",
+    "metadata": {
+      "strategy": "ma_crossover"
+    }
+  }
+]

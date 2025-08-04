@@ -1,0 +1,13 @@
+# strategies.yaml
+strategies:
+  trend_following:
+    class_path: "agents.trend.TrendFollowingAgent"
+    config: "config/strategies/trend.yaml"
+  mean_reversion:
+    class_path: "agents.mean_reversion.ReversionAgent" 
+    config: "config/strategies/reversion.yaml"
+
+
+  adaptive_learning:
+    class_path: "agents.learning.AdaptiveLearner"
+    config: "config/strategies/adaptive.yaml"

@@ -1,0 +1,5 @@
+# Sample OHLCV settings for Kraken.
+intervals:
+  - 1m
+  - 5m
+  - 1h

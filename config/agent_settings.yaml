@@ -1,0 +1,5 @@
+# Default agent settings for the crypto AI bot.
+general:
+  log_level: INFO
+signal:
+  threshold: 0.5

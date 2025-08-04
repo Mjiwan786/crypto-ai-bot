@@ -1,0 +1,75 @@
+## Specialized Flash Loan Setup
+##
+## This section contains configuration specific to flash loan arbitrage and
+## related high‑frequency operations.  It defines how large loans can be,
+## acceptable spreads and slippage, which protocols to use and how the AI
+## scoring model should filter opportunities.
+
+flash_loan_system:
+  enabled: true
+  mode: "aggressive_growth"        # Mode can be conservative, balanced or aggressive
+  min_roi: 0.02                    # Minimum return on investment to consider
+  max_loans_per_day: 3             # Limit on the number of loans attempted per day
+  capital_multiplier: 5.0          # Multiply available capital for loan sizing
+
+  arbitrage:
+    min_spread: 0.018              # Minimum spread (1.8%) required to execute
+    max_slippage: 0.003            # Maximum acceptable slippage (0.3%)
+    exchanges: ["binance", "ftx", "kucoin", "uniswap_v3"]
+    pair_whitelist: ["ETH/USDT", "BTC/USDT", "SOL/USDT"]
+
+  sizing:
+    base_multiplier: 3.0
+    volatility_adjusted: true
+    max_capital_utilization: 0.7    # Do not allocate more than 70% of capital
+
+  protocols:
+    aave:
+      enabled: true
+      max_loan_usd: 5000
+      preferred_assets: ["ETH", "DAI", "USDC"]
+      health_factor_safety: 1.25
+    dydx:
+      enabled: true
+      max_loan_usd: 10000
+      collateral_ratio: 1.3
+    ironbank:
+      enabled: false
+
+  execution:
+    max_attempts: 2
+    timeout_seconds: 15
+    gas_price_strategy: "dynamic"
+    max_gas_price_gwei: 80
+    profit_split:
+      protocol_fee: 0.15
+      miner_tip: 0.05
+      retained: 0.80
+
+  ai_scoring:
+    model: "flash_loan_v3.xgb"
+    features:
+      - liquidity_depth
+      - price_impact
+      - gas_cost_projection
+      - mev_risk_score
+    min_confidence: 0.85           # Require 85% confidence from the model
+
+  risk:
+    max_daily_operations: 5
+    cooloff_period: 300
+    circuit_breakers:
+      - trigger: "2_failed_attempts"
+        action: "pause_1h"
+      - trigger: "network_congestion > 0.8"
+        action: "reduce_size_50%"
+      - trigger: "profitability < 0.01"
+        action: "switch_to_conservative"
+
+  learning:
+    enabled: true
+    retrain_interval: 168            # Retrain the model every 168 hours (7 days)
+    feedback_metrics:
+      - actual_vs_expected_profit
+      - slippage_analysis
+      - failed_tx_causes

@@ -1,0 +1,211 @@
+# config/settings.yaml - Ultimate Hypergrowth Edition
+
+### Core Settings ###
+bot:
+  mode: "hypergrowth"  # hypergrowth | conservative
+  env: "paper"         # paper | live
+  log_level: "INFO"    # DEBUG | INFO | WARNING
+
+### Growth Engine ###
+growth:
+  monthly_injection: 100.0
+  compounding: true
+  profit_reinvestment: 0.8
+  monthly_phase_adjust: true
+
+### AI Core Settings ###
+ai_engine:
+  mode: "hypergrowth"
+  daily_profit_target: 0.015
+  max_daily_loss: -0.03
+  strategy_allocations:
+    trend_following: 0.25
+    breakout: 0.20
+    mean_reversion: 0.15
+    momentum: 0.25
+    sideways: 0.15
+
+### Strategy Configuration ###
+strategies:
+  active_strategies:
+    - trend_following
+    - breakout
+    - mean_reversion
+    - momentum
+    - sideways
+    - moving_average
+
+  allocations:
+    trend_following: 0.25
+    breakout: 0.20
+    mean_reversion: 0.15
+    momentum: 0.25
+    sideways: 0.15
+
+  trend_following:
+    ema_short: 9
+    ema_long: 21
+    atr_period: 14
+    min_trend_strength: 0.3
+    entry_conditions:
+      confirmation_bars: 2
+      volume_ratio: 1.2
+
+  breakout:
+    resistance_window: 20
+    min_breakout_ratio: 1.5
+    retest_allowed: true
+    false_breakout_filter: true
+    volume_requirement: 1.5
+
+  mean_reversion:
+    bollinger_window: 20
+    std_dev: 2.0
+    entry_zones:
+      oversold: 0.3
+      overbought: 0.7
+    exit_at_mean: true
+
+  momentum:
+    rsi_period: 14
+    vwap_window: 20
+    entry_signals:
+      rsi_oversold: 30
+      rsi_overbought: 70
+      vwap_gap: 0.015
+    exit_after_bars: 6
+
+  sideways:
+    grid_size: 0.005
+    max_grid_levels: 10
+    position_size: 0.05
+    volatility_cutoff: 0.01
+
+  moving_average:
+    sma_short: 10
+    sma_long: 50
+    rsi_period: 14
+    rsi_trend_confirm: 50
+    volume_ratio: 1.2
+
+### Aggressive but Smart Trading ###
+trading:
+  base_position_size: 0.15
+  dynamic_sizing:
+    enabled: true
+    volatility_multiplier: 1.8
+    max_position: 0.30
+  entry_conditions:
+    min_confidence: 0.75
+    confirmation_bars: 1
+
+### Flash Loan Optimization ###
+flash_loan_system:
+  enabled: true
+  mode: "aggressive_growth"
+  min_roi: 0.02
+  max_loans_per_day: 3
+  capital_multiplier: 5.0
+  arbitrage:
+    min_spread: 0.018
+    max_slippage: 0.003
+    exchanges: ["binance", "ftx", "kucoin", "uniswap_v3"]
+    pair_whitelist: ["ETH/USDT", "BTC/USDT", "SOL/USDT"]
+  sizing:
+    base_multiplier: 3.0
+    volatility_adjusted: true
+    max_capital_utilization: 0.7
+  protocols:
+    aave:
+      enabled: true
+      max_loan_usd: 5000
+      preferred_assets: ["ETH", "DAI", "USDC"]
+      health_factor_safety: 1.25
+    dydx:
+      enabled: true
+      max_loan_usd: 10000
+      collateral_ratio: 1.3
+    ironbank:
+      enabled: false
+  execution:
+    max_attempts: 2
+    timeout_seconds: 15
+    gas_price_strategy: "dynamic"
+    max_gas_price_gwei: 80
+    profit_split:
+      protocol_fee: 0.15
+      miner_tip: 0.05
+      retained: 0.80
+  ai_scoring:
+    model: "flash_loan_v3.xgb"
+    features:
+      - liquidity_depth
+      - price_impact
+      - gas_cost_projection
+      - mev_risk_score
+    min_confidence: 0.85
+  risk:
+    max_daily_operations: 5
+    cooloff_period: 300
+    circuit_breakers:
+      - trigger: "2_failed_attempts"
+        action: "pause_1h"
+      - trigger: "network_congestion > 0.8"
+        action: "reduce_size_50%"
+      - trigger: "profitability < 0.01"
+        action: "switch_to_conservative"
+  learning:
+    enabled: true
+    retrain_interval: 168
+    feedback_metrics:
+      - actual_vs_expected_profit
+      - slippage_analysis
+      - failed_tx_causes
+
+### Risk Management ###
+risk:
+  global_max_drawdown: -0.20
+  daily_stop_loss: -0.05
+  strategy_max_loss:
+    trend_following: -0.10
+    breakout: -0.15
+    mean_reversion: -0.08
+    momentum: -0.12
+    sideways: -0.05
+  circuit_breakers:
+    - trigger: "3_losses_in_row"
+      action: "reduce_size_50%"
+    - trigger: "weekly_loss_limit"
+      action: "cooloff_24h"
+
+### Backtest Configuration ###
+backtest:
+  fee_structure:
+    binance: 0.001
+    kraken: 0.0026
+    uniswap: 0.003
+  slippage: 0.0005
+  warmup_candles: 100
+  data_source: "local"
+
+### Exchange Configuration ###
+exchanges:
+  binance:
+    api_key: "{{ env.BINANCE_API_KEY }}"
+    api_secret: "{{ env.BINANCE_API_SECRET }}"
+    sandbox: false
+    pairs: ["BTC/USDT", "ETH/USDT"]
+  kraken:
+    api_key: "{{ env.KRAKEN_API_KEY }}"
+    api_secret: "{{ env.KRAKEN_API_SECRET }}"
+    pairs: ["BTC/USD", "ETH/USD"]
+    sandbox: false
+
+### Monitoring ###
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9090
+  healthchecks:
+    enabled: true
+    interval: 300

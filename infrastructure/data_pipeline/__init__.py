@@ -1,0 +1,1 @@
+"""Data pipeline for ingesting real‑time and historical data."""

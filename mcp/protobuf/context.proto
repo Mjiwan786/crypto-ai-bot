@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package mcp;
+
+// Defines the structure of messages and conversation context for MCP.
+
+message Message {
+  string role = 1;
+  string content = 2;
+  int64 timestamp = 3;
+  map<string, string> metadata = 4;
+}
+
+message ConversationContext {
+  repeated Message messages = 1;
+  uint32 max_length = 2;
+}

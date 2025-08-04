@@ -1,0 +1,29 @@
+{
+  "title": "Crypto AI Bot Performance",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Equity Curve",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "equity_curve",
+          "legendFormat": "Equity"
+        }
+      ],
+      "interval": "30s"
+    },
+    {
+      "type": "graph",
+      "title": "Drawdown",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "drawdown",
+          "legendFormat": "Drawdown"
+        }
+      ],
+      "interval": "30s"
+    }
+  ]
+}

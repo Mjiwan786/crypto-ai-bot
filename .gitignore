@@ -1,0 +1,42 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.orig
+*.so
+*.pyd
+
+# Environment files
+.env
+.env.*
+.venv/
+*.env
+secrets.yml
+
+# VS Code / PyCharm / IDE
+.vscode/
+.idea/
+
+# Build and test artifacts
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Node / frontend (if applicable)
+node_modules/
+
+# Redis / database / state
+*.sqlite3
+*.rdb
+*.db
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
