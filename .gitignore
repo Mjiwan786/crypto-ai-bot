@@ -1,42 +1,50 @@
-# Python artifacts
+# Python cache and bytecode
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
-*.orig
-*.so
 *.pyd
 
-# Environment files
+# Virtual environment folders
 .env
-.env.*
 .venv/
-*.env
-secrets.yml
+env/
+venv/
 
-# VS Code / PyCharm / IDE
+# Development artifacts
+*.log
+.DS_Store
+*.orig
+
+# IDE/editor folders
 .vscode/
 .idea/
 
-# Build and test artifacts
+# Build folders
 build/
 dist/
+.eggs/
 *.egg-info/
-.pytest_cache/
-.coverage
-htmlcov/
-*.log
 
-# Node / frontend (if applicable)
+# Local override files
+requirements_local.txt
+
+# Ignore any ta-lib related files
+*ta-lib*
+
+# Secrets/config
+config/secrets.json
+
+# Testing artifacts
+.pytest_cache/
+coverage.xml
+htmlcov/
+.tox/
+nosetests.xml
+test-results/
+
+# Node (if used)
 node_modules/
 
-# Redis / database / state
-*.sqlite3
-*.rdb
-*.db
-
-# Notebooks
-.ipynb_checkpoints/
-
-# OS files
-.DS_Store
+# OS-specific
 Thumbs.db
+Desktop.ini
