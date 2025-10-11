@@ -1,0 +1,172 @@
+# Prometheus SLO Alerting Rules for Crypto AI Bot
+#
+# This file contains alerting rules that mirror the SLO definitions in slo_definitions.py
+# and monitor the metrics exported by metrics_exporter.py.
+#
+# Integration with Alertmanager:
+# - Configure Alertmanager to route these alerts to Discord/Telegram
+# - Example Alertmanager config:
+#   route:
+#     group_by: ['alertname']
+#     group_wait: 10s
+#     group_interval: 10s
+#     repeat_interval: 1h
+#     receiver: 'crypto-bot-alerts'
+#   receivers:
+#   - name: 'crypto-bot-alerts'
+#     discord_configs:
+#     - webhook_url: 'https://discord.com/api/webhooks/YOUR_WEBHOOK_URL'
+#       title: 'Crypto AI Bot Alert'
+#       text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+#     telegram_configs:
+#     - bot_token: 'YOUR_BOT_TOKEN'
+#       chat_id: 'YOUR_CHAT_ID'
+#       message: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+groups:
+  - name: crypto_ai_bot_slo_alerts
+    rules:
+      # High Publish Latency Alert
+      # SLO: P95 publish latency should be under 500ms for real-time trading
+      - alert: CryptoAIBotHighPublishLatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(publish_latency_ms_bucket[15m])) by (le)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: latency
+          slo: publish_latency
+        annotations:
+          summary: "Crypto AI Bot P95 publish latency is {{ $value }}s (threshold: 0.5s)"
+          description: "The 95th percentile publish latency has been above 500ms for more than 10 minutes. This may impact real-time trading performance."
+          runbook_url: "https://docs.example.com/runbooks/high-latency"
+
+      # High Stream Lag Alert
+      # SLO: Stream lag should be minimal - consumers must keep up with producers
+      - alert: CryptoAIBotStreamLagHigh
+        expr: |
+          avg_over_time(stream_lag_seconds[10m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: stream_lag
+          slo: stream_lag
+        annotations:
+          summary: "Crypto AI Bot stream lag is {{ $value }}s (threshold: 1s)"
+          description: "Average stream lag has been above 1 second for more than 10 minutes. Consumers may not be keeping up with producers."
+          runbook_url: "https://docs.example.com/runbooks/stream-lag"
+
+      # Low Uptime Alert
+      # SLO: Uptime target of 99.5% (allows for ~3.6 hours downtime per month)
+      # Note: This is an approximation using bot_uptime_seconds and bot_heartbeat_seconds
+      - alert: CryptoAIBotUptimeLow
+        expr: |
+          (
+            sum_over_time(bot_heartbeat_seconds[72h] > 0) / (72 * 3600)
+          ) < 0.995
+        for: 5m
+        labels:
+          severity: critical
+          component: uptime
+          slo: uptime
+        annotations:
+          summary: "Crypto AI Bot uptime is {{ $value | humanizePercentage }} (threshold: 99.5%)"
+          description: "Bot uptime over the last 72 hours is below 99.5%. This indicates significant downtime."
+          runbook_url: "https://docs.example.com/runbooks/low-uptime"
+
+      # High Duplicate Rate Alert
+      # SLO: Duplicate rate should be very low for data integrity
+      # Note: This requires implementing duplicate detection metrics
+      # For now, this is a placeholder that would need actual duplicate tracking
+      - alert: CryptoAIBotDupRateHigh
+        expr: |
+          (
+            signals_published_total - 
+            count by (agent, stream, symbol) (signals_published_total)
+          ) / signals_published_total > 0.001
+        for: 5m
+        labels:
+          severity: warning
+          component: data_integrity
+          slo: duplicate_rate
+        annotations:
+          summary: "Crypto AI Bot duplicate rate is {{ $value | humanizePercentage }} (threshold: 0.1%)"
+          description: "Signal duplicate rate is above 0.1% for more than 5 minutes. This may indicate data integrity issues."
+          runbook_url: "https://docs.example.com/runbooks/high-duplicate-rate"
+
+      # Bot Heartbeat Missing Alert
+      # Additional alert for when the bot stops sending heartbeats entirely
+      - alert: CryptoAIBotHeartbeatMissing
+        expr: |
+          time() - bot_heartbeat_seconds > 300
+        for: 1m
+        labels:
+          severity: critical
+          component: heartbeat
+          slo: uptime
+        annotations:
+          summary: "Crypto AI Bot heartbeat missing for {{ $value }}s"
+          description: "Bot has not sent a heartbeat for more than 5 minutes. The bot may be down or unresponsive."
+          runbook_url: "https://docs.example.com/runbooks/missing-heartbeat"
+
+      # High Ingestor Disconnect Rate Alert
+      # Additional alert for data source connectivity issues
+      - alert: CryptoAIBotHighDisconnectRate
+        expr: |
+          rate(ingestor_disconnects_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: data_ingestion
+          slo: connectivity
+        annotations:
+          summary: "Crypto AI Bot high disconnect rate: {{ $value }} disconnects/sec"
+          description: "Data source disconnect rate is above 0.1 disconnects per second for more than 2 minutes."
+          runbook_url: "https://docs.example.com/runbooks/high-disconnect-rate"
+
+      # Redis Publish Errors Alert
+      # Additional alert for Redis connectivity issues
+      - alert: CryptoAIBotRedisPublishErrors
+        expr: |
+          rate(redis_publish_errors_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          component: redis
+          slo: connectivity
+        annotations:
+          summary: "Crypto AI Bot Redis publish errors: {{ $value }} errors/sec"
+          description: "Redis publish error rate is above 0.01 errors per second for more than 2 minutes."
+          runbook_url: "https://docs.example.com/runbooks/redis-errors"
+
+# Additional alert groups for different severity levels
+  - name: crypto_ai_bot_critical_alerts
+    rules:
+      # Critical: Bot completely down
+      - alert: CryptoAIBotDown
+        expr: |
+          up{job="crypto-ai-bot"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: availability
+        annotations:
+          summary: "Crypto AI Bot is DOWN"
+          description: "The crypto AI bot metrics endpoint is not responding."
+          runbook_url: "https://docs.example.com/runbooks/bot-down"
+
+  - name: crypto_ai_bot_info_alerts
+    rules:
+      # Info: Bot started/restarted
+      - alert: CryptoAIBotStarted
+        expr: |
+          increase(bot_uptime_seconds[1m]) > 0
+        for: 0m
+        labels:
+          severity: info
+          component: lifecycle
+        annotations:
+          summary: "Crypto AI Bot started"
+          description: "The crypto AI bot has started or restarted."

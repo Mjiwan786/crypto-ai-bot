@@ -1,0 +1,99 @@
+{
+  "additionalProperties": false,
+  "description": "Runtime policy broadcast from MCP to agents.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "description": "Schema version for compatibility",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "policy.update",
+      "default": "policy.update",
+      "title": "Type",
+      "type": "string"
+    },
+    "active_strategies": {
+      "description": "Set of active strategies",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Active Strategies",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "allocations": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "description": "Strategy allocations (sum ~= 1.0)",
+      "examples": [
+        {
+          "scalp": 0.4,
+          "trend_following": 0.6
+        }
+      ],
+      "title": "Allocations",
+      "type": "object"
+    },
+    "risk_overrides": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Risk parameter overrides",
+      "examples": [
+        {
+          "daily_stop": -0.03,
+          "max_spread_bps": 12
+        }
+      ],
+      "title": "Risk Overrides"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional notes",
+      "title": "Notes"
+    },
+    "timestamp": {
+      "description": "UTC epoch seconds",
+      "title": "Timestamp",
+      "type": "number"
+    }
+  },
+  "required": [
+    "active_strategies",
+    "allocations",
+    "timestamp"
+  ],
+  "title": "PolicyUpdate",
+  "type": "object"
+}

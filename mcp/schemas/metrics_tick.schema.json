@@ -1,0 +1,79 @@
+{
+  "additionalProperties": false,
+  "description": "Periodic metrics snapshot from agents to MCP.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "description": "Schema version for compatibility",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "metrics.tick",
+      "default": "metrics.tick",
+      "title": "Type",
+      "type": "string"
+    },
+    "pnl": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "description": "P&L metrics",
+      "examples": [
+        {
+          "fees": 12.75,
+          "realized": 150.25,
+          "unrealized": -45.5
+        }
+      ],
+      "title": "Pnl",
+      "type": "object"
+    },
+    "slippage_bps_p50": {
+      "description": "50th percentile slippage in bps",
+      "minimum": 0.0,
+      "title": "Slippage Bps P50",
+      "type": "number"
+    },
+    "latency_ms_p95": {
+      "description": "95th percentile latency in ms",
+      "minimum": 0.0,
+      "title": "Latency Ms P95",
+      "type": "number"
+    },
+    "win_rate_1h": {
+      "description": "1-hour win rate",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Win Rate 1H",
+      "type": "number"
+    },
+    "drawdown_daily": {
+      "description": "Daily drawdown (negative values acceptable)",
+      "title": "Drawdown Daily",
+      "type": "number"
+    },
+    "errors_rate": {
+      "description": "Error rate",
+      "minimum": 0.0,
+      "title": "Errors Rate",
+      "type": "number"
+    },
+    "timestamp": {
+      "description": "UTC epoch seconds",
+      "title": "Timestamp",
+      "type": "number"
+    }
+  },
+  "required": [
+    "pnl",
+    "slippage_bps_p50",
+    "latency_ms_p95",
+    "win_rate_1h",
+    "drawdown_daily",
+    "errors_rate",
+    "timestamp"
+  ],
+  "title": "MetricsTick",
+  "type": "object"
+}

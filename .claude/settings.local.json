@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda run:*)",
+      "Bash(python:*)",
+      "Bash(ruff check:*)",
+      "Bash(tree:*)",
+      "Bash(dir /B agentscore)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "bot-ops"
+  ]
+}

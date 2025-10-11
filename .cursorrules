@@ -1,0 +1,16 @@
+# === Hard rules ===
+- Pydantic v2 only; no v1 compat.
+- agents/risk/** are PURE LOGIC: no env reads, no network/Redis I/O.
+- UTC-only time in pure modules; deterministic outputs.
+- Do not open or paste secrets from .env, *.pem, secrets/**, or API keys.
+
+# === Tests & style ===
+- Tests in tests/** with pytest, stable public APIs unless told otherwise.
+- Black + Ruff must pass; provide minimal cohesive diffs.
+
+# === Trading/risk principles ===
+- Gates fail closed; explicit GateDecision models; clear invariants.
+- Infrastructure I/O (Redis, Kraken, HTTP) lives in dedicated modules only.
+
+# === Commit etiquette ===
+- Update tests/docs in the same diff when APIs change.

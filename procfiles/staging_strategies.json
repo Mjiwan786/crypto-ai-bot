@@ -1,0 +1,45 @@
+{
+  "description": "Signal and strategy agents for staging environment",
+  "stage": "strategies",
+  "procs": [
+    {
+      "name": "strategy_scalper",
+      "cmd": ["python", "scripts/run_mock_signal_analyst.py"],
+      "env": {
+        "STRATEGY": "scalping",
+        "SYMBOL": "BTC/USD",
+        "OUTPUT_STREAM": "signals:staging",
+        "LOG_LEVEL": "INFO"
+      },
+      "ready_regex": "Mock signal analyst ready|Redis connection established",
+      "log": "logs/strategy_scalper.log",
+      "description": "Mock scalping strategy signal analyst"
+    },
+    {
+      "name": "strategy_trend_following",
+      "cmd": ["python", "scripts/run_mock_signal_analyst.py"],
+      "env": {
+        "STRATEGY": "trend_following",
+        "SYMBOL": "BTC/USD",
+        "OUTPUT_STREAM": "signals:staging",
+        "LOG_LEVEL": "INFO"
+      },
+      "ready_regex": "Mock signal analyst ready|Redis connection established",
+      "log": "logs/strategy_trend_following.log",
+      "description": "Mock trend following strategy signal analyst"
+    },
+    {
+      "name": "strategy_momentum",
+      "cmd": ["python", "scripts/run_mock_signal_analyst.py"],
+      "env": {
+        "STRATEGY": "momentum",
+        "SYMBOL": "ETH/USD",
+        "OUTPUT_STREAM": "signals:staging",
+        "LOG_LEVEL": "INFO"
+      },
+      "ready_regex": "Mock signal analyst ready|Redis connection established",
+      "log": "logs/strategy_momentum.log",
+      "description": "Mock momentum strategy signal analyst"
+    }
+  ]
+}

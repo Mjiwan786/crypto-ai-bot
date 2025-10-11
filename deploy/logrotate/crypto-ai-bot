@@ -1,0 +1,11 @@
+/opt/crypto-ai-bot/logs/*.log {
+  weekly
+  rotate 8
+  compress
+  missingok
+  copytruncate
+  notifempty
+}
+
+
+

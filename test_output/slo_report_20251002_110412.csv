@@ -1,0 +1,2 @@
+window_hours,total_signals,unique_signals,dup_rate,p95_latency_ms,stream_lag_p95_sec,uptime_ratio,breaches,warnings,timestamp,environment
+1,1000,953,0.04700000000000004,0.0,0.0,1.0,"[""Duplicate rate 0.0470 > 0.0010""]","[""Uptime 1.000 approaching threshold""]",1759403052.9998012,production

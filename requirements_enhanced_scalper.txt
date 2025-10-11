@@ -1,0 +1,41 @@
+# ===============================================
+# Enhanced Scalper Agent Requirements
+# Additional dependencies for scalping strategies
+# ===============================================
+
+# Include base requirements
+-r requirements.txt
+
+# --- Performance optimizations ---
+uvloop>=0.19.0; sys_platform != "win32"
+uvloop-windows>=0.1.2; sys_platform == "win32"
+
+# --- Advanced technical analysis ---
+ta-lib==0.6.4
+talib-binary==0.4.19; sys_platform == "win32"
+
+# --- High-frequency data processing ---
+numba>=0.59.0
+cython>=3.0.0
+
+# --- Scalping-specific libraries ---
+ccxt[pro]==4.4.98
+asyncio-mqtt>=0.11.0
+
+# --- Memory optimization ---
+memory-profiler>=0.60.0
+pympler>=0.9
+
+# --- Advanced ML for scalping ---
+optuna>=3.0.0
+hyperopt>=0.2.7
+
+# --- Real-time monitoring ---
+influxdb-client>=1.40.0
+grafana-api>=1.0.3
+
+# --- Development tools ---
+black==25.1.0
+ruff==0.13.0
+mypy==1.18.1
+pre-commit>=3.0.0

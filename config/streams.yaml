@@ -1,0 +1,23 @@
+---
+# Single source of truth for Redis stream names
+# This file centralizes all stream naming to prevent drift across configs
+streams:
+  prefix: "kraken"
+  sep: ":"
+  publish:
+    trades:   "kraken:trades:{symbol}"
+    orderbook: "kraken:orderbook:{symbol}"
+    ticker:   "kraken:ticker:{symbol}"
+    ohlcv:    "kraken:ohlc:{timeframe}:{symbol}"
+    orders:   "kraken:orders:{symbol}"
+    fills:    "kraken:fills:{symbol}"
+    positions: "kraken:positions"
+    balance:  "kraken:balance"
+    heartbeat: "kraken:heartbeat"
+    status:   "kraken:status"
+    errors:   "kraken:errors"
+    metrics:  "kraken:metrics"
+  subscribe:
+    signals:           "signals:kraken:{symbol}"
+    risk_alerts:       "risk:alerts:kraken"
+    portfolio_updates: "portfolio:updates"

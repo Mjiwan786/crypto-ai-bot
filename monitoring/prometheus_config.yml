@@ -1,0 +1,6 @@
+
+# Prometheus scrape configuration
+scrape_configs:
+  - job_name: 'crypto_ai_bot'
+    static_configs:
+      - targets: ['localhost:8000']

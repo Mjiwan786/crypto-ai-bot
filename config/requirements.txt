@@ -1,0 +1,2 @@
+# Configuration system requirements
+PyYAML>=6.0

@@ -1,0 +1,8 @@
+# Kraken exchange specific configuration
+api_key: "${KRAKEN_API_KEY}"
+api_secret: "${KRAKEN_API_SECRET}"
+base_url: "https://api.kraken.com"
+ws_url: "wss://ws.kraken.com"
+timeout_seconds: 30
+rate_limit_per_second: 1
+max_retries: 3

@@ -1,0 +1,392 @@
+# =============================================================================
+# CRYPTO-AI-BOT: Enhanced Kraken OHLCV Configuration (Production)
+# =============================================================================
+# Notes:
+# - Uses env vars where possible to allow dev/staging/prod switches without edits
+# - Kraken native OHLC intervals: 1,5,15,30,60,240,1440 (minutes)
+# - Synthetic sub-minute bars must be derived from trades/ticks (bucketed)
+# =============================================================================
+
+exchange:
+  name: "kraken"
+  display_name: "Kraken Pro"
+  api_version: "v1"
+  region: "global"
+
+  connection:
+    rest_base_url: "${KRAKEN_API_URL:https://api.kraken.com}"
+    ws_public_url: "wss://ws.kraken.com"
+    ws_private_url: "wss://ws-auth.kraken.com"
+    timeout: 30        # seconds
+    retry_attempts: 5
+    retry_backoff: 2.0 # exponential base
+
+  rate_limits:
+    rest_public_rpm: 60
+    rest_private_rpm: 60
+    websocket_msgs_rpm: 50
+
+# =============================================================================
+# TIMEFRAME CONFIGURATION
+# =============================================================================
+timeframes:
+  primary:  # Kraken-native OHLC
+    "1m":   { kraken_interval: 1,    seconds: 60,    redis_stream: "kraken:ohlc:1m",   buffer_size: 2000, ml_features: true }
+    "5m":   { kraken_interval: 5,    seconds: 300,   redis_stream: "kraken:ohlc:5m",   buffer_size: 1500, ml_features: true }
+    "15m":  { kraken_interval: 15,   seconds: 900,   redis_stream: "kraken:ohlc:15m",  buffer_size: 1000, ml_features: true }
+    "30m":  { kraken_interval: 30,   seconds: 1800,  redis_stream: "kraken:ohlc:30m",  buffer_size: 800,  ml_features: true }
+    "1h":   { kraken_interval: 60,   seconds: 3600,  redis_stream: "kraken:ohlc:1h",   buffer_size: 1680, ml_features: true } # ~10 weeks
+    "4h":   { kraken_interval: 240,  seconds: 14400, redis_stream: "kraken:ohlc:4h",   buffer_size: 180,  ml_features: true } # ~30 days
+    "1d":   { kraken_interval: 1440, seconds: 86400, redis_stream: "kraken:ohlc:1d",   buffer_size: 400,  ml_features: true } # ~1.1y
+
+  synthetic:
+    # Sub-minute bars MUST derive from trades/ticks using time bucketing (no downsampling of 1m)
+    "15s":
+      derive_from: "trades"          # trades/ticks source
+      method: "time_bucket"
+      seconds: 15
+      redis_stream: "kraken:ohlc:15s"
+      buffer_size: 4000
+      ml_features: true
+      scalper_optimized: true
+    "30s":
+      derive_from: "trades"
+      method: "time_bucket"
+      seconds: 30
+      redis_stream: "kraken:ohlc:30s"
+      buffer_size: 3000
+      ml_features: true
+
+    # Coarser multi-minute bars are rollups of 1m
+    "2m":
+      derive_from: "1m"
+      method: "rollup"                # aggregate 2x 1m bars
+      seconds: 120
+      redis_stream: "kraken:ohlc:2m"
+      buffer_size: 1200
+      ml_features: false
+    "3m":
+      derive_from: "1m"
+      method: "rollup"                # aggregate 3x 1m bars
+      seconds: 180
+      redis_stream: "kraken:ohlc:3m"
+      buffer_size: 900
+      ml_features: false
+
+# =============================================================================
+# TRADING PAIRS CONFIGURATION
+# =============================================================================
+trading_pairs:
+  # Tick sizes reflect Kraken min price increments for spot pairs (decimal sizes are illustrative; validate at startup)
+  tier_1:
+    - symbol: "BTC/USD"
+      kraken_symbol: "XBTUSD"
+      base: "BTC"
+      quote: "USD"
+      min_volume: 0.0001
+      tick_size: 0.1
+      min_notional: 5.0
+      max_leverage: 5
+      spread_tolerance_bps: 5     # 0.05%
+      liquidity_tier: "high"
+      ml_priority: 1
+
+    - symbol: "ETH/USD"
+      kraken_symbol: "ETHUSD"
+      base: "ETH"
+      quote: "USD"
+      min_volume: 0.001
+      tick_size: 0.01
+      min_notional: 5.0
+      max_leverage: 5
+      spread_tolerance_bps: 5
+      liquidity_tier: "high"
+      ml_priority: 1
+
+    - symbol: "BTC/EUR"
+      kraken_symbol: "XBTEUR"
+      base: "BTC"
+      quote: "EUR"
+      min_volume: 0.0001
+      tick_size: 0.1
+      min_notional: 5.0
+      max_leverage: 5
+      spread_tolerance_bps: 5
+      liquidity_tier: "high"
+      ml_priority: 2
+
+  tier_2:
+    - symbol: "ADA/USD"
+      kraken_symbol: "ADAUSD"
+      base: "ADA"
+      quote: "USD"
+      min_volume: 1.0
+      tick_size: 0.0001
+      min_notional: 5.0
+      max_leverage: 3
+      spread_tolerance_bps: 10
+      liquidity_tier: "medium"
+      ml_priority: 3
+
+    - symbol: "SOL/USD"
+      kraken_symbol: "SOLUSD"
+      base: "SOL"
+      quote: "USD"
+      min_volume: 0.01
+      tick_size: 0.001
+      min_notional: 5.0
+      max_leverage: 3
+      spread_tolerance_bps: 8
+      liquidity_tier: "medium"
+      ml_priority: 3
+
+    - symbol: "AVAX/USD"
+      kraken_symbol: "AVAXUSD"
+      base: "AVAX"
+      quote: "USD"
+      min_volume: 0.1
+      tick_size: 0.001
+      min_notional: 5.0
+      max_leverage: 3
+      spread_tolerance_bps: 8
+      liquidity_tier: "medium"
+      ml_priority: 4
+
+  tier_3:
+    - symbol: "LINK/USD"
+      kraken_symbol: "LINKUSD"
+      base: "LINK"
+      quote: "USD"
+      min_volume: 0.1
+      tick_size: 0.001
+      min_notional: 5.0
+      max_leverage: 2
+      spread_tolerance_bps: 15
+      liquidity_tier: "low"
+      ml_priority: 5
+
+# =============================================================================
+# DATA STREAM CONFIGURATION
+# =============================================================================
+streams:
+  redis:
+    url: "${REDIS_URL:redis://localhost:6379/0}"
+    ssl: "${REDIS_SSL:false}"
+    decode_responses: true
+
+    stream_prefix: "kraken:ohlc"   # final key: <prefix>:<tf>:<pair>, e.g. kraken:ohlc:1m:BTC-USD
+
+    retention:
+      max_length: 100000     # XADD MAXLEN ~
+      max_age_seconds: 86400 # soft policy via janitor
+
+    consumer_groups:
+      - name: "scalper_agents"
+        timeframes: ["15s", "30s", "1m"]
+        lag_threshold_msgs: 5
+      - name: "trend_agents"
+        timeframes: ["5m", "15m", "30m", "1h"]
+        lag_threshold_msgs: 30
+      - name: "swing_agents"
+        timeframes: ["1h", "4h", "1d"]
+        lag_threshold_msgs: 300
+      - name: "ml_processors"
+        timeframes: ["1m", "5m", "15m", "1h"]
+        lag_threshold_msgs: 10
+
+  websocket:
+    ohlc_subscription:
+      name: "ohlc"
+      interval_map: { 1: "1m", 5: "5m", 15: "15m", 30: "30m", 60: "1h", 240: "4h", 1440: "1d" }
+
+    heartbeat_interval: 30     # seconds
+    reconnect_delay: 5
+    max_reconnects: 10
+
+    buffer_size: 2000
+    batch_size: 50
+    flush_interval: 1.0        # seconds
+
+# =============================================================================
+# VALIDATION & QUALITY CONTROL
+# =============================================================================
+validation:
+  quality_checks:
+    price_validation:
+      enabled: true
+      max_price_change: 0.15       # 15% candle-to-candle
+      min_price: 0.00000001
+      max_price: 1000000
+    volume_validation:
+      enabled: true
+      min_volume: 0.0
+      volume_spike_threshold: 10.0 # 10x trailing mean
+    ohlc_validation:
+      enabled: true
+      check_high_low: true         # high >= open,close ; low <= open,close
+      check_zero_volume: true
+    timestamp_validation:
+      enabled: true
+      max_delay_seconds: 60
+      duplicate_check: true
+
+  anomaly_detection:
+    enabled: true
+    algorithms: ["isolation_forest", "statistical_outlier", "price_jump_detector"]
+    sensitivity: 0.05
+
+  circuit_breakers:
+    price_circuit_breaker:  { enabled: true, threshold: 0.20, cooldown_seconds: 300 }
+    volume_circuit_breaker: { enabled: true, threshold: 20.0, cooldown_seconds: 60  }
+
+# =============================================================================
+# BACKTEST CONFIGURATION
+# =============================================================================
+backtest:
+  data_source:
+    primary: "redis_cache"
+    fallback: "kraken_api"
+
+  history_limits:
+    max_candles: 10000
+    max_days: 365
+
+  consistency_checks:
+    enabled: true
+    price_tolerance: 0.0001
+    volume_tolerance: 0.01
+
+  optimization:
+    parallel_loading: true
+    chunk_size: 1000
+    compression: true
+    cache_results: true
+
+# =============================================================================
+# MACHINE LEARNING FEATURES
+# =============================================================================
+ml_features:
+  technical_indicators:
+    trend:      ["sma_9", "sma_21", "sma_50", "ema_12", "ema_26", "macd", "rsi_14", "adx_14"]
+    volatility: ["bollinger_bands", "atr_14", "true_range", "volatility_ratio"]
+    momentum:   ["stoch_k", "stoch_d", "williams_r", "momentum_10", "roc_10"]
+    volume:     ["volume_sma_20", "volume_ratio", "obv", "vwap"]
+
+  custom_features:
+    price_features: ["price_returns", "log_returns", "price_acceleration", "normalized_price"]
+    time_features:  ["hour_of_day", "day_of_week", "minute_of_hour", "session_type"]
+    market_microstructure: ["bid_ask_spread", "order_flow_imbalance", "trade_intensity", "volatility_clustering"]
+
+  pipeline:
+    normalization: { method: "robust_scaler", window_size: 100 }
+    lag_features:  { enabled: true, max_lags: 10 }
+    rolling_features: { enabled: true, windows: [5, 10, 20, 50] }
+    interaction_features: { enabled: true, max_interactions: 2 }
+
+# =============================================================================
+# RISK MANAGEMENT INTEGRATION
+# =============================================================================
+risk_management:
+  volatility:
+    measurement_window: 20
+    high_vol_threshold: 0.05
+    extreme_vol_threshold: 0.10
+
+  position_sizing:
+    volatility_adjusted: true
+    lookback_period: 50
+    confidence_interval: 0.95
+
+  correlation:
+    enabled: true
+    pairs_to_monitor:
+      - ["BTC/USD", "ETH/USD"]
+      - ["BTC/USD", "SOL/USD"]
+      - ["ETH/USD", "ADA/USD"]
+    correlation_threshold: 0.8
+
+  drawdown:
+    enabled: true
+    max_drawdown: 0.05
+    lookback_window: 100
+
+# =============================================================================
+# PERFORMANCE & MONITORING
+# =============================================================================
+performance:
+  metrics:
+    enabled: true
+    collection_interval: 60
+    latency_tracking:   { enabled: true, percentiles: [50, 90, 95, 99] }
+    throughput_tracking:{ enabled: true, window_size: 300 }
+    error_tracking:     { enabled: true, error_rate_threshold: 0.01 }
+
+  health_checks:
+    data_freshness:   { enabled: true, max_age_seconds: 120 }
+    stream_lag:       { enabled: true, max_lag_msgs: 10 }
+    connection_health:{ enabled: true, check_interval: 30 }
+
+# =============================================================================
+# AGENT INTEGRATION
+# =============================================================================
+agent_integration:
+  scalper_agent:
+    timeframes: ["15s", "30s", "1m"]
+    features: ["price_returns", "volume_ratio", "rsi_14", "macd"]
+    latency_target_ms: 50
+
+  trend_agent:
+    timeframes: ["5m", "15m", "30m", "1h"]
+    features: ["sma_21", "ema_12", "adx_14", "bollinger_bands"]
+    latency_target_ms: 500
+
+  swing_agent:
+    timeframes: ["1h", "4h", "1d"]
+    features: ["sma_50", "macd", "rsi_14", "volume_sma_20"]
+    latency_target_ms: 5000
+
+  ml_agent:
+    timeframes: ["1m", "5m", "15m"]
+    features: "all"
+    model_update_frequency_s: 300
+    feature_importance_tracking: true
+
+# =============================================================================
+# LOGGING & DEBUGGING
+# =============================================================================
+logging:
+  level: "${LOG_LEVEL:INFO}"
+  format: "structured"  # JSON-friendly
+
+  components:
+    websocket: "DEBUG"
+    validation: "INFO"
+    ml_features: "INFO"
+    performance: "WARNING"
+
+  rotation:
+    max_size: "100MB"
+    backup_count: 7
+
+  metrics_logging:
+    enabled: true
+    interval: 300
+    include_features: true
+
+# =============================================================================
+# EMERGENCY PROCEDURES
+# =============================================================================
+emergency:
+  kill_switches:
+    data_quality_kill: { enabled: true, bad_data_threshold: 0.10 }
+    latency_kill:      { enabled: true, max_latency_ms: 5000 }
+    error_rate_kill:   { enabled: true, error_threshold: 0.05 }
+
+  degradation:
+    fallback_timeframes: ["1m", "5m", "1h"]
+    reduced_pairs: ["BTC/USD", "ETH/USD"]
+
+  recovery:
+    auto_recovery: true
+    recovery_delay_seconds: 300
+    max_recovery_attempts: 3

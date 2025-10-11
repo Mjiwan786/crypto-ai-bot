@@ -1,0 +1,40 @@
+# Production environment overrides
+mode: LIVE
+
+logging:
+  level: INFO
+  dir: "logs/production"
+
+risk:
+  max_position_pct: 0.05
+  max_daily_loss_pct: 0.10
+  max_concurrent_positions: 5
+
+strategies:
+  allocations:
+    scalper: 0.4
+    trend: 0.3
+    mean_reversion: 0.2
+    breakout: 0.1
+
+redis:
+  host: "prod-redis.example.com"
+  port: 6379
+
+kraken:
+  timeout: 60
+  retry_attempts: 5
+  retry_delay: 2.0
+
+monitoring:
+  metrics_enabled: true
+  prometheus_port: 9090
+  health_check_interval: 30
+  alert_thresholds:
+    max_drawdown_pct: 0.12
+    max_position_risk_pct: 0.06
+
+performance:
+  enable_profiling: false
+  memory_limit_mb: 4096
+  cpu_limit_percent: 90

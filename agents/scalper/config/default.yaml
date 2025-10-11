@@ -1,0 +1,54 @@
+# Scalper agent configuration
+scalper:
+  # Market data parameters
+  lookback_window: 50
+  min_liquidity: 10000
+  max_spread_pct: 0.002
+  min_volume_24h: 50000
+  
+  # Order management
+  order_size_pct: 0.01
+  max_order_size_usd: 1000
+  min_order_size_usd: 10
+  order_timeout_secs: 30
+  
+  # Timing controls
+  cooldown_secs: 30
+  max_orders_per_minute: 10
+  max_orders_per_hour: 100
+  
+  # Risk management
+  max_daily_trades: 200
+  max_consecutive_losses: 5
+  stop_loss_pct: 0.015
+  take_profit_pct: 0.008
+  
+  # Technical indicators
+  ema_fast: 12
+  ema_slow: 26
+  rsi_period: 14
+  rsi_oversold: 30
+  rsi_overbought: 70
+  bollinger_period: 20
+  bollinger_std: 2
+  
+  # Market conditions
+  min_volatility: 0.001
+  max_volatility: 0.05
+  trend_threshold: 0.002
+  
+  # Execution parameters
+  slippage_tolerance: 0.0005
+  price_impact_threshold: 0.001
+  execution_priority: "speed"  # speed | cost | balanced
+  
+  # Monitoring
+  enable_debug_logs: false
+  log_trade_details: true
+  performance_tracking: true
+  
+  # Advanced features
+  enable_machine_learning: true
+  ml_model_update_frequency: "hourly"
+  adaptive_parameters: true
+  market_regime_detection: true

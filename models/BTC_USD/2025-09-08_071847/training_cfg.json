@@ -1,0 +1,24 @@
+{
+  "trainer_version": "test-suite",
+  "feature_schema_version": "v1.0.0",
+  "calibration_input": "proba",
+  "model_params": {
+    "C": 1.0,
+    "class_weight": null,
+    "dual": false,
+    "fit_intercept": true,
+    "intercept_scaling": 1,
+    "l1_ratio": null,
+    "max_iter": 100,
+    "multi_class": "deprecated",
+    "n_jobs": null,
+    "penalty": "l2",
+    "random_state": 42,
+    "solver": "liblinear",
+    "tol": 0.0001,
+    "verbose": 0,
+    "warm_start": false
+  },
+  "n_samples": 1000,
+  "n_features": 10
+}

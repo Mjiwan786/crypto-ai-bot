@@ -1,0 +1,489 @@
+# =============================================================================
+# CRYPTO-AI-BOT: Kraken Exchange Configuration (Production-Ready)
+# =============================================================================
+# Single source of truth for Kraken Spot. Env-first, validated on preflight.
+# =============================================================================
+
+exchange:
+  name: "kraken"
+  display_name: "Kraken Pro"
+  exchange_id: "KRKN"
+  api_version: "v1"
+  region: "global"
+
+  environment:
+    # Use ENVIRONMENT=dev|staging|prod in .env for app behavior
+    environment_var: "${ENVIRONMENT:prod}"
+    sandbox: "${KRAKEN_SANDBOX:false}"   # when true, prefer sandbox REST if available
+
+  endpoints:
+    rest:
+      base_url: "${KRAKEN_API_URL:https://api.kraken.com}"
+      sandbox_url: "${KRAKEN_API_SANDBOX:https://api.sandbox.kraken.com}"
+      timeout_seconds: 30
+      max_retries: 3
+    websocket:
+      public_url: "wss://ws.kraken.com"
+      private_url: "wss://ws-auth.kraken.com"
+      # Optional sandbox WS; leave empty if not provided by Kraken
+      sandbox_public_url: "${KRAKEN_WS_SANDBOX_PUBLIC:}"
+      sandbox_private_url: "${KRAKEN_WS_SANDBOX_PRIVATE:}"
+      heartbeat_interval: 30
+      reconnect_delay: 5
+      max_reconnects: 10
+
+  timing:
+    clock_skew_tolerance_ms: 1500
+    ntp_servers: ["time.cloudflare.com","pool.ntp.org"]
+    sync_check_interval_seconds: 3600
+
+  health_check:
+    system_status_path: "/0/public/SystemStatus"
+    interval_seconds: 60
+    timeout_seconds: 10
+    alert_threshold_failures: 5
+
+# =============================================================================
+# AUTH & SECURITY
+# =============================================================================
+auth:
+  credentials:
+    key_env: "KRAKEN_API_KEY"
+    secret_env: "KRAKEN_API_SECRET"
+    # Kraken Spot has no passphrase; omit to prevent confusion
+
+  # Optional dedicated keys per agent (use only if you truly run multiple API keys)
+  agent_keys:
+    scalper_agent:
+      key_env: "${KRAKEN_SCALPER_KEY:}"
+      secret_env: "${KRAKEN_SCALPER_SECRET:}"
+      permissions: ["query","trade"]
+    market_data_agent:
+      key_env: "${KRAKEN_DATA_KEY:}"
+      secret_env: "${KRAKEN_DATA_SECRET:}"
+      permissions: ["query"]
+
+  security:
+    require_live_confirmation: "${LIVE_TRADING_CONFIRMATION:}"  # must equal: I-accept-the-risk
+    two_factor_enabled: "${KRAKEN_2FA_ENABLED:false}"
+    ip_whitelist_enabled: "${KRAKEN_IP_WHITELIST:false}"
+    session_timeout_seconds: 3600
+
+  signature:
+    method: "HMAC-SHA512"
+    encoding: "base64"
+    nonce_method: "timestamp_microseconds"
+
+  safety:
+    kill_switch_env: "KRAKEN_EMERGENCY_STOP"
+    max_daily_volume_usd: "${MAX_DAILY_VOLUME:1000000}"
+    trading_hours_only: "${TRADING_HOURS_ONLY:false}"
+
+# =============================================================================
+# SYMBOLS (MAPPING & NORMALIZATION)
+# =============================================================================
+symbols:
+  delimiter_internal: "/"
+  delimiter_stream: "-"     # how streams render pairs, e.g. BTC-USD
+  normalize:                # Internal -> Kraken pair codes
+    "BTC/USD": "XBTUSD"
+    "BTC/EUR": "XBTEUR"
+    "ETH/USD": "ETHUSD"
+    "ETH/EUR": "ETHEUR"
+    "ADA/USD": "ADAUSD"
+    "SOL/USD": "SOLUSD"
+    "AVAX/USD": "AVAXUSD"
+    "LINK/USD": "LINKUSD"
+  denormalize:              # Kraken -> Internal
+    "XBTUSD": "BTC/USD"
+    "XBTEUR": "BTC/EUR"
+    "ETHUSD": "ETH/USD"
+    "ETHEUR": "ETH/EUR"
+    "ADAUSD": "ADA/USD"
+    "SOLUSD": "SOL/USD"
+    "AVAXUSD": "AVAX/USD"
+    "LINKUSD": "LINK/USD"
+
+  categories:
+    majors: ["XBTUSD","ETHUSD","XBTEUR","ETHEUR"]
+    altcoins: ["ADAUSD","SOLUSD","AVAXUSD","LINKUSD"]
+
+# =============================================================================
+# TRADING SPECS (PRECISION, FEES, MARGIN)
+# =============================================================================
+trading_specs:
+  # These are defaults; the bot should refresh from /0/public/AssetPairs at startup.
+  precision:
+    "XBTUSD": { price_dp: 1, size_dp: 6, tick_size: 0.1, lot_size: 0.000001, min_notional: 5.0 }
+    "ETHUSD": { price_dp: 2, size_dp: 5, tick_size: 0.01, lot_size: 0.00001, min_notional: 5.0 }
+    "ADAUSD": { price_dp: 4, size_dp: 2, tick_size: 0.0001, lot_size: 0.01, min_notional: 5.0 }
+    "SOLUSD": { price_dp: 3, size_dp: 4, tick_size: 0.001, lot_size: 0.0001, min_notional: 5.0 }
+    "AVAXUSD": { price_dp: 3, size_dp: 4, tick_size: 0.001, lot_size: 0.0001, min_notional: 5.0 }
+    "LINKUSD": { price_dp: 3, size_dp: 3, tick_size: 0.001, lot_size: 0.001, min_notional: 5.0 }
+
+  fees:
+    # Default fee schedule; strategy should recompute effective bps from live data when available
+    maker_bps_default: 16
+    taker_bps_default: 26
+    tiers_usd:  # example, update from live fee tier if available
+      - { up_to_volume: 50000, maker_bps: 16, taker_bps: 26 }
+      - { up_to_volume: 100000, maker_bps: 14, taker_bps: 24 }
+      - { up_to_volume: 250000, maker_bps: 12, taker_bps: 22 }
+      - { up_to_volume: 500000, maker_bps: 10, taker_bps: 20 }
+      - { up_to_volume: 1000000000, maker_bps: 8, taker_bps: 18 }  # catch-all
+
+  margin:
+    enabled: "${KRAKEN_MARGIN_ENABLED:false}"
+    max_leverage:
+      "XBTUSD": 5
+      "ETHUSD": 5
+      default: 1
+    requirements:
+      initial_margin_pct: 20.0
+      maintenance_margin_pct: 15.0
+
+# =============================================================================
+# ORDER POLICY (Kraken Spot)
+# =============================================================================
+order_policy:
+  defaults:
+    time_in_force: "GTC"
+    order_type: "limit"
+    post_only: true
+    reduce_only: false  # reduce-only mostly applies to derivatives; keep false for Spot
+    hidden: true        # Kraken supports hidden on Spot
+    iceberg: false      # Not supported on Kraken Spot
+    trailing_stop: true
+
+  allowed_order_types:
+    - "market"
+    - "limit"
+    - "stop_loss"
+    - "take_profit"
+    - "stop_loss_limit"
+    - "take_profit_limit"
+    - "trailing_stop"
+
+  allowed_tif: ["GTC","IOC","FOK","GTD"]
+
+  features:
+    post_only: true
+    hidden_orders: true
+    iceberg_orders: false
+    bracket_orders: false
+    oco_orders: false
+
+  validation:
+    min_order_size_check: true
+    max_order_size_check: true
+    price_band_check: true
+    balance_check: true
+    position_limit_check: true
+
+  safety:
+    idempotency_prefix: "crypto-ai-bot"
+    max_order_rate_rps: 1.5      # let rate-limiter enforce bursts
+    max_orders_per_symbol: 100
+    max_total_orders: 1000
+    duplicate_order_window_ms: 1000
+  emergency:
+    cancel_all_on_disconnect: true
+    max_slippage_bps: 50
+    position_size_limit_usd: 100000
+
+# =============================================================================
+# DATA STREAMS & FEEDS
+# =============================================================================
+streams:
+  redis:
+    url: "${REDIS_URL:redis://localhost:6379/0}"
+    ssl: "${REDIS_SSL:false}"
+    decode_responses: true
+
+  naming:
+    prefix: "kraken"
+    separator: ":"
+
+  publish:
+    trades:   "kraken:trades:{symbol}"         # XBTUSD -> trades:XBTUSD
+    orderbook:"kraken:orderbook:{symbol}"
+    ticker:   "kraken:ticker:{symbol}"
+    ohlcv:    "kraken:ohlc:{timeframe}:{symbol}"
+    orders:   "kraken:orders:{symbol}"
+    fills:    "kraken:fills:{symbol}"
+    positions:"kraken:positions"
+    balance:  "kraken:balance"
+    heartbeat:"kraken:heartbeat"
+    status:   "kraken:status"
+    errors:   "kraken:errors"
+    metrics:  "kraken:metrics"
+
+  subscribe:
+    signals:           "signals:kraken:{symbol}"
+    risk_alerts:       "risk:alerts:kraken"
+    portfolio_updates: "portfolio:updates"
+
+  websocket:
+    public:
+      ohlc:
+        enabled: true
+        timeframes_native: ["1","5","15","30","60","240","1440"]
+        symbols: ["XBTUSD","ETHUSD","ADAUSD","SOLUSD"]
+      book:
+        enabled: true
+        depth: 25
+        symbols: ["XBTUSD","ETHUSD"]
+      trade:
+        enabled: true
+        symbols: ["XBTUSD","ETHUSD","ADAUSD","SOLUSD"]
+      ticker:
+        enabled: true
+        symbols: ["XBTUSD","ETHUSD"]
+      spread:
+        enabled: false
+        symbols: []
+    private:
+      openOrders: { enabled: true }
+      ownTrades:  { enabled: true }
+
+  processing:
+    batch_size: 100
+    batch_timeout_ms: 100
+    buffer_size: 10000
+    buffer_high_watermark: 8000
+    buffer_low_watermark: 2000
+    max_retries: 5
+    retry_delay_ms: 1000
+    dead_letter_queue: "kraken:dlq"
+
+# =============================================================================
+# RISK GUARDS
+# =============================================================================
+risk_guards:
+  price_validation:
+    max_spread_bps:
+      "XBTUSD": 5
+      "ETHUSD": 8
+      "ADAUSD": 15
+      "SOLUSD": 12
+      default: 20
+    max_slippage_bps:
+      "XBTUSD": 10
+      "ETHUSD": 15
+      default: 25
+    max_price_deviation_pct: 2.0
+
+  liquidity_guards:
+    min_book_depth_usd:
+      "XBTUSD": 50000
+      "ETHUSD": 30000
+      default: 10000
+    max_order_pct_of_book: 10.0
+    min_daily_volume_usd:
+      "XBTUSD": 1000000
+      "ETHUSD": 500000
+      default: 100000
+
+  position_limits:
+    max_position_usd:
+      "XBTUSD": 500000
+      "ETHUSD": 300000
+      "ADAUSD": 100000
+      "SOLUSD": 150000
+      default: 50000
+    max_total_exposure_usd: 1000000
+    max_correlation_exposure: 0.7
+
+  volatility_guards:
+    max_volatility_pct:
+      "XBTUSD": 80.0
+      "ETHUSD": 100.0
+      default: 120.0
+    volatility_spike_threshold: 2.0
+
+  trading_windows:
+    enabled: false
+    start_hour_utc: 0
+    end_hour_utc: 24
+    weekend_trading: true
+
+  circuit_breakers:
+    price_circuit:   { enabled: true, threshold_pct: 10.0, duration_seconds: 300 }
+    volume_circuit:  { enabled: true, threshold_multiplier: 5.0, duration_seconds: 60 }
+    loss_circuit:    { enabled: true, daily_loss_limit_usd: 10000, total_loss_limit_usd: 50000 }
+
+  emergency_controls:
+    kill_switch:
+      env_var: "KRAKEN_EMERGENCY_STOP"
+      redis_key: "kraken:emergency:kill_switch"
+    auto_liquidation:
+      enabled: true
+      margin_call_threshold_pct: 80.0
+      liquidation_threshold_pct: 90.0
+
+# =============================================================================
+# AGENT INTEGRATION
+# =============================================================================
+agent_integration:
+  agents:
+    scalper:        { enabled: true,  symbols: ["XBTUSD","ETHUSD"], timeframes: ["1m","5m"],  max_position_usd: 50000,  max_orders: 20,  priority: "high" }
+    trend_follower: { enabled: true,  symbols: ["XBTUSD","ETHUSD","ADAUSD","SOLUSD"], timeframes: ["15m","1h","4h"], max_position_usd: 200000, max_orders: 10,  priority: "medium" }
+    risk_manager:   { enabled: true,  symbols: "all", timeframes: ["1m","5m","15m"], max_position_usd: 0, max_orders: 0, priority: "critical" }
+    arbitrage:      { enabled: false, symbols: ["XBTUSD","ETHUSD"], timeframes: ["1m"],       max_position_usd: 100000, max_orders: 50,  priority: "high" }
+
+  coordination:
+    shared_positions: true
+    order_conflicts: { resolution_method: "priority", max_conflict_window_ms: 100 }
+    risk_allocation: { method: "proportional", total_budget_usd: 1000000 }
+
+  communication:
+    messaging:  { enabled: true, redis_channel: "agents:kraken:comms" }
+    state_sync: { enabled: true, sync_interval_seconds: 5, redis_key_prefix: "agents:kraken:state" }
+
+# =============================================================================
+# MONITORING & ALERTS
+# =============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    collection_interval_seconds: 60
+    retention_days: 30
+    performance: ["latency_ms","throughput_rps","error_rate","success_rate","order_fill_rate"]
+    financial: ["pnl_realized","pnl_unrealized","volume_traded","fees_paid","slippage"]
+    risk: ["max_drawdown","var_95","expected_shortfall","correlation","volatility"]
+
+  health_checks:
+    connection:    { interval_seconds: 30, timeout_seconds: 10, retries: 3 }
+    data_freshness:{ max_age_seconds: 60, check_interval_seconds: 30 }
+    orderbook:     { min_levels: 5, max_spread_multiple: 2.0, check_interval_seconds: 10 }
+
+  alerts:
+    channels:
+      email: "${ALERT_EMAIL:}"
+      slack: "${ALERT_SLACK_WEBHOOK:}"
+      discord: "${ALERT_DISCORD_WEBHOOK:}"
+      telegram: "${ALERT_TELEGRAM_BOT:}"
+    rules:
+      critical:
+        - { name: "connection_lost", condition: "connection_status == 'down'", cooldown_seconds: 60 }
+        - { name: "large_loss",      condition: "daily_pnl < -10000",         cooldown_seconds: 300 }
+        - { name: "margin_call",     condition: "margin_usage > 80",          cooldown_seconds: 60 }
+      warning:
+        - { name: "high_slippage",   condition: "avg_slippage_bps > 25",      cooldown_seconds: 300 }
+        - { name: "low_liquidity",   condition: "book_depth_usd < min_book_depth_usd", cooldown_seconds: 600 }
+      info:
+        - { name: "daily_summary",   condition: "time == '23:59'",            cooldown_seconds: 86400 }
+
+# =============================================================================
+# BACKTEST & SIM
+# =============================================================================
+backtesting:
+  data_source: { primary: "kraken_api", fallback: "redis_cache" }
+  quality_checks: { enabled: true, max_gap_minutes: 5, min_trade_count: 10, price_spike_threshold: 0.1 }
+  simulation:
+    latency:  { enabled: true, base_latency_ms: 50, jitter_ms: 20 }
+    slippage: { enabled: true, linear_coefficient: 0.0001, sqrt_coefficient: 0.001 }
+    fills:    { partial_fill_probability: 0.1, market_impact_coefficient: 0.0005 }
+  attribution: { enabled: true, benchmark_symbol: "XBTUSD", risk_free_rate: 0.02 }
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+logging:
+  level: "${LOG_LEVEL:INFO}"
+  format: "json"
+  targets:
+    console: { enabled: true, level: "INFO" }
+    file:    { enabled: true, level: "DEBUG", path: "logs/kraken.log", max_size: "100MB", backup_count: 7 }
+  components:
+    websocket: "DEBUG"
+    orders: "INFO"
+    risk: "INFO"
+    metrics: "WARNING"
+    agents: "INFO"
+  security_masks:
+    mask_api_keys: true
+    mask_order_ids: false
+    mask_balances: true
+
+# =============================================================================
+# INCLUDES & FEATURES
+# =============================================================================
+integrations:
+  includes:
+    ohlcv_config: "config/exchange_configs/kraken_ohlcv.yaml"
+    rate_limits:  "config/exchange_configs/kraken_rate_limits.py"
+    fee_schedule: "config/exchange_configs/kraken_fees.yaml"
+
+features:
+  experimental:
+    ml_position_sizing: false
+    dynamic_fees: false
+    cross_exchange_arb: false
+  toggles:
+    advanced_orders: true
+    risk_overlays: true
+    performance_analytics: true
+    realtime_monitoring: true
+
+# =============================================================================
+# DEPLOYMENT & VALIDATION
+# =============================================================================
+deployment:
+  environment_overrides: { enabled: true, prefix: "KRAKEN_" }
+  validation:
+    enabled: true
+    strict_mode: true
+    fail_on_unknown_keys: false
+    # Preflight checks the following:
+    checks:
+      - "can_connect_rest"
+      - "can_connect_ws_public"
+      - "asset_pairs_precision_matches"
+      - "symbol_map_is_bijective"
+      - "redis_url_valid"
+  hot_reload:
+    enabled: false
+    watch_files:
+      - "config/exchange_configs/kraken.yaml"
+      - "config/exchange_configs/kraken_ohlcv.yaml"
+
+# =============================================================================
+# COMPLIANCE
+# =============================================================================
+compliance:
+  audit:
+    enabled: true
+    log_all_orders: true
+    log_position_changes: true
+    log_balance_changes: true
+    retention_days: 2555  # ~7 years
+  regulatory:
+    jurisdiction: "US"
+    mifid_ii: false
+    best_execution: true
+  reporting:
+    daily_risk_report: true
+    weekly_performance_report: true
+    monthly_compliance_report: true
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  version: "2.1.1"
+  schema_version: "1.0"
+  created_by: "crypto-ai-bot-system"
+  last_modified: "${CONFIG_LAST_MODIFIED:2025-09-26}"
+  dependencies:
+    kraken_ohlcv: ">=1.5.0"
+    kraken_rate_limits: ">=2.0.0"
+    risk_engine: ">=1.8.0"
+  compatibility:
+    min_python: "3.10"
+    max_python: "3.12"
+    kraken_api_version: "v1"
+  docs:
+    readme: "docs/exchanges/kraken.md"
+    api_docs: "https://docs.kraken.com/rest/"
+    changelog: "CHANGELOG.md"

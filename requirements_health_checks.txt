@@ -1,0 +1,13 @@
+# ===============================================
+# Health Check Dependencies
+# Minimal set for health monitoring
+# ===============================================
+
+# --- Core health check deps ---
+requests==2.32.4
+redis==5.0.8
+python-dotenv==1.1.1
+
+# --- Optional: Enhanced health checks ---
+psutil>=7.0.0
+pydantic>=2.11.9

@@ -1,0 +1,20 @@
+{
+  "description": "Execution agents for staging environment (PAPER mode only)",
+  "stage": "execution",
+  "procs": [
+    {
+      "name": "execution_paper",
+      "cmd": ["python", "scripts/run_execution_agent.py"],
+      "env": {
+        "MODE": "PAPER",
+        "INPUT_STREAM": "signals:staging",
+        "OUTPUT_STREAM": "exec:paper:confirms",
+        "LOG_LEVEL": "INFO",
+        "DRY_RUN": "true"
+      },
+      "ready_regex": "Execution agent ready|Redis connection established|PAPER mode",
+      "log": "logs/execution_paper.log",
+      "description": "Paper trading execution agent (no live orders)"
+    }
+  ]
+}

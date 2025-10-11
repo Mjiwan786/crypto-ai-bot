@@ -1,0 +1,79 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Python files
+*.py text diff=python
+
+# Configuration files
+*.{yml,yaml} text
+*.{json,toml} text
+*.{ini,cfg,conf} text
+
+# Documentation
+*.{md,rst,txt} text
+*.{adoc,asciidoc} text
+
+# Scripts
+*.{sh,bash} text eol=lf
+*.{ps1} text eol=crlf
+*.{bat,cmd} text eol=crlf
+
+# Docker files
+Dockerfile* text
+*.dockerfile text
+docker-compose*.yml text
+
+# Git files
+.gitignore text
+.gitattributes text
+.gitmodules text
+
+# CI/CD files
+.github/** text
+.gitlab-ci.yml text
+.travis.yml text
+.circleci/** text
+
+# License and legal
+LICENSE* text
+CHANGELOG* text
+SECURITY* text
+CONTRIBUTING* text
+README* text
+
+# Binary files that should not be normalized
+*.{png,jpg,jpeg,gif,ico,svg} binary
+*.{zip,tar,gz,bz2,7z} binary
+*.{pdf,doc,docx,xls,xlsx,ppt,pptx} binary
+*.{exe,dll,so,dylib} binary
+*.{pkl,pickle,bin} binary
+*.{whl,egg} binary
+
+# Model files
+*.{h5,hdf5,pb,pkl,pickle,bin,model} binary
+
+# Data files
+*.{csv,tsv,parquet,feather} text
+*.{sqlite,db} binary
+
+# Log files
+*.log text
+
+# Environment files (should not be committed but if they are, treat as text)
+.env* text
+
+# Lock files
+package-lock.json text
+yarn.lock text
+poetry.lock text
+Pipfile.lock text
+requirements-lock.txt text
+
+# Editor files
+.editorconfig text
+.vscode/settings.json text
+.idea/** text
+
+# OS files
+.DS_Store binary
+Thumbs.db binary

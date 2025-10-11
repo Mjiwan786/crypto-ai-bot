@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  bot:
+    build: .
+    env_file:
+      - compose.env.example
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+# ===============================================
+# Redis Cloud Configuration
+# ===============================================
+# To switch to Redis Cloud instead of local Redis:
+#
+# 1. Comment out or remove the 'redis' service above
+# 2. Set REDIS_URL in your compose.env.example:
+#    REDIS_URL=rediss://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+#
+# 3. The bot service will automatically use the Redis Cloud connection
+#    when REDIS_URL is set, and the healthcheck will ping the cloud instance
+#
+# 4. Make sure to have the CA certificate available for TLS connection:
+#    redis-cli -u redis://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert <path_to_ca_certfile>

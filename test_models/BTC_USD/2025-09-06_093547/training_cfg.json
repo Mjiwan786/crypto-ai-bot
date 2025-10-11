@@ -1,0 +1,40 @@
+{
+  "artifacts_dir": "test_models",
+  "calibrator": "platt",
+  "class_weight": "balanced",
+  "embargo_frac": 0.02,
+  "feature_cols": [
+    "feature_0",
+    "feature_1",
+    "feature_2",
+    "feature_3",
+    "feature_4",
+    "feature_5",
+    "feature_6",
+    "feature_7",
+    "feature_8",
+    "feature_9"
+  ],
+  "feature_list_sha256": "56276a0d1b0fb169c520d07f2578bddc9439d88dd53c791e3bfddc738fc52677",
+  "label_col": "y",
+  "max_iters": 200,
+  "metrics_focus": "auc",
+  "model_type": "logreg",
+  "n_splits": 5,
+  "purge_gap": 2,
+  "random_state": 17,
+  "strict_checks": true,
+  "symbol": "BTC/USD",
+  "tag": null,
+  "test_size_frac": 0.2,
+  "timeframe": "1h",
+  "versions": {
+    "lightgbm": "4.6.0",
+    "numpy": "2.2.6",
+    "pandas": "2.3.1",
+    "python": "3.10.18",
+    "sklearn": "1.7.1",
+    "xgboost": "3.0.3"
+  },
+  "warnings": []
+}

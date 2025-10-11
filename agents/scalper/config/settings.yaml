@@ -1,0 +1,60 @@
+# Scalper system configuration
+symbols:
+  - "BTC/USD"
+  - "ETH/USD"
+
+strategy: "scalping"
+mode: "live"
+timezone: "UTC"
+
+kraken:
+  base_url: "https://api.kraken.com"
+  ws_url: "wss://ws.kraken.com"
+  timeout_seconds: 30
+  rate_limit_per_second: 1
+  max_retries: 3
+
+risk:
+  max_position_size_usd: 10000.0
+  max_daily_loss_usd: 1000.0
+  max_drawdown_pct: 5.0
+  max_exposure_pct: 80.0
+  position_size_pct: 2.0
+  stop_loss_pct: 1.0
+  take_profit_pct: 2.0
+  max_orders_per_minute: 10
+  volatility_threshold: 0.02
+  toxic_flow_threshold: 0.6
+
+analysis:
+  lookback_ticks: 100
+  liquidity_threshold: 0.1
+  order_flow_window: 20
+  toxic_flow_window: 50
+  min_volume_usd: 1000.0
+  price_impact_threshold: 0.001
+
+execution:
+  slippage_model: "linear"
+  max_slippage_bps: 5
+  order_size_min_usd: 10.0
+  order_size_max_usd: 1000.0
+  execution_delay_ms: 100
+  partial_fill_threshold: 0.8
+  retry_delay_ms: 1000
+
+monitoring:
+  metrics_port: 8080
+  health_check_interval_ms: 5000
+  log_level: "INFO"
+  enable_metrics: true
+  enable_health_checks: true
+  latency_tracking: true
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  ssl: false
+  timeout_seconds: 5
+  max_connections: 10

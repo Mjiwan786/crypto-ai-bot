@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "bot-ops": {
+      "command": "python",
+      "args": ["-u", "ops_mcp.py"],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}

@@ -1,0 +1,576 @@
+# Enhanced Kraken Scalping Strategy Configuration
+# Ultra-high frequency trading with comprehensive analysis integration
+# Updated: 2025-09-21
+# Schema version lets the loader select correct validators.
+schema_version: "2.0"
+
+# -------------------------------
+# YAML anchors (DRY)
+# -------------------------------
+anchors:
+  bps_quality: &bps_quality
+    excellent_spread_bps: 1.0
+    good_spread_bps: 2.0
+    fair_spread_bps: 3.0
+    poor_spread_bps: 5.0
+
+  size_buckets_btc: &size_buckets_btc
+    small_order_btc: 0.1
+    medium_order_btc: 0.5
+    large_order_btc: 1.0
+
+# -------------------------------
+# Strategy Metadata
+# -------------------------------
+strategy:
+  name: "kraken_scalp_enhanced"
+  version: "2.0.0"
+  description: "Production-grade Kraken scalping with advanced market analysis"
+  author: "crypto-ai-bot"
+
+# -------------------------------
+# Core Scalping Parameters
+# -------------------------------
+scalping:
+  # Basic strategy configuration
+  enabled: "${SCALP_ENABLED:-true}"
+  timeframe: "${SCALP_TIMEFRAME:-15s}"
+  target_bps: "${SCALP_TARGET_BPS:-10}"          # absolute bps target (positive)
+  stop_loss_bps: "${SCALP_STOP_LOSS_BPS:-5}"     # absolute bps stop (positive)
+  max_hold_seconds: "${SCALP_MAX_HOLD_SECONDS:-120}"
+  max_slippage_bps: "${SCALP_MAX_SLIPPAGE_BPS:-4}"
+
+  # Enhanced profit targets with adaptive sizing
+  profit_targets:
+    primary_bps: 10
+    secondary_bps: 15
+    tertiary_bps: 20
+    partial_close_percentages: [50, 30, 20]      # must sum to 100
+    adaptive_targets: true
+    volatility_adjustment: true
+
+  # Enhanced stop loss configuration
+  stop_loss:
+    static_bps: 5
+    trailing_enabled: true
+    trailing_step_bps: 2
+    break_even_trigger_bps: 3
+    time_based_exit: true
+    adaptive_stops: true
+
+  # Market requirements with enhanced validation
+  market_requirements:
+    min_liquidity_usd: "${SCALP_MIN_LIQUIDITY_USD:-1000000}"
+    max_spread_bps: "${SCALP_MAX_SPREAD_BPS:-3}"
+    min_book_depth_btc: "${SCALP_MIN_BOOK_DEPTH_BTC:-2.0}"
+    book_imbalance_min: "${SCALP_BOOK_IMBALANCE_MIN:-0.65}"
+    min_book_depth_levels: "${SCALP_MIN_BOOK_DEPTH_LEVELS:-10}"
+    volume_consistency_check: true
+    price_stability_check: true
+
+  # Enhanced execution preferences
+  execution:
+    preferred_order_type: "${SCALP_PREFERRED_ORDER_TYPE:-limit}"
+    post_only: "${SCALP_POST_ONLY:-true}"
+    hidden_orders: "${SCALP_HIDDEN_ORDERS:-true}"
+    cancel_replace_threshold_bps: "${SCALP_CANCEL_REPLACE_THRESHOLD_BPS:-2}"
+    ioc_fallback: true
+    smart_order_routing: true
+    latency_optimization: true
+    order_size_randomization: true
+    # Safe default list + CSV override for env
+    execution_delay_randomization_ms: [0, 50]
+    execution_delay_randomization_ms_csv: "${SCALP_EXEC_DELAY_MS:-}"
+
+  # Enhanced rate limiting and safety
+  rate_limits:
+    max_trades_per_minute: "${SCALP_MAX_TRADES_PER_MINUTE:-4}"
+    max_trades_per_hour: "${SCALP_MAX_TRADES_PER_HOUR:-60}"
+    daily_trade_limit: "${SCALP_DAILY_TRADE_LIMIT:-150}"
+    cooldown_after_loss_seconds: "${SCALP_COOLDOWN_AFTER_LOSS_SECONDS:-90}"
+    max_consecutive_losses: 3
+    hourly_loss_limit_bps: -50
+    adaptive_rate_limiting: true
+
+  # Position sizing with enhanced risk management
+  position_sizing:
+    base_size_usd: "${SCALP_BASE_SIZE_USD:-100}"
+    max_size_usd: "${SCALP_MAX_SIZE_USD:-500}"
+    min_size_usd: "${SCALP_MIN_SIZE_USD:-25}"
+    volatility_adjustment: true
+    liquidity_adjustment: true
+    confidence_scaling: true
+    kelly_criterion: false
+    max_portfolio_allocation: 0.25
+
+  # Performance optimization
+  performance:
+    latency_target_ms: 25
+    cpu_affinity: [0, 1]
+    thread_priority: "high"
+    memory_preallocation: true
+    jit_compilation: false
+    batch_processing: false
+
+# -------------------------------
+# Enhanced Pair-Specific Configuration
+# -------------------------------
+pairs:
+  # Bitcoin USD - Primary scalping pair
+  "BTC/USD":
+    enabled: true
+    priority: 1
+
+    # Market specifications
+    min_order_size: 0.002
+    max_order_size: 0.1
+    price_increment: 0.1
+    size_increment: 0.00000001
+    min_notional: 5
+
+    # Strategy parameters
+    target_bps: 8
+    stop_loss_bps: 4
+    max_spread_bps: 2.5
+    min_book_depth_btc: 3.0
+
+    # Enhanced liquidity requirements
+    liquidity_requirements:
+      min_daily_volume_btc: 100
+      min_hourly_volume_btc: 4
+      max_volume_concentration: 0.3
+      min_market_makers: 3
+
+    # Risk controls
+    max_position_btc: 0.5
+    max_daily_trades: 80
+    max_hourly_trades: 12
+    concentration_limit: 0.4
+
+  # Ethereum USD - Secondary scalping pair
+  "ETH/USD":
+    enabled: true
+    priority: 2
+
+    # Market specifications
+    min_order_size: 0.02
+    max_order_size: 1.0
+    price_increment: 0.05
+    size_increment: 0.0000001
+    min_notional: 5
+
+    # Strategy parameters
+    target_bps: 10
+    stop_loss_bps: 5
+    max_spread_bps: 3.0
+    min_book_depth_btc: 2.0
+
+    # Enhanced liquidity requirements
+    liquidity_requirements:
+      min_daily_volume_btc: 50
+      min_hourly_volume_btc: 2
+      max_volume_concentration: 0.35
+      min_market_makers: 2
+
+    # Risk controls
+    max_position_btc: 2.0
+    max_daily_trades: 60
+    max_hourly_trades: 10
+    concentration_limit: 0.3
+
+  # Solana USD - Tertiary pair
+  "SOL/USD":
+    enabled: "${SCALP_SOL_ENABLED:-false}"
+    priority: 3
+
+    # Market specifications
+    min_order_size: 0.1
+    max_order_size: 10.0
+    price_increment: 0.001
+    size_increment: 0.000001
+    min_notional: 5
+
+    # Strategy parameters
+    target_bps: 12
+    stop_loss_bps: 6
+    max_spread_bps: 4.0
+    min_book_depth_btc: 1.0
+
+    # Risk controls
+    max_position_btc: 5.0
+    max_daily_trades: 40
+    max_hourly_trades: 8
+    concentration_limit: 0.2
+
+# -------------------------------
+# Advanced Market Analysis Integration
+# -------------------------------
+analysis:
+  # Liquidity Analysis Configuration
+  liquidity_analyzer:
+    enabled: true
+    update_frequency_ms: 250
+    depth_levels_to_analyze: 10
+
+    # Quality thresholds
+    quality_thresholds:
+      <<: *bps_quality
+
+    # Market impact thresholds
+    market_impact_thresholds:
+      <<: *size_buckets_btc
+
+    # Circuit breakers
+    circuit_breakers:
+      min_quality_score: 0.6
+      max_spread_volatility: 2.0
+      min_effective_depth_btc: 1.5
+
+  # Order Flow Analysis Configuration
+  order_flow_analyzer:
+    enabled: true
+    analysis_windows: [10, 30, 60, 300]
+    analysis_windows_csv: "${SCALP_OF_WINDOWS:-}"
+    min_trades_per_window: 3
+
+    # Size thresholds
+    size_thresholds:
+      large_trade_btc: 0.5
+      block_trade_btc: 2.0
+      whale_trade_btc: 10.0
+
+    # Signal thresholds
+    signal_thresholds:
+      strong_imbalance: 0.7
+      weak_imbalance: 0.3
+      flow_strength_min: 0.6
+
+    # Integration with strategy
+    strategy_integration:
+      use_flow_signals: true
+      flow_signal_weight: 0.3
+      imbalance_threshold: 0.6
+      momentum_confirmation: true
+
+  # Toxic Flow Detection Configuration
+  toxic_flow_detector:
+    enabled: true
+    analysis_windows: [30, 60, 300, 900]
+    analysis_windows_csv: "${SCALP_TOX_WINDOWS:-}"
+
+    # Toxicity thresholds
+    toxicity_thresholds:
+      high_toxicity: 0.7
+      medium_toxicity: 0.4
+      low_toxicity: 0.2
+
+    # Pattern detection
+    pattern_detection:
+      informed_trading: true
+      momentum_ignition: true
+      spoofing_detection: true
+      adverse_selection: true
+      stop_hunting: true
+
+    # Trading recommendations
+    trading_recommendations:
+      halt_on_high_toxicity: true
+      reduce_size_on_medium: true
+      increase_caution_on_low: true
+
+# -------------------------------
+# Signal Generation and Processing
+# -------------------------------
+signals:
+  # Signal sources and weights
+  sources:
+    liquidity_signals:   { enabled: true,  weight: 0.25, min_confidence: 0.7 }
+    order_flow_signals:  { enabled: true,  weight: 0.35, min_confidence: 0.6 }
+    technical_signals:   { enabled: true,  weight: 0.25, min_confidence: 0.7 }
+    sentiment_signals:   { enabled: true,  weight: 0.15, min_confidence: 0.6 }
+
+  # Signal processing
+  processing:
+    aggregation_method: "weighted_average"
+    confidence_threshold: 0.65
+    signal_timeout_seconds: 30
+    duplicate_detection: true
+    signal_validation: true
+
+  # Signal filtering
+  filtering:
+    toxicity_filter: true
+    liquidity_filter: true
+    volatility_filter: true
+    time_filter: true
+    correlation_filter: true
+
+  # Entry signal requirements
+  entry_requirements:
+    min_overall_confidence: 0.7
+    max_conflicting_signals: 1
+    liquidity_check: true
+    toxicity_check: true
+    regime_check: true
+
+# -------------------------------
+# Risk Management Integration
+# -------------------------------
+risk_management:
+  # Enhanced position limits
+  position_limits:
+    max_single_position_usd: 500
+    max_total_exposure_usd: 1500
+    max_correlation_exposure: 0.8
+    max_sector_exposure: 0.6
+
+  # Dynamic risk adjustment
+  dynamic_adjustment:
+    enabled: true
+    volatility_scaling: true
+    liquidity_scaling: true
+    correlation_adjustment: true
+    drawdown_scaling: true
+
+  # Circuit breakers specific to scalping
+  scalping_circuit_breakers:
+    max_slippage_bps: 6
+    max_execution_latency_ms: 200
+    min_fill_ratio: 0.9
+    max_partial_fills: 3
+
+  # Performance-based adjustments
+  performance_adjustments:
+    win_rate_threshold: 0.55
+    profit_factor_threshold: 1.2
+    sharpe_ratio_threshold: 1.0
+    max_drawdown_threshold: 0.05
+
+    # Actions on poor performance
+    poor_performance_actions:
+      reduce_position_size: true
+      increase_spread_threshold: true
+      reduce_trade_frequency: true
+      require_higher_confidence: true
+
+# -------------------------------
+# Market Regime Integration
+# -------------------------------
+regime_integration:
+  regime_adjustment:
+    enabled: true
+    regime_detection_window: 300
+
+  regime_parameters:
+    trending:
+      target_bps_adjustment: 1.2
+      stop_loss_adjustment: 0.8
+      position_size_adjustment: 1.1
+      frequency_adjustment: 0.9
+
+    ranging:
+      target_bps_adjustment: 1.0
+      stop_loss_adjustment: 1.0
+      position_size_adjustment: 1.0
+      frequency_adjustment: 1.0
+
+    volatile:
+      target_bps_adjustment: 1.5
+      stop_loss_adjustment: 0.7
+      position_size_adjustment: 0.8
+      frequency_adjustment: 0.7
+
+    calm:
+      target_bps_adjustment: 0.8
+      stop_loss_adjustment: 1.2
+      position_size_adjustment: 1.2
+      frequency_adjustment: 1.1
+
+# -------------------------------
+# Execution Optimization
+# -------------------------------
+execution_optimization:
+  order_placement:
+    price_improvement_attempts: 3
+    queue_position_monitoring: true
+    order_book_pressure_analysis: true
+    tick_size_optimization: true
+
+  timing_optimization:
+    avoid_news_events: true
+    avoid_rollover_times: true
+    prefer_high_liquidity_periods: true
+    execution_scheduling: true
+
+  fill_optimization:
+    partial_fill_management: true
+    fill_probability_estimation: true
+    order_aging_monitoring: true
+    cancel_replace_optimization: true
+
+  slippage_minimization:
+    adaptive_order_sizing: true
+    volume_matching: true
+    time_weighted_execution: true
+    market_impact_prediction: true
+
+# -------------------------------
+# Performance Monitoring and Analytics
+# -------------------------------
+performance_monitoring:
+  real_time_metrics:
+    latency_tracking: true
+    fill_rate_monitoring: true
+    slippage_measurement: true
+    pnl_attribution: true
+
+  analytics:
+    trade_analysis: true
+    pattern_recognition: true
+    performance_attribution: true
+    risk_decomposition: true
+
+  reporting:
+    daily_summary: true
+    weekly_analysis: true
+    monthly_review: true
+    performance_alerts: true
+
+  benchmarking:
+    market_comparison: true
+    strategy_comparison: true
+    peer_analysis: false
+    historical_comparison: true
+
+# -------------------------------
+# Advanced Features
+# -------------------------------
+advanced_features:
+  machine_learning:
+    enabled: "${ML_ENABLED:-false}"
+    model_updates: true
+    feature_engineering: true
+    online_learning: true
+
+  adaptive_optimization:
+    enabled: true
+    parameter_tuning: true
+    strategy_evolution: true
+    performance_feedback: true
+
+  cross_asset:
+    enabled: false
+    correlation_monitoring: true
+    portfolio_optimization: true
+    risk_diversification: true
+
+  news_sentiment:
+    enabled: false
+    news_filtering: true
+    sentiment_scoring: true
+    event_detection: true
+
+# -------------------------------
+# Infrastructure Integration
+# -------------------------------
+infrastructure:
+  health_monitoring:
+    component_health_checks: true
+    performance_monitoring: true
+    error_tracking: true
+    uptime_monitoring: true
+
+  metrics_collection:
+    strategy_metrics: true
+    execution_metrics: true
+    risk_metrics: true
+    performance_metrics: true
+
+  logging:
+    trade_logging: true
+    decision_logging: true
+    error_logging: true
+    performance_logging: true
+
+  alerting:
+    performance_alerts: true
+    risk_alerts: true
+    system_alerts: true
+    strategy_alerts: true
+
+# -------------------------------
+# Testing and Validation
+# -------------------------------
+testing:
+  backtesting:
+    enabled: true
+    data_source: "historical"
+    commission_model: "kraken"
+    slippage_model: "realistic"
+
+  paper_trading:
+    enabled: true
+    real_time_validation: true
+    performance_tracking: true
+    risk_validation: true
+
+  live_validation:
+    gradual_rollout: true
+    performance_monitoring: true
+    risk_monitoring: true
+    rollback_procedures: true
+
+# -------------------------------
+# Configuration Management
+# -------------------------------
+configuration:
+  dynamic_config:
+    enabled: true
+    hot_reloading: true
+    parameter_validation: true
+    rollback_capability: true
+
+  versioning:
+    enabled: true
+    change_tracking: true
+    audit_trail: true
+    rollback_history: 10
+
+  environment_overrides:
+    development:
+      reduced_limits: true
+      enhanced_logging: true
+      testing_mode: true
+
+    staging:
+      paper_trading_only: true
+      full_monitoring: true
+      performance_testing: true
+
+    production:
+      enhanced_security: true
+      full_monitoring: true
+      strict_validation: true
+
+# -------------------------------
+# Loader-side validation hints (optional but recommended)
+# Your loader can read these to fail fast on bad configs.
+# -------------------------------
+__validation__:
+  profit_targets:
+    partial_close_sum_equals: 100
+    bps_positive: true
+  scalping:
+    target_bps_range: [2, 30]
+    stop_loss_bps_range: [2, 30]
+    max_slippage_bps_range: [1, 10]
+    max_hold_seconds_range: [5, 900]
+  rate_limits:
+    max_trades_per_minute_range: [1, 20]
+    max_trades_per_hour_range: [10, 200]
+    daily_trade_limit_range: [10, 1000]
+  position_sizing:
+    min_size_lte_base_lte_max: true
+    max_portfolio_allocation_range: [0.0, 0.5]
+  pairs:
+    require_enabled_in_trading_pairs: true

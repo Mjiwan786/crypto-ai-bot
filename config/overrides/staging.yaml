@@ -1,0 +1,217 @@
+# ===========================================
+# STAGING ENVIRONMENT OVERRIDES
+# ===========================================
+# Configuration overrides for staging environment
+# These settings ensure safe staging operation
+
+meta:
+  environment: staging
+  app_name: crypto-ai-bot-staging
+
+mode:
+  bot_mode: PAPER
+  enable_trading: false
+  live_trading_confirmation: ""
+
+logging:
+  level: INFO
+  json: true
+  dir: logs/staging
+  file: logs/staging/crypto_ai_bot_staging.log
+  verbose: true
+
+server:
+  port: 9001
+  enable_metrics: true
+  enable_health: true
+  concurrency: 1
+  heartbeat_interval: 60
+
+redis:
+  client_name: crypto-ai-bot-staging
+  decode_responses: true
+  streams:
+    md_trades: "md:trades"
+    md_spread: "md:spread"
+    md_book: "md:orderbook"
+    md_candles: "md:candles"
+    signals_paper: "signals:staging"
+    signals_live: "signals:live"
+    active_signals: "signals:staging"
+    events: "events:bus"
+    orders_req: "orders:requests"
+    orders_conf: "exec:paper:confirms"
+
+health:
+  freshness_ms:
+    md_trades: 5000
+    md_spread: 5000
+    md_book: 5000
+    md_candles: 10000
+  redis:
+    startup_validate: true
+    startup_timeout_seconds: 30
+    check_on_startup: true
+    write_read_self_test: true
+
+exchange:
+  primary: kraken
+  kraken:
+    api_url: "https://api.kraken.com"
+    sandbox: false
+    market_type: spot
+    pairs: ["BTC/USD", "ETH/USD", "SOL/USD"]
+    fees_bps:
+      maker: 16
+      taker: 26
+    rate_limit_guard: true
+    ws:
+      enabled: true
+      reconnect_delay_sec: 5
+      max_retries: 10
+      ping_interval_sec: 20
+      close_timeout_sec: 5
+
+risk:
+  portfolio:
+    max_drawdown_pct: 5.0
+    max_single_position_notional_usd: 100
+  notional_limits:
+    min_usd: 1.0
+    max_usd: 100.0
+  compliance:
+    kill_switch: true
+    allowed_symbols: ["BTC/USD", "ETH/USD", "SOL/USD"]
+    banned_symbols: []
+    quote_currencies_allowed: ["USD"]
+    allowed_hours_utc: ["00:00-24:00"]
+    per_symbol_size: {}
+  volatility_shield:
+    enabled: true
+    max_atr_threshold: 0.02
+  dead_mans_switch:
+    enabled: true
+    timeout_hours: 2
+
+strategies:
+  active: ["scalping", "trend_following"]
+  allocations:
+    scalping: 0.50
+    trend_following: 0.50
+  scalping:
+    enabled: true
+    max_position_size: 0.01
+    stop_loss_pct: 0.005
+    take_profit_pct: 0.01
+  trend_following:
+    enabled: true
+    max_position_size: 0.02
+    stop_loss_pct: 0.01
+    take_profit_pct: 0.02
+
+execution:
+  taker_fee_bps: 26
+  maker_fee_bps: 16
+  default_order_type: limit
+  time_in_force: GTC
+  post_only: true
+  slippage_bps_max: 5
+
+market_data:
+  replay: false
+  book_depth: 10
+  trades_buffer: 1000
+
+mcp:
+  enabled: false
+  role: brain
+  planning_mode: plan_act_reflect
+  schemas_path: mcp/schemas
+  memory_backend: redis
+  context_window: 4
+  parallel_workers: 2
+  timeouts_ms:
+    plan: 1000
+    act: 500
+    reflect: 800
+    health_check: 5000
+  reflection:
+    enabled: false
+    depth: 1
+  circuit_breakers:
+    timeouts: 2
+    window_seconds: 30
+
+ai:
+  openai:
+    enabled: true
+    model: gpt-4o-mini
+    temperature: 0.3
+    max_tokens: 2000
+    timeout_seconds: 15
+  anthropic:
+    enabled: false
+    model: claude-3-5-sonnet-latest
+  strategy_selector:
+    enabled: false
+
+ml:
+  enabled: false
+  models_dir: models
+  symbols: ["BTC_USD"]
+  warmup_enabled: false
+  trend_model_path: models/staging_trend_model.h5
+  scalping_model_path: models/staging_scalp_model.h5
+  thresholds:
+    trend_confidence: 0.70
+    scalping_confidence: 0.80
+  prediction_window: 3
+
+sentiment:
+  enabled: false
+  symbols: ["BTC", "ETH"]
+  window_minutes: 30
+  score_threshold: 0.20
+  reddit:
+    subreddits: ["CryptoCurrency", "Bitcoin"]
+  twitter:
+    enabled: false
+
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9109
+  alerts:
+    level: WARNING
+  thresholds:
+    redis_latency_ms_warn: 200
+    redis_memory_mb_warn: 100
+    redis_connections_warn: 5
+    redis_error_rate_warn: 0.10
+
+discord:
+  enabled: false
+  webhook_url: ""
+  bot:
+    token: ""
+    prefix: "!"
+    alert_channel_id: ""
+    admin_role: "Admin"
+
+backtest:
+  start: "2025-01-01T00:00:00Z"
+  end: "2025-09-30T00:00:00Z"
+  base_currency: USD
+  starting_equity: 1000.0
+  commission_bps: 16
+  slippage_bps: 5
+  warmup_bars: 100
+
+dev_overrides:
+  dry_run: true
+  sandbox: true
+  strict_config: true
+  validate_allocations: true
+  fail_fast_on_policy_error: true
+  test_disable_sentiment: true
+  test_disable_mcp: true

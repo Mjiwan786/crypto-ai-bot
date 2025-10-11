@@ -1,0 +1,18 @@
+{
+  "description": "Market data ingestors for staging environment",
+  "stage": "ingestors",
+  "procs": [
+    {
+      "name": "ingestor_data_pipeline",
+      "cmd": ["python", "scripts/run_mock_data_pipeline.py"],
+      "env": {
+        "TRADING_PAIRS": "BTC/USD,ETH/USD,SOL/USD",
+        "TIMEFRAMES": "1m,5m",
+        "LOG_LEVEL": "INFO"
+      },
+      "ready_regex": "Mock data pipeline ready|Redis connection established",
+      "log": "logs/ingestor_data_pipeline.log",
+      "description": "Mock data pipeline (trades, orderbook, spreads)"
+    }
+  ]
+}

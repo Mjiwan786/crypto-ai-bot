@@ -1,0 +1,10 @@
+.env
+**/*.pem
+**/*.key
+**/*.p12
+**/secrets/**
+**/.venv/**
+**/node_modules/**
+**/.git/**
+**/data/**
+**/models/**/artifacts/**

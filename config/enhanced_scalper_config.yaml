@@ -1,0 +1,187 @@
+# Enhanced Scalper Agent Configuration
+# Integrates scalping with multiple trading strategies for improved performance
+
+# Core scalping configuration
+scalper:
+  pairs: ["BTC/USD", "ETH/USD", "ADA/USD", "SOL/USD"]
+  target_bps: 10
+  stop_loss_bps: 5
+  timeframe: "15s"
+  preferred_order_type: "limit"
+  post_only: true
+  hidden_orders: false
+  max_slippage_bps: 4
+  max_trades_per_minute: 4
+  cooldown_after_loss_seconds: 90
+  daily_trade_limit: 150
+  max_hold_seconds: 120
+  max_spread_bps: 3.0
+  min_liquidity_usd: 1000000.0
+
+# Strategy router configuration
+strategy_router:
+  strategy_allocations:
+    breakout: 0.25
+    mean_reversion: 0.20
+    momentum: 0.25
+    trend_following: 0.30
+    sideways: 0.15
+  min_confidence: 0.3
+  high_confidence: 0.7
+
+# Individual strategy configurations
+strategies:
+  breakout:
+    resistance_window: 20
+    min_breakout_ratio: 0.5
+    volume_requirement: 1.5
+    atr_multiplier: 2.0
+    retest_allowed: true
+    false_breakout_filter: true
+    confirmation_bars: 1
+    risk_multiple_tp: [1.0, 2.0, 3.0]
+    trailing_atr: 1.5
+    max_spread: 0.001
+    min_confidence: 0.75
+    fee_bps: 10.0
+    slippage_bps: 10.0
+    side: "both"
+    symbol_whitelist: ["BTC/USD", "ETH/USD", "ADA/USD", "SOL/USD"]
+
+  mean_reversion:
+    bollinger_window: 20
+    std_dev: 2.0
+    entry_zones:
+      oversold: 0.3
+      overbought: 0.7
+    exit_at_mean: true
+    cooloff_bars: 2
+    min_liquidity_usd: 1000000
+    volume_ratio_min: 0.8
+    rsi_filter:
+      enabled: true
+      period: 14
+      oversold: 35
+      overbought: 65
+    max_hold_bars: 24
+    max_positions: 1
+
+  momentum:
+    rsi_period: 10
+    vwap_window: 14
+    rsi_range: [40, 70]
+    vwap_gap: 0.01
+    trailing_stop: 0.01
+    min_volume_ratio: 1.2
+    confirmation_candles: 2
+    max_position_hold_hours: 24
+
+  trend_following:
+    ema_short: 9
+    ema_long: 21
+    atr_period: 14
+    min_trend_strength: 0.3
+    entry_conditions:
+      confirmation_bars: 2
+      volume_ratio: 1.2
+    base_position_size: 0.05
+    max_position_size: 0.15
+
+  sideways:
+    grid_size: 0.005
+    max_grid_levels: 10
+    position_size: 0.05
+    volatility_cutoff: 0.01
+    base_confidence: 0.6
+    stop_loss: 0.02
+    volatility_method: "atr"
+    atr_period: 14
+    std_window: 20
+
+# Regime adaptation configuration
+regime_adaptation:
+  sideways_target_bps: 8
+  sideways_stop_bps: 4
+  sideways_max_trades: 6
+  bull_target_bps: 12
+  bull_stop_bps: 6
+  bull_max_trades: 4
+  bear_target_bps: 12
+  bear_stop_bps: 6
+  bear_max_trades: 4
+
+# Signal filtering configuration
+signal_filtering:
+  min_alignment_confidence: 0.3
+  min_strategy_alignment: 0.6
+  require_alignment: false
+  min_regime_confidence: 0.3
+  min_scalping_confidence: 0.5
+
+# Enhanced validation configuration
+enhanced_validation:
+  min_enhanced_confidence: 0.6
+  min_regime_confidence: 0.4
+  require_strategy_alignment: false
+
+# Trading configuration
+trading:
+  base_position_size: 0.15
+  dynamic_sizing:
+    enabled: true
+    volatility_multiplier: 1.8
+    max_position: 0.30
+
+# Risk management
+risk:
+  daily_stop_loss: -0.05
+  circuit_breakers:
+    - trigger: "3_losses_in_row"
+      action: "reduce_size_50%"
+    - trigger: "5_losses_in_row"
+      action: "pause_1h"
+  max_daily_operations: 5
+
+# AI engine configuration
+ai_engine:
+  mode: "hypergrowth"
+  daily_profit_target: 0.015
+  max_daily_loss: -0.03
+  regime_detection:
+    enabled: true
+    update_interval_seconds: 300
+    confidence_threshold: 0.4
+
+# Redis configuration
+redis:
+  enabled: true
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: null
+  streams:
+    signals: "stream:enhanced_scalper:signals"
+    metrics: "stream:enhanced_scalper:metrics"
+    regime: "stream:enhanced_scalper:regime"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/enhanced_scalper.log"
+  max_size: "10MB"
+  backup_count: 5
+
+# Performance monitoring
+monitoring:
+  prometheus:
+    enabled: true
+    port: 8000
+  metrics:
+    - "signals_generated_total"
+    - "signals_aligned_total"
+    - "signals_filtered_total"
+    - "regime_adaptations_total"
+    - "strategy_confidence_histogram"
+    - "enhanced_confidence_histogram"
+    - "signal_latency_histogram"
