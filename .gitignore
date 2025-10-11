@@ -201,3 +201,7 @@ yarn-error.log*
 *.temp
 *.bak
 *.backup
+temp/
+tmp/
+.temp/
+.tmp/
