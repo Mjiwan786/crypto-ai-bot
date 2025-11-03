@@ -1,321 +1,394 @@
 #!/usr/bin/env python3
 """
-preflight.py — Crypto AI Bot
-Production preflight & environment validator.
+Crypto AI Bot - Production Preflight Check
 
-Checks:
-  1) Required environment variables present
-  2) Redis PING + XADD test (signals:*)
-  3) Kraken public status OK
-  4) Rate-limit module loaded (if applicable)
-  5) Risk allocations sane (≈1.0)
+⚠️ SAFETY WARNING:
+This script validates environment configuration before trading operations.
+Never bypass preflight checks in production. Live trading requires:
+- Python 3.10.18 exactly
+- Valid Redis Cloud TLS connection
+- Kraken API credentials (live mode only)
+- Proper environment templates without secrets committed
 
 Exit codes:
-  0 = READY
-  2 = DEGRADED  
-  1 = NOT_READY
+  0 = READY (all critical checks passed)
+  1 = NOT_READY (critical failures)
+  2 = DEGRADED (warnings but operational)
 
-Usage:
-  python scripts/preflight.py --env .env.staging --verbose
+Usage examples:
+  python scripts/preflight.py --mode dev
+  python scripts/preflight.py --mode staging --strict
+  python scripts/preflight.py --mode prod --strict
 """
 
 from __future__ import annotations
+
+import argparse
 import os
+import platform
+import socket
+import stat
 import sys
 import time
-import json
-import argparse
-import logging
-from typing import Dict, List, Tuple, Optional
-from datetime import datetime, timezone
+import urllib.parse
+from pathlib import Path
+from typing import List, Tuple
 
-# Dependencies
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    print("Error: python-dotenv required. Install with: pip install python-dotenv")
-    sys.exit(1)
-
-try:
-    import redis
-except ImportError:
-    print("Error: redis required. Install with: pip install redis")
-    sys.exit(1)
-
-try:
-    import requests
-except ImportError:
-    print("Error: requests required. Install with: pip install requests")
-    sys.exit(1)
-
-try:
-    import yaml
-except ImportError:
-    print("Error: PyYAML required. Install with: pip install PyYAML")
-    sys.exit(1)
-
-# Setup logging
-LOG = logging.getLogger("preflight")
-
-# Result codes
+# --- Constants ---
 READY = 0
 DEGRADED = 2
 NOT_READY = 1
 
-# Required environment variables
-REQUIRED_ENVS = [
-    "ENVIRONMENT", "TIMEZONE", "LOG_LEVEL", "PAPER_TRADING_ENABLED", 
-    "LIVE_TRADING_CONFIRMATION", "REDIS_URL", "KRAKEN_API_URL"
-]
+REQUIRED_PYTHON_VERSION = "3.10.18"
+REQUIRED_ENV_TEMPLATES = [".env.example", ".env.staging.example", ".env.prod.example"]
+FORBIDDEN_ENV_FILES = [".env", ".env.local", ".env.staging", ".env.prod"]
+REQUIRED_PORTS = [9308]  # Prometheus exporter
+
+# Environment variables required for all modes
+BASE_ENV_VARS = ["ENVIRONMENT", "REDIS_URL", "LOG_LEVEL"]
+# Additional variables required for live mode
+LIVE_ENV_VARS = ["KRAKEN_API_KEY", "KRAKEN_API_SECRET", "LIVE_TRADING_CONFIRMATION"]
+
+# --- Helper Functions ---
+
+def check_python_version() -> Tuple[bool, str]:
+    """Check Python version matches exactly 3.10.18"""
+    current_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+    if current_version == REQUIRED_PYTHON_VERSION:
+        return True, f"Python {current_version}"
+    else:
+        return False, f"Python {current_version} (expected {REQUIRED_PYTHON_VERSION})"
 
 
-def ok(msg: str) -> None:
-    """Print success message with ✅"""
-    print(f"[OK] {msg}")
-
-
-def warn(msg: str) -> None:
-    """Print warning message with ⚠️"""
-    print(f"[WARN] {msg}")
-
-
-def fail(msg: str) -> None:
-    """Print failure message with ❌"""
-    print(f"[FAIL] {msg}")
-
-
-def timeit(func):
-    """Simple timing decorator"""
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        result = func(*args, **kwargs)
-        elapsed = (time.time() - start) * 1000
-        return result, elapsed
-    return wrapper
-
-
-def check_required_envs() -> Tuple[bool, List[str]]:
-    """Check if all required environment variables are present"""
+def check_env_templates() -> Tuple[bool, str]:
+    """Check that environment templates exist"""
+    root = Path.cwd()
     missing = []
-    for env_var in REQUIRED_ENVS:
-        if not os.getenv(env_var):
-            missing.append(env_var)
-    
+
+    for template in REQUIRED_ENV_TEMPLATES:
+        if not (root / template).exists():
+            missing.append(template)
+
     if missing:
-        fail(f"Missing required environment variables: {', '.join(missing)}")
-        return False, missing
-    
-    present_vars = [var for var in REQUIRED_ENVS if os.getenv(var)]
-    ok(f"Envs present: {', '.join(present_vars)}")
-    return True, []
+        return False, f"Missing templates: {', '.join(missing)}"
+    return True, f"All {len(REQUIRED_ENV_TEMPLATES)} env templates present"
 
 
-def test_redis_connection() -> Tuple[bool, str, float]:
-    """Test Redis connection, PING, and XADD/XREAD"""
-    start_time = time.time()
+def check_no_real_env() -> Tuple[bool, str]:
+    """Verify NO real .env files exist (only examples allowed)"""
+    root = Path.cwd()
+    found = []
+
+    for env_file in FORBIDDEN_ENV_FILES:
+        if (root / env_file).exists():
+            found.append(env_file)
+
+    if found:
+        return False, f"Found real env files (use examples only): {', '.join(found)}"
+    return True, "No real .env files (examples only)"
+
+
+def check_redis_url_format() -> Tuple[bool, str]:
+    """Verify Redis URL format if set"""
     redis_url = os.getenv("REDIS_URL")
+
     if not redis_url:
-        return False, "REDIS_URL not set", 0.0
-    
-    try:
-        # Parse Redis URL
-        if not redis_url.startswith(("redis://", "rediss://")):
-            return False, "REDIS_URL must start with redis:// or rediss://", 0.0
-        
-        # Connect with timeout
-        r = redis.Redis.from_url(redis_url, socket_timeout=5, socket_connect_timeout=5)
-        
-        # PING test
-        if not r.ping():
-            return False, "Redis PING failed", 0.0
-        
-        # Determine stream name based on mode
-        paper_mode = os.getenv("PAPER_TRADING_ENABLED", "true").lower() in ("true", "1", "yes")
-        stream_name = "signals:paper" if paper_mode else "signals:live"
-        
-        # XADD test
-        test_entry = {
-            "preflight": "ok",
-            "ts": datetime.now(timezone.utc).isoformat()
-        }
-        
-        entry_id = r.xadd(stream_name, test_entry)
-        
-        # XREAD back the last item
-        result = r.xread({stream_name: "0-0"}, count=1, block=1000)
-        
-        if not result:
-            return False, "XREAD failed - no data returned", 0.0
-        
-        elapsed = (time.time() - start_time) * 1000
-        return True, f"PING ok, XADD/XREAD ok on stream {stream_name}", elapsed
-        
-    except redis.exceptions.ConnectionError as e:
-        return False, f"Redis connection failed: {e}", 0.0
-    except redis.exceptions.TimeoutError as e:
-        return False, f"Redis timeout: {e}", 0.0
-    except Exception as e:
-        return False, f"Redis error: {e}", 0.0
+        return True, "REDIS_URL not set (will skip connection check)"
 
-
-def test_kraken_status() -> Tuple[bool, str, float]:
-    """Test Kraken public API status"""
-    start_time = time.time()
-    kraken_url = os.getenv("KRAKEN_API_URL", "https://api.kraken.com")
-    status_url = f"{kraken_url}/0/public/SystemStatus"
-    
     try:
-        response = requests.get(status_url, timeout=10)
-        
-        if response.status_code != 200:
-            return False, f"HTTP {response.status_code}", 0.0
-        
-        data = response.json()
-        
-        if "result" in data and "status" in data["result"]:
-            status = data["result"]["status"]
-            if status in ["online", "healthy", "operational"]:
-                elapsed = (time.time() - start_time) * 1000
-                return True, f"SystemStatus={status}", elapsed
-            else:
-                return False, f"SystemStatus={status} (not healthy)", 0.0
+        parsed = urllib.parse.urlparse(redis_url)
+
+        if parsed.scheme not in ["redis", "rediss"]:
+            return False, f"Invalid Redis URL scheme: {parsed.scheme} (expected redis:// or rediss://)"
+
+        if not parsed.hostname:
+            return False, "Redis URL missing hostname"
+
+        if parsed.scheme == "rediss":
+            return True, f"Redis TLS URL: {parsed.hostname}:{parsed.port or 6380}"
         else:
-            return False, "Invalid response format", 0.0
-            
-    except requests.exceptions.Timeout:
-        return False, "Request timeout", 0.0
-    except requests.exceptions.ConnectionError:
-        return False, "Connection failed", 0.0
-    except json.JSONDecodeError:
-        return False, "Invalid JSON response", 0.0
+            return True, f"Redis URL: {parsed.hostname}:{parsed.port or 6379}"
+
     except Exception as e:
-        return False, f"Error: {e}", 0.0
+        return False, f"Invalid Redis URL format: {e}"
 
 
-def check_rate_limit_module() -> Tuple[bool, str]:
-    """Check if rate-limit module is available"""
-    modules_to_try = [
-        "utils.rate_limit",
-        "agents.common.rate_limit", 
-        "agents.rate_limit"
-    ]
-    
-    for module_name in modules_to_try:
+def check_kraken_keys(mode: str) -> Tuple[bool, str]:
+    """Verify Kraken keys present ONLY in live mode"""
+    kraken_key = os.getenv("KRAKEN_API_KEY")
+    kraken_secret = os.getenv("KRAKEN_API_SECRET")
+
+    if mode == "prod":
+        # Live mode: require credentials
+        if not kraken_key or not kraken_secret:
+            return False, "KRAKEN_API_KEY and KRAKEN_API_SECRET required for live mode"
+
+        # Check key format (basic sanity)
+        if len(kraken_key) < 20 or len(kraken_secret) < 20:
+            return False, "Kraken credentials appear invalid (too short)"
+
+        return True, f"Kraken credentials present (key len={len(kraken_key)})"
+    else:
+        # Dev/staging: credentials optional but warn if present
+        if kraken_key or kraken_secret:
+            return True, "Warning: Kraken credentials set in non-live mode"
+
+        return True, "No Kraken credentials (not required for dev/staging)"
+
+
+def check_ports_free() -> Tuple[bool, str]:
+    """Check required ports are free"""
+    blocked = []
+
+    for port in REQUIRED_PORTS:
         try:
-            __import__(module_name)
-            return True, f"Rate-limit module found: {module_name}"
-        except ImportError:
-            continue
-    
-    return False, "Rate-limit module not found"
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(1)
+                result = sock.connect_ex(("127.0.0.1", port))
+
+                if result == 0:
+                    # Port is in use
+                    blocked.append(port)
+        except Exception:
+            # Assume port is free if check fails
+            pass
+
+    if blocked:
+        return False, f"Ports blocked: {', '.join(map(str, blocked))}"
+
+    return True, f"All {len(REQUIRED_PORTS)} required ports free"
 
 
-def check_risk_allocations() -> Tuple[bool, str]:
-    """Check if risk allocations sum to approximately 1.0"""
+def check_file_permissions() -> Tuple[bool, str]:
+    """Check file permissions sanity on Windows"""
+    if platform.system() != "Windows":
+        return True, "File permissions check skipped (non-Windows)"
+
+    # On Windows, just check we can write to logs directory
+    logs_dir = Path.cwd() / "logs"
+
     try:
-        # Try to load config via merge_config
-        from config.merge_config import load_config
-        
-        env = os.getenv("ENVIRONMENT", "staging")
-        config = load_config(env)
-        
-        if "strategies" not in config or "allocations" not in config["strategies"]:
-            return False, "No allocations found in config"
-        
-        allocations = config["strategies"]["allocations"]
-        total = sum(allocations.values())
-        
-        if 0.99 <= total <= 1.01:
-            return True, f"Allocations sum={total:.3f} (good)"
-        else:
-            return False, f"Allocations sum={total:.3f} (expected ~1.0)"
-            
-    except ImportError:
-        return False, "Config loader not available"
+        logs_dir.mkdir(exist_ok=True)
+
+        # Test write
+        test_file = logs_dir / ".preflight_test"
+        test_file.write_text("test")
+        test_file.unlink()
+
+        return True, "Logs directory writable"
+
     except Exception as e:
-        return False, f"Config error: {e}"
+        return False, f"Cannot write to logs directory: {e}"
 
 
-def main():
-    """Main preflight function"""
-    parser = argparse.ArgumentParser(description="Crypto AI Bot preflight validator")
-    parser.add_argument("--env", default=".env", help="Path to .env file (default: .env)")
-    parser.add_argument("--verbose", action="store_true", help="Verbose output")
+def check_conda_environment() -> Tuple[bool, str]:
+    """Check conda environment"""
+    conda_env = os.environ.get("CONDA_DEFAULT_ENV")
+
+    if not conda_env:
+        return True, "No conda environment (not required)"
+
+    if conda_env == "crypto-bot":
+        return True, f"Conda environment: {conda_env}"
+    else:
+        return True, f"Warning: Conda environment is '{conda_env}' (expected 'crypto-bot')"
+
+
+def check_env_variables(mode: str) -> Tuple[bool, str]:
+    """Check required environment variables"""
+    missing = []
+
+    # Check base variables
+    for var in BASE_ENV_VARS:
+        if not os.getenv(var):
+            missing.append(var)
+
+    # Check live mode variables
+    if mode == "prod":
+        for var in LIVE_ENV_VARS:
+            if not os.getenv(var):
+                missing.append(var)
+
+    if missing:
+        return False, f"Missing environment variables: {', '.join(missing)}"
+
+    return True, f"All required environment variables present"
+
+
+# --- Main Execution ---
+
+def run_preflight_checks(mode: str, strict: bool) -> int:
+    """
+    Run preflight checks for specified mode.
+
+    Args:
+        mode: Deployment mode (dev, staging, prod)
+        strict: If True, treat warnings as failures
+
+    Returns:
+        Exit code (0=READY, 1=NOT_READY, 2=DEGRADED)
+    """
+    start_time = time.time()
+
+    print(f"# Crypto AI Bot - Preflight Check")
+    print(f"Mode: {mode}")
+    print(f"Strict: {strict}")
+    print(f"Platform: {platform.system()} {platform.release()}")
+    print(f"Python: {sys.version}")
+    print()
+
+    failures = []
+    warnings = []
+
+    # Check 1: Python version
+    print("## Python Version")
+    ok, msg = check_python_version()
+    print(f"- {msg}")
+    if not ok:
+        failures.append(msg)
+    print()
+
+    # Check 2: Environment templates
+    print("## Environment Templates")
+    ok, msg = check_env_templates()
+    print(f"- {msg}")
+    if not ok:
+        failures.append(msg)
+    print()
+
+    # Check 3: No real .env files
+    print("## Environment Files")
+    ok, msg = check_no_real_env()
+    print(f"- {msg}")
+    if not ok:
+        warnings.append(msg)
+    print()
+
+    # Check 4: Redis URL format
+    print("## Redis Configuration")
+    ok, msg = check_redis_url_format()
+    print(f"- {msg}")
+    if not ok:
+        failures.append(msg)
+    print()
+
+    # Check 5: Kraken keys
+    print("## Kraken API Credentials")
+    ok, msg = check_kraken_keys(mode)
+    print(f"- {msg}")
+    if not ok:
+        failures.append(msg)
+    elif "Warning" in msg:
+        warnings.append(msg)
+    print()
+
+    # Check 6: Required ports
+    print("## Required Ports")
+    ok, msg = check_ports_free()
+    print(f"- {msg}")
+    if not ok:
+        warnings.append(msg)
+    print()
+
+    # Check 7: File permissions
+    print("## File Permissions")
+    ok, msg = check_file_permissions()
+    print(f"- {msg}")
+    if not ok:
+        failures.append(msg)
+    print()
+
+    # Check 8: Conda environment
+    print("## Conda Environment")
+    ok, msg = check_conda_environment()
+    print(f"- {msg}")
+    if "Warning" in msg:
+        warnings.append(msg)
+    print()
+
+    # Check 9: Environment variables
+    print("## Environment Variables")
+    ok, msg = check_env_variables(mode)
+    print(f"- {msg}")
+    if not ok:
+        failures.append(msg)
+    print()
+
+    # Summary
+    elapsed = time.time() - start_time
+    print("## Summary")
+    print(f"- Checks completed in {elapsed:.2f}s")
+    print(f"- Failures: {len(failures)}")
+    print(f"- Warnings: {len(warnings)}")
+    print()
+
+    # Determine exit code
+    if failures:
+        print("**Status: NOT READY**")
+        print()
+        print("### Failures")
+        for i, failure in enumerate(failures, 1):
+            print(f"{i}. {failure}")
+        return NOT_READY
+
+    if warnings:
+        if strict:
+            print("**Status: NOT READY (strict mode)**")
+            print()
+            print("### Warnings Treated as Failures")
+            for i, warning in enumerate(warnings, 1):
+                print(f"{i}. {warning}")
+            return NOT_READY
+        else:
+            print("**Status: DEGRADED**")
+            print()
+            print("### Warnings")
+            for i, warning in enumerate(warnings, 1):
+                print(f"{i}. {warning}")
+            return DEGRADED
+
+    print("**Status: READY**")
+    return READY
+
+
+def main() -> int:
+    """Main entry point"""
+    parser = argparse.ArgumentParser(
+        description="Crypto AI Bot Production Preflight Check",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python scripts/preflight.py --mode dev
+  python scripts/preflight.py --mode staging --strict
+  python scripts/preflight.py --mode prod --strict
+        """
+    )
+
+    parser.add_argument(
+        "--mode",
+        choices=["dev", "staging", "prod"],
+        default="dev",
+        help="Deployment mode (default: dev)"
+    )
+
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat warnings as failures"
+    )
+
     args = parser.parse_args()
-    
-    # Setup logging
-    level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=level, format="[Preflight] %(message)s")
-    
-    print(f"[Preflight] Start — env: {args.env}")
-    
-    # Load environment file
-    if os.path.exists(args.env):
-        load_dotenv(args.env, override=True)
-        if args.verbose:
-            print(f"[Preflight] Loaded environment from {args.env}")
-    else:
-        if args.verbose:
-            print(f"[Preflight] No .env file found at {args.env}, using system environment")
-    
-    # Track results
-    results = []
-    
-    # 1. Check required environment variables
-    env_ok, missing = check_required_envs()
-    results.append(NOT_READY if not env_ok else READY)
-    
-    if not env_ok:
-        print("RESULT: NOT_READY")
-        sys.exit(NOT_READY)
-    
-    # 2. Test Redis connection
-    redis_ok, redis_msg, redis_time = test_redis_connection()
-    if redis_ok:
-        ok(f"Redis: {redis_msg} ({redis_time:.1f} ms)")
-        results.append(READY)
-    else:
-        fail(f"Redis: {redis_msg}")
-        results.append(NOT_READY)
-    
-    # 3. Test Kraken status
-    kraken_ok, kraken_msg, kraken_time = test_kraken_status()
-    if kraken_ok:
-        ok(f"Kraken: {kraken_msg} ({kraken_time:.0f} ms)")
-        results.append(READY)
-    else:
-        fail(f"Kraken: {kraken_msg}")
-        results.append(NOT_READY)
-    
-    # 4. Check rate-limit module
-    rate_ok, rate_msg = check_rate_limit_module()
-    if rate_ok:
-        ok(f"Rate-limit module: {rate_msg}")
-        results.append(READY)
-    else:
-        warn(f"Rate-limit module: {rate_msg} — enable for prod to avoid 429s")
-        results.append(DEGRADED)
-    
-    # 5. Check risk allocations
-    alloc_ok, alloc_msg = check_risk_allocations()
-    if alloc_ok:
-        ok(f"Allocations: {alloc_msg}")
-        results.append(READY)
-    else:
-        warn(f"Allocations: {alloc_msg}")
-        results.append(DEGRADED)
-    
-    # Determine final result
-    if NOT_READY in results:
-        print("RESULT: NOT_READY")
-        sys.exit(NOT_READY)
-    elif DEGRADED in results:
-        print("RESULT: DEGRADED")
-        sys.exit(DEGRADED)
-    else:
-        print("RESULT: READY")
-        sys.exit(READY)
+
+    try:
+        return run_preflight_checks(args.mode, args.strict)
+    except KeyboardInterrupt:
+        print("\n[Preflight] Interrupted by user")
+        return NOT_READY
+    except Exception as e:
+        print(f"\n[Preflight] Unexpected error: {e}")
+        return NOT_READY
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

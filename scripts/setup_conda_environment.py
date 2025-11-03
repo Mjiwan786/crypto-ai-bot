@@ -6,10 +6,11 @@ This script sets up the conda environment for the complete trading system
 with all required dependencies.
 """
 
+import logging
 import subprocess
 import sys
-import logging
 from pathlib import Path
+
 
 def setup_logging():
     """Setup logging"""

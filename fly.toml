@@ -1,0 +1,92 @@
+# ===============================================
+# Fly.io Configuration for Crypto AI Bot
+# Worker deployment with health checks
+# ===============================================
+
+# App name (update with your Fly.io app name)
+app = "crypto-ai-bot"
+primary_region = "ewr"  # Newark (us-east)
+
+# Build configuration
+[build]
+
+# Deployment configuration
+[deploy]
+  # Worker strategy: always restart, never auto-stop
+  strategy = "rolling"
+
+# VM configuration
+[vm]
+  # Shared CPU with 1GB RAM (adjust based on needs)
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
+
+# Environment variables (non-sensitive)
+[env]
+  ENVIRONMENT = "prod"
+  LOG_LEVEL = "INFO"
+  TZ = "America/Toronto"
+  PYTHONUNBUFFERED = "1"
+  HEALTH_API_PORT = "8080"
+
+# Process groups - this is a worker, not a web service
+[[processes]]
+  name = "worker"
+  cmd = ["python", "main.py", "run", "--mode", "paper"]
+  auto_start_machines = true
+  auto_stop_machines = false  # Never auto-stop
+  min_machines_running = 1
+
+# Health server process (optional: run health endpoint separately)
+[[processes]]
+  name = "health"
+  cmd = ["python", "health.py"]
+  auto_start_machines = true
+  auto_stop_machines = false
+  min_machines_running = 1
+
+# HTTP service for health checks (internal only)
+[[services]]
+  protocol = "tcp"
+  internal_port = 8080
+  auto_stop_machines = false  # Never auto-stop
+  auto_start_machines = true
+
+  # Health check configuration
+  [[services.http_checks]]
+    interval = "30s"
+    grace_period = "60s"
+    method = "GET"
+    path = "/health"
+    protocol = "http"
+    timeout = "10s"
+    tls_skip_verify = false
+
+  # TCP check for liveness
+  [[services.tcp_checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "60s"
+
+  # Port configuration
+  [[services.ports]]
+    port = 8080
+    handlers = []
+
+# Metrics (optional - enable Prometheus metrics)
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+# Restart policy
+[[restart]]
+  policy = "always"
+  max_retries = 0  # Unlimited retries
+
+# Secrets to set via Fly CLI:
+# fly secrets set REDIS_URL="rediss://default:password@host:port/0"
+# fly secrets set KRAKEN_API_KEY="your_key"
+# fly secrets set KRAKEN_API_SECRET="your_secret"
+# fly secrets set DISCORD_BOT_TOKEN="your_token"
+# fly secrets set LIVE_TRADING_CONFIRMATION="I-accept-the-risk"  # Only if enabling live trading

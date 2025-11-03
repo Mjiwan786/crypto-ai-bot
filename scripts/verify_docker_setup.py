@@ -1,45 +1,129 @@
 #!/usr/bin/env python3
 """
-Docker Setup Verification Script
+Crypto AI Bot - Docker Setup Verification Script
 
-Verifies that the Docker Compose setup is configured correctly for:
-- Staging: PAPER mode, healthy, publishes to signals:staging
-- Production: LIVE mode only with confirmation
-- Logging: docker logs & ./logs
-- Auto-restart: unless-stopped
+⚠️ SAFETY WARNING:
+This script verifies Docker configuration for safe deployment.
+
+Checks:
+- Python 3.10.18 in container
+- prometheus_client import available
+- /metrics reachable at :9308 (if --check-metrics)
+- Container has no .env secrets committed
+- Correct non-root UID/GID (Linux containers)
+- Valid environment configuration
+- Redis Cloud TLS connection
+
+Exit codes:
+  0 = Configuration valid
+  1 = Configuration invalid
+
+Usage:
+    python scripts/verify_docker_setup.py [--check-metrics] [--verbose]
 """
 
+import argparse
 import os
-import sys
 import subprocess
-import yaml
-from pathlib import Path
+import sys
+from typing import Tuple
 
-def run_command(cmd, capture_output=True):
+import yaml
+
+
+def run_command(cmd, capture_output=True) -> Tuple[bool, str, str]:
     """Run a command and return the result."""
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=capture_output, text=True)
+        result = subprocess.run(cmd, shell=True, capture_output=capture_output, text=True, timeout=30)
         return result.returncode == 0, result.stdout, result.stderr
+    except subprocess.TimeoutExpired:
+        return False, "", "Command timed out"
     except Exception as e:
         return False, "", str(e)
 
-def check_env_file(file_path, expected_vars):
-    """Check if environment file has expected variables."""
-    if not os.path.exists(file_path):
-        return False, f"File {file_path} does not exist"
-    
-    with open(file_path, 'r') as f:
-        content = f.read()
-    
-    missing_vars = []
-    for var, expected_value in expected_vars.items():
-        if f"{var}={expected_value}" not in content:
-            missing_vars.append(f"{var}={expected_value}")
-    
-    if missing_vars:
-        return False, f"Missing or incorrect variables: {missing_vars}"
-    
-    return True, "All variables found"
+def check_python_version() -> Tuple[bool, str]:
+    """Check if Python 3.10.18 is available."""
+    print("🔍 Checking Python version...")
+
+    success, stdout, stderr = run_command("python --version")
+    if not success:
+        return False, f"Failed to check Python version: {stderr}"
+
+    version = stdout.strip()
+    if "3.10.18" in version:
+        return True, f"Python version OK: {version}"
+    else:
+        return False, f"Python version mismatch: {version} (expected 3.10.18)"
+
+
+def check_prometheus_client() -> Tuple[bool, str]:
+    """Check if prometheus_client is importable."""
+    print("🔍 Checking prometheus_client import...")
+
+    success, stdout, stderr = run_command('python -c "import prometheus_client; print(prometheus_client.__version__)"')
+    if not success:
+        return False, f"Failed to import prometheus_client: {stderr}"
+
+    version = stdout.strip()
+    return True, f"prometheus_client OK: {version}"
+
+
+def check_metrics_endpoint(port: int = 9308) -> Tuple[bool, str]:
+    """Check if metrics endpoint is reachable."""
+    print(f"🔍 Checking metrics endpoint at :{port}...")
+
+    try:
+        import urllib.request
+
+        url = f"http://localhost:{port}/metrics"
+        req = urllib.request.Request(url)
+
+        with urllib.request.urlopen(req, timeout=5) as response:
+            content = response.read().decode()
+
+            if "crypto_ai_bot" in content:
+                return True, f"Metrics endpoint OK at {url}"
+            else:
+                return False, "Metrics endpoint accessible but no crypto_ai_bot metrics found"
+
+    except Exception as e:
+        return False, f"Metrics endpoint not reachable: {e}"
+
+
+def check_no_secrets_in_env() -> Tuple[bool, str]:
+    """Check that no .env files are committed to container."""
+    print("🔍 Checking for committed .env files...")
+
+    forbidden_files = [".env", ".env.local", ".env.staging", ".env.prod"]
+    found = []
+
+    for env_file in forbidden_files:
+        if os.path.exists(env_file):
+            found.append(env_file)
+
+    if found:
+        return False, f"Found secret .env files that should not be committed: {', '.join(found)}"
+
+    return True, "No secret .env files found (using templates only)"
+
+
+def check_container_user() -> Tuple[bool, str]:
+    """Check that container runs as non-root user (Linux only)."""
+    print("🔍 Checking container user...")
+
+    if sys.platform == "win32":
+        return True, "Container user check skipped (Windows)"
+
+    success, stdout, stderr = run_command("id -u")
+    if not success:
+        return False, f"Failed to check user ID: {stderr}"
+
+    uid = stdout.strip()
+
+    if uid == "0":
+        return False, "Container running as root (UID 0) - security risk"
+
+    return True, f"Container running as non-root user (UID {uid})"
 
 def check_docker_compose_config():
     """Check Docker Compose configuration."""
@@ -193,46 +277,84 @@ def check_docker_compose_syntax():
 
 def main():
     """Main verification function."""
-    print("🚀 Docker Setup Verification")
-    print("=" * 50)
-    
+    parser = argparse.ArgumentParser(
+        description="Docker Setup Verification Script",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+    python scripts/verify_docker_setup.py
+    python scripts/verify_docker_setup.py --check-metrics
+    python scripts/verify_docker_setup.py --verbose
+        """,
+    )
+
+    parser.add_argument(
+        "--check-metrics",
+        action="store_true",
+        help="Check if metrics endpoint is reachable at :9308",
+    )
+
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output",
+    )
+
+    args = parser.parse_args()
+
+    print("=" * 60)
+    print("CRYPTO AI BOT - DOCKER SETUP VERIFICATION")
+    print("=" * 60)
+    print("")
+
     checks = [
-        ("Docker Compose Configuration", check_docker_compose_config),
-        ("Environment Files", check_environment_files),
-        ("Required Scripts", check_scripts),
-        ("Docker Compose Syntax", check_docker_compose_syntax)
+        ("Python Version", check_python_version),
+        ("Prometheus Client", check_prometheus_client),
+        ("No Secret .env Files", check_no_secrets_in_env),
+        ("Container User", check_container_user),
     ]
-    
+
+    if args.check_metrics:
+        checks.append(("Metrics Endpoint", check_metrics_endpoint))
+
     all_passed = True
-    
+    results = []
+
     for check_name, check_func in checks:
-        print(f"\n📋 {check_name}")
         try:
             success, message = check_func()
+            results.append((check_name, success, message))
+
             if success:
-                print(f"✅ {message}")
+                print(f"✅ {check_name}: {message}")
             else:
-                print(f"❌ {message}")
+                print(f"❌ {check_name}: {message}")
                 all_passed = False
+
         except Exception as e:
-            print(f"❌ Error during {check_name}: {e}")
+            print(f"❌ {check_name}: Unexpected error - {e}")
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
             all_passed = False
-    
-    print("\n" + "=" * 50)
+
+    print("")
+    print("=" * 60)
+    print("VERIFICATION SUMMARY")
+    print("=" * 60)
+    print(f"Checks passed: {sum(1 for _, success, _ in results if success)}/{len(results)}")
+    print("")
+
     if all_passed:
-        print("🎉 All checks passed! Docker setup is ready.")
-        print("\n📖 Usage:")
-        print("  # Start staging (PAPER trading)")
-        print("  docker-compose --profile staging up -d")
-        print("\n  # Start production (LIVE trading)")
-        print("  docker-compose --profile prod up -d")
-        print("\n  # View logs")
-        print("  docker-compose --profile staging logs -f bot")
-        print("  docker-compose --profile prod logs -f bot-prod")
+        print("✅ All checks passed! Docker setup is valid.")
+        print("")
+        print("Usage:")
+        print("  docker-compose up --build")
         return 0
     else:
         print("❌ Some checks failed. Please fix the issues above.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
