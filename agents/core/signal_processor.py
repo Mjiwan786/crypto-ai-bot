@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import time
+import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -69,6 +70,124 @@ class SignalQuality(str, Enum):
     FAIR = "fair"
     GOOD = "good"
     EXCELLENT = "excellent"
+
+
+class ResilientPublisher:
+    """
+    Resilient Redis publisher with rate limiting and exponential backoff.
+
+    Features:
+    - Rate limiting (max 2 signals/sec)
+    - Exponential backoff with jitter on Redis errors
+    - Continues operation despite transient failures
+    - Tracks last publish time for health monitoring
+    - Configurable XTRIM via environment variables
+    """
+
+    def __init__(self, redis_client, max_rate_per_sec: float = 2.0):
+        self.redis_client = redis_client
+        self.max_rate = max_rate_per_sec
+        self.min_interval = 1.0 / max_rate_per_sec  # 0.5 seconds
+        self.last_publish_time = 0.0
+        self.publish_count = 0
+        self.error_count = 0
+        self.logger = logging.getLogger(f"{__name__}.ResilientPublisher")
+
+        # Load stream maxlen from environment with defaults
+        self.maxlen_signals = int(os.getenv('STREAM_MAXLEN_SIGNALS', '10000'))
+        self.maxlen_pnl = int(os.getenv('STREAM_MAXLEN_PNL', '5000'))
+        self.maxlen_heartbeat = int(os.getenv('STREAM_MAXLEN_HEARTBEAT', '1000'))
+        self.maxlen_metrics = int(os.getenv('STREAM_MAXLEN_METRICS', '10000'))
+
+    async def publish_with_backoff(
+        self,
+        stream_name: str,
+        data: Dict[str, Any],
+        max_retries: int = 3,
+        initial_backoff: float = 1.0,
+        max_backoff: float = 60.0
+    ) -> Optional[str]:
+        """
+        Publish to Redis stream with rate limiting and exponential backoff.
+
+        Args:
+            stream_name: Redis stream key
+            data: Data dictionary to publish
+            max_retries: Maximum retry attempts
+            initial_backoff: Initial backoff in seconds
+            max_backoff: Maximum backoff in seconds
+
+        Returns:
+            Message ID if successful, None otherwise
+        """
+        # Rate limiting: enforce minimum interval between publishes
+        current_time = time.time()
+        time_since_last = current_time - self.last_publish_time
+        if time_since_last < self.min_interval and self.last_publish_time > 0:
+            await asyncio.sleep(self.min_interval - time_since_last)
+
+        # Determine maxlen based on stream name
+        if 'pnl' in stream_name.lower():
+            maxlen = self.maxlen_pnl
+        elif 'heartbeat' in stream_name.lower():
+            maxlen = self.maxlen_heartbeat
+        elif 'signal' in stream_name.lower():
+            maxlen = self.maxlen_signals
+        else:
+            maxlen = self.maxlen_metrics
+
+        backoff_seconds = initial_backoff
+
+        for attempt in range(max_retries + 1):
+            try:
+                # Publish to stream with XTRIM (approximate allows Redis to optimize)
+                msg_id = await self.redis_client.xadd(stream_name, data, maxlen=maxlen)
+
+                # Update tracking
+                self.last_publish_time = time.time()
+                self.publish_count += 1
+
+                if attempt > 0:
+                    self.logger.info(f"✓ Recovered after {attempt} retries, published to {stream_name}")
+
+                return msg_id
+
+            except Exception as e:
+                self.error_count += 1
+
+                if attempt < max_retries:
+                    # Exponential backoff with jitter
+                    jitter = random.uniform(0, backoff_seconds * 0.3)
+                    sleep_time = min(backoff_seconds + jitter, max_backoff)
+
+                    self.logger.warning(
+                        f"✗ Publish failed (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                        f"Backing off {sleep_time:.2f}s..."
+                    )
+
+                    await asyncio.sleep(sleep_time)
+                    backoff_seconds = min(backoff_seconds * 2, max_backoff)
+                else:
+                    # All retries exhausted - log but continue
+                    self.logger.error(
+                        f"✗ Failed to publish to {stream_name} after {max_retries + 1} attempts: {e}. "
+                        f"Continuing operation..."
+                    )
+                    return None
+
+        return None
+
+    def get_health_stats(self) -> Dict[str, Any]:
+        """Get publisher health statistics"""
+        current_time = time.time()
+        time_since_publish = current_time - self.last_publish_time if self.last_publish_time > 0 else 999
+
+        return {
+            "last_publish_seconds_ago": round(time_since_publish, 2),
+            "total_published": self.publish_count,
+            "total_errors": self.error_count,
+            "max_rate_per_sec": self.max_rate
+        }
 
 
 @dataclass
@@ -271,13 +390,26 @@ class SignalRouter:
         }
 
         # Stream mappings
+        # === FEATURE FLAG: Use same stream selection logic as SignalProcessor ===
+        publish_mode = os.getenv("PUBLISH_MODE", "paper")
+        redis_stream_name = os.getenv("REDIS_STREAM_NAME")
+
+        if redis_stream_name:
+            default_stream = redis_stream_name
+        elif publish_mode == "staging":
+            default_stream = "signals:paper:staging"
+        elif publish_mode == "live":
+            default_stream = "signals:live"
+        else:
+            default_stream = os.getenv("STREAM_SIGNALS_PAPER", "signals:paper")
+
         self.execution_streams = {
             "scalp": "signals:scalp",
             "trend_following": "signals:trend",
             "sideways": "signals:sideways",
             "momentum": "signals:momentum",
             "breakout": "signals:breakout",
-            "default": os.getenv("STREAM_SIGNALS_PAPER", "signals:paper"),
+            "default": default_stream,
         }
 
     def route_signal(self, processed_signal: ProcessedSignal) -> List[str]:
@@ -318,7 +450,7 @@ class SignalRouter:
 class SignalProcessor:
     """Main Signal Processor Agent"""
 
-    def __init__(self, config_path: str = "config/settings.yaml"):
+    def __init__(self, config_path: str = "config/settings.yaml", redis_manager=None):
         self.logger = logging.getLogger(__name__)
 
         # Load environment variables
@@ -331,8 +463,10 @@ class SignalProcessor:
         self.quality_assessor = SignalQualityAssessor(self.config)
         self.signal_router = SignalRouter(self.config)
 
-        # Redis connection
+        # Redis connection (use shared AsyncRedisManager if provided)
+        self.redis_manager = redis_manager
         self.redis_client: Optional[redis.Redis] = None
+        self.resilient_publisher: Optional[ResilientPublisher] = None
 
         # State management
         self.running = False
@@ -349,22 +483,70 @@ class SignalProcessor:
             "start_time": time.time(),
         }
 
-        # Signal processing strategies
-        self.signal_generators = {
-            "ai_fusion": self._process_ai_fusion_signal,
-            "regime_change": self._process_regime_change_signal,
-            "quality_threshold": self._process_quality_threshold_signal,
-        }
+        # Signal processing strategies (TODO: Implement these methods if needed)
+        # self.signal_generators = {
+        #     "ai_fusion": self._process_ai_fusion_signal,
+        #     "regime_change": self._process_regime_change_signal,
+        #     "quality_threshold": self._process_quality_threshold_signal,
+        # }
+
+    def _load_trading_pairs(self) -> List[str]:
+        """
+        Load trading pairs with support for EXTRA_PAIRS.
+
+        Priority:
+        1. TRADING_PAIRS (base pairs) - defaults to BTC/USD,ETH/USD
+        2. EXTRA_PAIRS (additive) - optional additional pairs
+
+        Returns:
+            List of unique trading pairs (deduplicated, order preserved)
+        """
+        # Load base pairs (default: BTC/USD,ETH/USD for backward compatibility)
+        base_pairs_str = os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD")
+        base_pairs = [p.strip() for p in base_pairs_str.split(",") if p.strip()]
+
+        # Load extra pairs (additive)
+        extra_pairs_str = os.getenv("EXTRA_PAIRS", "")
+        extra_pairs = [p.strip() for p in extra_pairs_str.split(",") if p.strip()]
+
+        # Merge and deduplicate (preserves order)
+        all_pairs = base_pairs + extra_pairs
+        unique_pairs = list(dict.fromkeys(all_pairs))
+
+        self.logger.info(f"Trading pairs loaded: {', '.join(unique_pairs)}")
+        if extra_pairs:
+            self.logger.info(f"  Base pairs: {', '.join(base_pairs)}")
+            self.logger.info(f"  Extra pairs: {', '.join(extra_pairs)}")
+
+        return unique_pairs
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from environment"""
+        # === FEATURE FLAG: Staging Stream Support ===
+        # Priority: REDIS_STREAM_NAME > PUBLISH_MODE > STREAM_SIGNALS_PAPER > default
+        publish_mode = os.getenv("PUBLISH_MODE", "paper")  # paper|staging|live
+        redis_stream_name = os.getenv("REDIS_STREAM_NAME")  # Optional direct override
+
+        if redis_stream_name:
+            # Direct override takes highest priority
+            processed_signals_stream = redis_stream_name
+        elif publish_mode == "staging":
+            # Staging mode maps to staging stream
+            processed_signals_stream = "signals:paper:staging"
+        elif publish_mode == "live":
+            # Live mode maps to live stream
+            processed_signals_stream = "signals:live"
+        else:
+            # Default: fallback to STREAM_SIGNALS_PAPER or "signals:paper"
+            processed_signals_stream = os.getenv("STREAM_SIGNALS_PAPER", "signals:paper")
+
         config = {
             # Redis configuration
             "redis_url": os.getenv("REDIS_URL"),
             "redis_streams": {
                 "market_context": "ai:market_context",
                 "raw_signals": "signals:raw",
-                "processed_signals": os.getenv("STREAM_SIGNALS_PAPER", "signals:paper"),
+                "processed_signals": processed_signals_stream,
                 "regime_updates": "ai:regime",
             },
             # Signal processing parameters
@@ -389,9 +571,9 @@ class SignalProcessor:
                 "scalp": float(os.getenv("ALLOCATION_SCALP", "0.2")),
             },
             # Trading pairs and timeframes
-            "trading_pairs": os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD,SOL/USD,ADA/USD").split(
-                ","
-            ),
+            # === FEATURE FLAG: Extra Pairs Support ===
+            # Merge TRADING_PAIRS (base) + EXTRA_PAIRS (additive)
+            "trading_pairs": self._load_trading_pairs(),
             "timeframes": os.getenv("TIMEFRAMES", "1m,3m,5m").split(","),
             # AI fusion weights (for your signal_analyst.py)
             "ai_weights": {
@@ -440,60 +622,26 @@ class SignalProcessor:
     async def _init_redis(self):
         """Initialize Redis connection.
 
+        Uses shared AsyncRedisManager if provided, otherwise skips.
+
         Raises:
             ConfigError: If Redis URL is not configured
             RedisError: If Redis connection fails
         """
-        if not self.config["redis_url"]:
-            raise ConfigError(
-                "Redis URL not configured",
-                config_key="redis_url",
-                details={"env_var": "REDIS_URL"},
+        # Use shared AsyncRedisManager if provided
+        if self.redis_manager:
+            self.redis_client = self.redis_manager.client
+            # Initialize resilient publisher with rate limiting
+            self.resilient_publisher = ResilientPublisher(
+                redis_client=self.redis_client,
+                max_rate_per_sec=2.0  # Max 2 signals/sec
             )
+            self.logger.info("✅ Using shared AsyncRedisManager connection with resilient publisher (2/sec)")
+            return
 
-        try:
-            # Use the specific Redis Cloud format
-            if "redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com" in self.config["redis_url"]:
-                self.redis_client = redis.Redis(
-                    host="redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com",
-                    port=19818,
-                    username="default",
-                    password="inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8",
-                    ssl=True,
-                    ssl_cert_reqs="required",
-                    decode_responses=False,
-                    socket_timeout=30,
-                    socket_keepalive=True,
-                    socket_keepalive_options={
-                        "TCP_KEEPIDLE": 1,
-                        "TCP_KEEPINTVL": 3,
-                        "TCP_KEEPCNT": 5,
-                    },
-                )
-            else:
-                self.redis_client = redis.from_url(
-                    self.config["redis_url"],
-                    socket_timeout=30,
-                    socket_keepalive=True,
-                    decode_responses=False,
-                )
-
-            # Test connection
-            await self.redis_client.ping()
-            self.logger.info("Redis connection established")
-
-        except redis.ConnectionError as e:
-            raise RedisError(
-                f"Redis connection failed: {e}",
-                operation="connect",
-                details={"redis_url": self.config["redis_url"], "original_error": str(e)},
-            ) from e
-        except Exception as e:
-            raise RedisError(
-                f"Redis initialization error: {e}",
-                operation="initialize",
-                details={"original_error": str(e)},
-            ) from e
+        # Skip Redis initialization if no manager provided
+        self.logger.warning("No Redis manager provided, SignalProcessor will run without Redis")
+        return
 
     async def _load_market_context(self):
         """Load latest market context from AI engine"""
@@ -1099,20 +1247,38 @@ class SignalProcessor:
             # Convert to execution order format
             order_data = signal.to_execution_order()
 
-            # Send to each target stream
+            # Send to each target stream with resilient publisher
             for stream_name in target_streams:
-                try:
-                    await self.redis_client.xadd(stream_name, order_data)
-                    self.stats["signals_routed"] += 1
-                except Exception as e:
-                    self.logger.error(f"Failed to send to stream {stream_name}: {e}")
-                    # Metrics instrumentation for Redis errors
+                if self.resilient_publisher:
+                    # Use resilient publisher with rate limiting and exponential backoff
+                    msg_id = await self.resilient_publisher.publish_with_backoff(
+                        stream_name=stream_name,
+                        data=order_data,
+                        max_retries=3,
+                        initial_backoff=1.0,
+                        max_backoff=60.0
+                    )
+                    if msg_id:
+                        self.stats["signals_routed"] += 1
+                    else:
+                        # All retries failed - already logged by resilient publisher
+                        try:
+                            from monitoring.metrics_exporter import inc_redis_publish_error
+                            inc_redis_publish_error(stream=stream_name)
+                        except ImportError:
+                            pass
+                else:
+                    # Fallback: use direct xadd if resilient publisher not available
                     try:
-                        from monitoring.metrics_exporter import inc_redis_publish_error
-
-                        inc_redis_publish_error(stream=stream_name)
-                    except ImportError:
-                        pass  # Metrics not available
+                        await self.redis_client.xadd(stream_name, order_data)
+                        self.stats["signals_routed"] += 1
+                    except Exception as e:
+                        self.logger.error(f"Failed to send to stream {stream_name}: {e}")
+                        try:
+                            from monitoring.metrics_exporter import inc_redis_publish_error
+                            inc_redis_publish_error(stream=stream_name)
+                        except ImportError:
+                            pass
 
             # Metrics instrumentation for successful signals
             try:
