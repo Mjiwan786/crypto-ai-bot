@@ -1,0 +1,27 @@
+{
+  "pairs": [
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "ADA/USD",
+    "AVAX/USD"
+  ],
+  "pairs_successful": 0,
+  "pairs_failed": 5,
+  "total_trades": 0,
+  "winning_trades": 0,
+  "losing_trades": 0,
+  "avg_return_pct": 0.0,
+  "avg_win_rate_pct": 0.0,
+  "avg_profit_factor": 0.0,
+  "avg_sharpe_ratio": 0.0,
+  "max_drawdown_pct": 0.0,
+  "pair_results": {
+    "BTC/USD": null,
+    "ETH/USD": null,
+    "SOL/USD": null,
+    "ADA/USD": null,
+    "AVAX/USD": null
+  },
+  "timestamp": "2025-11-08T21:30:21.443227"
+}

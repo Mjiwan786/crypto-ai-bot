@@ -1,0 +1,37 @@
+2025-11-08T21:28:39 | INFO | __main__ | ================================================================================
+2025-11-08T21:28:39 | INFO | __main__ | BACKTEST RUNNER
+2025-11-08T21:28:39 | INFO | __main__ | ================================================================================
+2025-11-08T21:28:39 | INFO | __main__ | Pairs: ['BTC/USD', 'ETH/USD', 'SOL/USD', 'ADA/USD', 'AVAX/USD']
+2025-11-08T21:28:39 | INFO | __main__ | Timeframe: 5m
+2025-11-08T21:28:39 | INFO | __main__ | Lookback: 365 days
+2025-11-08T21:28:39 | INFO | __main__ | Capital: $10000.00
+2025-11-08T21:28:39 | INFO | __main__ | Fee: 5.0 bps (0.05%)
+2025-11-08T21:28:39 | INFO | __main__ | Slippage: 2.0 bps (0.02%)
+2025-11-08T21:28:39 | INFO | __main__ | Random seed: 42
+2025-11-08T21:28:39 | INFO | __main__ | Max DD threshold: 20.0%
+2025-11-08T21:28:39 | INFO | __main__ | ML filter: disabled
+2025-11-08T21:28:39 | INFO | __main__ | 
+2025-11-08T21:28:39 | INFO | __main__ | Loading 365d of 5m data for 5 pairs...
+2025-11-08T21:28:39 | INFO | __main__ |   Generating 105120 bars for BTC/USD...
+2025-11-08T21:28:39 | INFO | __main__ |     Loaded 105120 bars, price range: $2871.31 - $3720239.68
+2025-11-08T21:28:39 | INFO | __main__ |   Generating 105120 bars for ETH/USD...
+2025-11-08T21:28:39 | INFO | __main__ |     Loaded 105120 bars, price range: $131.83 - $654856.92
+2025-11-08T21:28:39 | INFO | __main__ |   Generating 105120 bars for SOL/USD...
+2025-11-08T21:28:39 | INFO | __main__ |     Loaded 105120 bars, price range: $3.82 - $64072.98
+2025-11-08T21:28:39 | INFO | __main__ |   Generating 105120 bars for ADA/USD...
+2025-11-08T21:28:39 | INFO | __main__ |     Loaded 105120 bars, price range: $0.02 - $940.53
+2025-11-08T21:28:39 | INFO | __main__ |   Generating 105120 bars for AVAX/USD...
+2025-11-08T21:28:39 | INFO | __main__ |     Loaded 105120 bars, price range: $1.21 - $193295.05
+2025-11-08T21:28:39 | INFO | __main__ | Starting backtest...
+2025-11-08T21:28:39 | INFO | __main__ | 
+2025-11-08T21:28:39 | INFO | ai_engine.regime_detector.detector | RegimeDetector initialized: hysteresis=3 bars
+2025-11-08T21:28:39 | INFO | agents.strategy_router | Loaded leverage caps for 3 symbols
+2025-11-08T21:28:39 | INFO | agents.strategy_router | StrategyRouter initialized: cooldown=2 bars, leverage_caps=True, kill_switch=TRADING_ENABLED, risk_breaker_check=True
+Traceback (most recent call last):
+  File "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\scripts\run_backtest_v2.py", line 454, in <module>
+    main()
+  File "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\scripts\run_backtest_v2.py", line 356, in main
+    runner = BacktestRunner(config=config)
+  File "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\backtests\runner.py", line 311, in __init__
+    momentum_strategy = MomentumStrategy()
+TypeError: MomentumStrategy.__init__() missing 2 required positional arguments: 'redis_manager' and 'config'

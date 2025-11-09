@@ -1,0 +1,325 @@
+2025-11-08 21:30:02 | INFO | ================================================================================
+2025-11-08 21:30:02 | INFO | MULTI-PAIR BACKTEST RUNNER
+2025-11-08 21:30:02 | INFO | ================================================================================
+2025-11-08 21:30:02 | INFO | Pairs: ['BTC/USD', 'ETH/USD', 'SOL/USD', 'ADA/USD', 'AVAX/USD']
+2025-11-08 21:30:02 | INFO | Lookback: 90 days
+2025-11-08 21:30:02 | INFO | Capital per pair: $10000.00
+2025-11-08 21:30:02 | INFO | 
+2025-11-08 21:30:02 | INFO | Running backtest for BTC/USD (90 days)...
+2025-11-08 21:30:06 | ERROR |   BTC/USD: Backtest failed
+2025-11-08 21:30:06 | ERROR |   stdout: 
+2025-11-08 21:30:06 | ERROR |   stderr: 2025-11-08 21:30:03 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:03 | INFO | __main__ | BAR REACTION BACKTEST
+2025-11-08 21:30:03 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:03 | INFO | __main__ | Config: config\bar_reaction_5m_aggressive.yaml
+2025-11-08 21:30:03 | INFO | __main__ | Lookback: 90 days
+2025-11-08 21:30:03 | INFO | __main__ | Capital: $10000.00
+2025-11-08 21:30:03 | INFO | __main__ | 
+2025-11-08 21:30:03 | INFO | __main__ | Strategy initialized with config:
+2025-11-08 21:30:03 | INFO | __main__ |   Mode: trend
+2025-11-08 21:30:03 | INFO | __main__ |   Trigger: 20.0 bps
+2025-11-08 21:30:03 | INFO | __main__ |   ATR range: 0.05% - 5.0%
+2025-11-08 21:30:03 | INFO | __main__ |   Stop: 1.5x ATR
+2025-11-08 21:30:03 | INFO | __main__ |   Targets: TP1=2.5x, TP2=4.0x ATR
+2025-11-08 21:30:03 | INFO | __main__ |   Risk/trade: 1.2%
+2025-11-08 21:30:03 | INFO | __main__ |   Position limits: $50.0 - $2000.0
+2025-11-08 21:30:03 | INFO | __main__ | 
+2025-11-08 21:30:03 | INFO | __main__ | Generating synthetic 1m OHLCV data (will roll up to 5m)...
+2025-11-08 21:30:03 | INFO | __main__ | Generated 129600 bars
+2025-11-08 21:30:03 | INFO | __main__ | Price range: $2523.27 - $22196144.88
+2025-11-08 21:30:03 | INFO | __main__ | 
+2025-11-08 21:30:03 | INFO | __main__ | Running backtest...
+2025-11-08 21:30:03 | INFO | strategies.bar_reaction_data | Using 1m\u21925m rollup for BTC/USD
+2025-11-08 21:30:03 | INFO | strategies.bar_reaction_data | Prepared 25920 bars for BTC/USD (trigger_mode=open_to_close)
+2025-11-08 21:30:03 | INFO | __main__ | Strategy prepared 25920 5m bars from 129600 1m bars
+2025-11-08 21:30:03 | INFO | __main__ | Running backtest on 25920 5m bars...
+2025-11-08 21:30:03 | WARNING | __main__ | should_trade() rejected bar 15: ATR%=7.5918%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:03 | WARNING | __main__ | should_trade() rejected bar 16: ATR%=7.0579%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:03 | WARNING | __main__ | should_trade() rejected bar 17: ATR%=6.5808%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:03 | WARNING | __main__ | should_trade() rejected bar 18: ATR%=6.6607%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:03 | WARNING | __main__ | should_trade() rejected bar 19: ATR%=6.7615%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:06 | WARNING | __main__ | Debug stats:
+2025-11-08 21:30:06 | WARNING | __main__ |   Total 1m bars: 129600
+2025-11-08 21:30:06 | WARNING | __main__ |   Total 5m bars: 25920
+2025-11-08 21:30:06 | WARNING | __main__ |   should_trade() rejections: 25905
+2025-11-08 21:30:06 | WARNING | __main__ |   generate_signals() empty: 0
+2025-11-08 21:30:06 | WARNING | __main__ |   Trades executed: 0
+2025-11-08 21:30:06 | WARNING | __main__ | No trades generated!
+2025-11-08 21:30:06 | INFO | __main__ | 
+2025-11-08 21:30:06 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:06 | INFO | __main__ | RESULTS
+2025-11-08 21:30:06 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:06 | INFO | __main__ | Status: NO_TRADES
+2025-11-08 21:30:06 | INFO | __main__ | Total Return: 0.00%
+2025-11-08 21:30:06 | INFO | __main__ | Profit Factor: 0.00
+2025-11-08 21:30:06 | INFO | __main__ | Sharpe Ratio: 0.00
+2025-11-08 21:30:06 | INFO | __main__ | Max Drawdown: 0.00%
+2025-11-08 21:30:06 | INFO | __main__ | Win Rate: 0.00%
+2025-11-08 21:30:06 | INFO | __main__ | Total Trades: 0
+2025-11-08 21:30:06 | INFO | __main__ |   Winners: 0
+2025-11-08 21:30:06 | INFO | __main__ |   Losers: 0
+2025-11-08 21:30:06 | INFO | __main__ | Avg Win: $0.00
+2025-11-08 21:30:06 | INFO | __main__ | Avg Loss: $0.00
+2025-11-08 21:30:06 | INFO | __main__ | Final Capital: $10000.00
+2025-11-08 21:30:06 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:06 | INFO | __main__ | Results saved to: out\backtests\BTC_USD_90d.json
+
+2025-11-08 21:30:06 | INFO | Running backtest for ETH/USD (90 days)...
+2025-11-08 21:30:10 | ERROR |   ETH/USD: Backtest failed
+2025-11-08 21:30:10 | ERROR |   stdout: 
+2025-11-08 21:30:10 | ERROR |   stderr: 2025-11-08 21:30:07 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:07 | INFO | __main__ | BAR REACTION BACKTEST
+2025-11-08 21:30:07 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:07 | INFO | __main__ | Config: config\bar_reaction_5m_aggressive.yaml
+2025-11-08 21:30:07 | INFO | __main__ | Lookback: 90 days
+2025-11-08 21:30:07 | INFO | __main__ | Capital: $10000.00
+2025-11-08 21:30:07 | INFO | __main__ | 
+2025-11-08 21:30:07 | INFO | __main__ | Strategy initialized with config:
+2025-11-08 21:30:07 | INFO | __main__ |   Mode: trend
+2025-11-08 21:30:07 | INFO | __main__ |   Trigger: 20.0 bps
+2025-11-08 21:30:07 | INFO | __main__ |   ATR range: 0.05% - 5.0%
+2025-11-08 21:30:07 | INFO | __main__ |   Stop: 1.5x ATR
+2025-11-08 21:30:07 | INFO | __main__ |   Targets: TP1=2.5x, TP2=4.0x ATR
+2025-11-08 21:30:07 | INFO | __main__ |   Risk/trade: 1.2%
+2025-11-08 21:30:07 | INFO | __main__ |   Position limits: $50.0 - $2000.0
+2025-11-08 21:30:07 | INFO | __main__ | 
+2025-11-08 21:30:07 | INFO | __main__ | Generating synthetic 1m OHLCV data (will roll up to 5m)...
+2025-11-08 21:30:07 | INFO | __main__ | Generated 129600 bars
+2025-11-08 21:30:07 | INFO | __main__ | Price range: $2523.27 - $22196144.88
+2025-11-08 21:30:07 | INFO | __main__ | 
+2025-11-08 21:30:07 | INFO | __main__ | Running backtest...
+2025-11-08 21:30:07 | INFO | strategies.bar_reaction_data | Using 1m\u21925m rollup for BTC/USD
+2025-11-08 21:30:07 | INFO | strategies.bar_reaction_data | Prepared 25920 bars for BTC/USD (trigger_mode=open_to_close)
+2025-11-08 21:30:07 | INFO | __main__ | Strategy prepared 25920 5m bars from 129600 1m bars
+2025-11-08 21:30:07 | INFO | __main__ | Running backtest on 25920 5m bars...
+2025-11-08 21:30:07 | WARNING | __main__ | should_trade() rejected bar 15: ATR%=7.5918%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:07 | WARNING | __main__ | should_trade() rejected bar 16: ATR%=7.0579%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:07 | WARNING | __main__ | should_trade() rejected bar 17: ATR%=6.5808%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:07 | WARNING | __main__ | should_trade() rejected bar 18: ATR%=6.6607%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:07 | WARNING | __main__ | should_trade() rejected bar 19: ATR%=6.7615%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:10 | WARNING | __main__ | Debug stats:
+2025-11-08 21:30:10 | WARNING | __main__ |   Total 1m bars: 129600
+2025-11-08 21:30:10 | WARNING | __main__ |   Total 5m bars: 25920
+2025-11-08 21:30:10 | WARNING | __main__ |   should_trade() rejections: 25905
+2025-11-08 21:30:10 | WARNING | __main__ |   generate_signals() empty: 0
+2025-11-08 21:30:10 | WARNING | __main__ |   Trades executed: 0
+2025-11-08 21:30:10 | WARNING | __main__ | No trades generated!
+2025-11-08 21:30:10 | INFO | __main__ | 
+2025-11-08 21:30:10 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:10 | INFO | __main__ | RESULTS
+2025-11-08 21:30:10 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:10 | INFO | __main__ | Status: NO_TRADES
+2025-11-08 21:30:10 | INFO | __main__ | Total Return: 0.00%
+2025-11-08 21:30:10 | INFO | __main__ | Profit Factor: 0.00
+2025-11-08 21:30:10 | INFO | __main__ | Sharpe Ratio: 0.00
+2025-11-08 21:30:10 | INFO | __main__ | Max Drawdown: 0.00%
+2025-11-08 21:30:10 | INFO | __main__ | Win Rate: 0.00%
+2025-11-08 21:30:10 | INFO | __main__ | Total Trades: 0
+2025-11-08 21:30:10 | INFO | __main__ |   Winners: 0
+2025-11-08 21:30:10 | INFO | __main__ |   Losers: 0
+2025-11-08 21:30:10 | INFO | __main__ | Avg Win: $0.00
+2025-11-08 21:30:10 | INFO | __main__ | Avg Loss: $0.00
+2025-11-08 21:30:10 | INFO | __main__ | Final Capital: $10000.00
+2025-11-08 21:30:10 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:10 | INFO | __main__ | Results saved to: out\backtests\ETH_USD_90d.json
+
+2025-11-08 21:30:10 | INFO | Running backtest for SOL/USD (90 days)...
+2025-11-08 21:30:14 | ERROR |   SOL/USD: Backtest failed
+2025-11-08 21:30:14 | ERROR |   stdout: 
+2025-11-08 21:30:14 | ERROR |   stderr: 2025-11-08 21:30:11 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:11 | INFO | __main__ | BAR REACTION BACKTEST
+2025-11-08 21:30:11 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:11 | INFO | __main__ | Config: config\bar_reaction_5m_aggressive.yaml
+2025-11-08 21:30:11 | INFO | __main__ | Lookback: 90 days
+2025-11-08 21:30:11 | INFO | __main__ | Capital: $10000.00
+2025-11-08 21:30:11 | INFO | __main__ | 
+2025-11-08 21:30:11 | INFO | __main__ | Strategy initialized with config:
+2025-11-08 21:30:11 | INFO | __main__ |   Mode: trend
+2025-11-08 21:30:11 | INFO | __main__ |   Trigger: 20.0 bps
+2025-11-08 21:30:11 | INFO | __main__ |   ATR range: 0.05% - 5.0%
+2025-11-08 21:30:11 | INFO | __main__ |   Stop: 1.5x ATR
+2025-11-08 21:30:11 | INFO | __main__ |   Targets: TP1=2.5x, TP2=4.0x ATR
+2025-11-08 21:30:11 | INFO | __main__ |   Risk/trade: 1.2%
+2025-11-08 21:30:11 | INFO | __main__ |   Position limits: $50.0 - $2000.0
+2025-11-08 21:30:11 | INFO | __main__ | 
+2025-11-08 21:30:11 | INFO | __main__ | Generating synthetic 1m OHLCV data (will roll up to 5m)...
+2025-11-08 21:30:11 | INFO | __main__ | Generated 129600 bars
+2025-11-08 21:30:11 | INFO | __main__ | Price range: $2523.27 - $22196144.88
+2025-11-08 21:30:11 | INFO | __main__ | 
+2025-11-08 21:30:11 | INFO | __main__ | Running backtest...
+2025-11-08 21:30:11 | INFO | strategies.bar_reaction_data | Using 1m\u21925m rollup for BTC/USD
+2025-11-08 21:30:11 | INFO | strategies.bar_reaction_data | Prepared 25920 bars for BTC/USD (trigger_mode=open_to_close)
+2025-11-08 21:30:11 | INFO | __main__ | Strategy prepared 25920 5m bars from 129600 1m bars
+2025-11-08 21:30:11 | INFO | __main__ | Running backtest on 25920 5m bars...
+2025-11-08 21:30:11 | WARNING | __main__ | should_trade() rejected bar 15: ATR%=7.5918%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:11 | WARNING | __main__ | should_trade() rejected bar 16: ATR%=7.0579%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:11 | WARNING | __main__ | should_trade() rejected bar 17: ATR%=6.5808%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:11 | WARNING | __main__ | should_trade() rejected bar 18: ATR%=6.6607%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:11 | WARNING | __main__ | should_trade() rejected bar 19: ATR%=6.7615%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:13 | WARNING | __main__ | Debug stats:
+2025-11-08 21:30:13 | WARNING | __main__ |   Total 1m bars: 129600
+2025-11-08 21:30:13 | WARNING | __main__ |   Total 5m bars: 25920
+2025-11-08 21:30:13 | WARNING | __main__ |   should_trade() rejections: 25905
+2025-11-08 21:30:13 | WARNING | __main__ |   generate_signals() empty: 0
+2025-11-08 21:30:13 | WARNING | __main__ |   Trades executed: 0
+2025-11-08 21:30:13 | WARNING | __main__ | No trades generated!
+2025-11-08 21:30:13 | INFO | __main__ | 
+2025-11-08 21:30:13 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:13 | INFO | __main__ | RESULTS
+2025-11-08 21:30:13 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:13 | INFO | __main__ | Status: NO_TRADES
+2025-11-08 21:30:13 | INFO | __main__ | Total Return: 0.00%
+2025-11-08 21:30:13 | INFO | __main__ | Profit Factor: 0.00
+2025-11-08 21:30:13 | INFO | __main__ | Sharpe Ratio: 0.00
+2025-11-08 21:30:13 | INFO | __main__ | Max Drawdown: 0.00%
+2025-11-08 21:30:13 | INFO | __main__ | Win Rate: 0.00%
+2025-11-08 21:30:13 | INFO | __main__ | Total Trades: 0
+2025-11-08 21:30:13 | INFO | __main__ |   Winners: 0
+2025-11-08 21:30:13 | INFO | __main__ |   Losers: 0
+2025-11-08 21:30:13 | INFO | __main__ | Avg Win: $0.00
+2025-11-08 21:30:13 | INFO | __main__ | Avg Loss: $0.00
+2025-11-08 21:30:13 | INFO | __main__ | Final Capital: $10000.00
+2025-11-08 21:30:13 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:13 | INFO | __main__ | Results saved to: out\backtests\SOL_USD_90d.json
+
+2025-11-08 21:30:14 | INFO | Running backtest for ADA/USD (90 days)...
+2025-11-08 21:30:17 | ERROR |   ADA/USD: Backtest failed
+2025-11-08 21:30:17 | ERROR |   stdout: 
+2025-11-08 21:30:17 | ERROR |   stderr: 2025-11-08 21:30:14 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:14 | INFO | __main__ | BAR REACTION BACKTEST
+2025-11-08 21:30:14 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:14 | INFO | __main__ | Config: config\bar_reaction_5m_aggressive.yaml
+2025-11-08 21:30:14 | INFO | __main__ | Lookback: 90 days
+2025-11-08 21:30:14 | INFO | __main__ | Capital: $10000.00
+2025-11-08 21:30:14 | INFO | __main__ | 
+2025-11-08 21:30:14 | INFO | __main__ | Strategy initialized with config:
+2025-11-08 21:30:14 | INFO | __main__ |   Mode: trend
+2025-11-08 21:30:14 | INFO | __main__ |   Trigger: 20.0 bps
+2025-11-08 21:30:14 | INFO | __main__ |   ATR range: 0.05% - 5.0%
+2025-11-08 21:30:14 | INFO | __main__ |   Stop: 1.5x ATR
+2025-11-08 21:30:14 | INFO | __main__ |   Targets: TP1=2.5x, TP2=4.0x ATR
+2025-11-08 21:30:14 | INFO | __main__ |   Risk/trade: 1.2%
+2025-11-08 21:30:14 | INFO | __main__ |   Position limits: $50.0 - $2000.0
+2025-11-08 21:30:14 | INFO | __main__ | 
+2025-11-08 21:30:14 | INFO | __main__ | Generating synthetic 1m OHLCV data (will roll up to 5m)...
+2025-11-08 21:30:14 | INFO | __main__ | Generated 129600 bars
+2025-11-08 21:30:14 | INFO | __main__ | Price range: $2523.27 - $22196144.88
+2025-11-08 21:30:14 | INFO | __main__ | 
+2025-11-08 21:30:14 | INFO | __main__ | Running backtest...
+2025-11-08 21:30:14 | INFO | strategies.bar_reaction_data | Using 1m\u21925m rollup for BTC/USD
+2025-11-08 21:30:14 | INFO | strategies.bar_reaction_data | Prepared 25920 bars for BTC/USD (trigger_mode=open_to_close)
+2025-11-08 21:30:14 | INFO | __main__ | Strategy prepared 25920 5m bars from 129600 1m bars
+2025-11-08 21:30:14 | INFO | __main__ | Running backtest on 25920 5m bars...
+2025-11-08 21:30:14 | WARNING | __main__ | should_trade() rejected bar 15: ATR%=7.5918%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:14 | WARNING | __main__ | should_trade() rejected bar 16: ATR%=7.0579%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:14 | WARNING | __main__ | should_trade() rejected bar 17: ATR%=6.5808%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:14 | WARNING | __main__ | should_trade() rejected bar 18: ATR%=6.6607%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:14 | WARNING | __main__ | should_trade() rejected bar 19: ATR%=6.7615%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:17 | WARNING | __main__ | Debug stats:
+2025-11-08 21:30:17 | WARNING | __main__ |   Total 1m bars: 129600
+2025-11-08 21:30:17 | WARNING | __main__ |   Total 5m bars: 25920
+2025-11-08 21:30:17 | WARNING | __main__ |   should_trade() rejections: 25905
+2025-11-08 21:30:17 | WARNING | __main__ |   generate_signals() empty: 0
+2025-11-08 21:30:17 | WARNING | __main__ |   Trades executed: 0
+2025-11-08 21:30:17 | WARNING | __main__ | No trades generated!
+2025-11-08 21:30:17 | INFO | __main__ | 
+2025-11-08 21:30:17 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:17 | INFO | __main__ | RESULTS
+2025-11-08 21:30:17 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:17 | INFO | __main__ | Status: NO_TRADES
+2025-11-08 21:30:17 | INFO | __main__ | Total Return: 0.00%
+2025-11-08 21:30:17 | INFO | __main__ | Profit Factor: 0.00
+2025-11-08 21:30:17 | INFO | __main__ | Sharpe Ratio: 0.00
+2025-11-08 21:30:17 | INFO | __main__ | Max Drawdown: 0.00%
+2025-11-08 21:30:17 | INFO | __main__ | Win Rate: 0.00%
+2025-11-08 21:30:17 | INFO | __main__ | Total Trades: 0
+2025-11-08 21:30:17 | INFO | __main__ |   Winners: 0
+2025-11-08 21:30:17 | INFO | __main__ |   Losers: 0
+2025-11-08 21:30:17 | INFO | __main__ | Avg Win: $0.00
+2025-11-08 21:30:17 | INFO | __main__ | Avg Loss: $0.00
+2025-11-08 21:30:17 | INFO | __main__ | Final Capital: $10000.00
+2025-11-08 21:30:17 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:17 | INFO | __main__ | Results saved to: out\backtests\ADA_USD_90d.json
+
+2025-11-08 21:30:17 | INFO | Running backtest for AVAX/USD (90 days)...
+2025-11-08 21:30:21 | ERROR |   AVAX/USD: Backtest failed
+2025-11-08 21:30:21 | ERROR |   stdout: 
+2025-11-08 21:30:21 | ERROR |   stderr: 2025-11-08 21:30:18 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:18 | INFO | __main__ | BAR REACTION BACKTEST
+2025-11-08 21:30:18 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:18 | INFO | __main__ | Config: config\bar_reaction_5m_aggressive.yaml
+2025-11-08 21:30:18 | INFO | __main__ | Lookback: 90 days
+2025-11-08 21:30:18 | INFO | __main__ | Capital: $10000.00
+2025-11-08 21:30:18 | INFO | __main__ | 
+2025-11-08 21:30:18 | INFO | __main__ | Strategy initialized with config:
+2025-11-08 21:30:18 | INFO | __main__ |   Mode: trend
+2025-11-08 21:30:18 | INFO | __main__ |   Trigger: 20.0 bps
+2025-11-08 21:30:18 | INFO | __main__ |   ATR range: 0.05% - 5.0%
+2025-11-08 21:30:18 | INFO | __main__ |   Stop: 1.5x ATR
+2025-11-08 21:30:18 | INFO | __main__ |   Targets: TP1=2.5x, TP2=4.0x ATR
+2025-11-08 21:30:18 | INFO | __main__ |   Risk/trade: 1.2%
+2025-11-08 21:30:18 | INFO | __main__ |   Position limits: $50.0 - $2000.0
+2025-11-08 21:30:18 | INFO | __main__ | 
+2025-11-08 21:30:18 | INFO | __main__ | Generating synthetic 1m OHLCV data (will roll up to 5m)...
+2025-11-08 21:30:18 | INFO | __main__ | Generated 129600 bars
+2025-11-08 21:30:18 | INFO | __main__ | Price range: $2523.27 - $22196144.88
+2025-11-08 21:30:18 | INFO | __main__ | 
+2025-11-08 21:30:18 | INFO | __main__ | Running backtest...
+2025-11-08 21:30:18 | INFO | strategies.bar_reaction_data | Using 1m\u21925m rollup for BTC/USD
+2025-11-08 21:30:18 | INFO | strategies.bar_reaction_data | Prepared 25920 bars for BTC/USD (trigger_mode=open_to_close)
+2025-11-08 21:30:18 | INFO | __main__ | Strategy prepared 25920 5m bars from 129600 1m bars
+2025-11-08 21:30:18 | INFO | __main__ | Running backtest on 25920 5m bars...
+2025-11-08 21:30:18 | WARNING | __main__ | should_trade() rejected bar 15: ATR%=7.5918%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:18 | WARNING | __main__ | should_trade() rejected bar 16: ATR%=7.0579%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:18 | WARNING | __main__ | should_trade() rejected bar 17: ATR%=6.5808%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:18 | WARNING | __main__ | should_trade() rejected bar 18: ATR%=6.6607%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:18 | WARNING | __main__ | should_trade() rejected bar 19: ATR%=6.7615%, range=[0.0500% - 5.0000%]
+2025-11-08 21:30:21 | WARNING | __main__ | Debug stats:
+2025-11-08 21:30:21 | WARNING | __main__ |   Total 1m bars: 129600
+2025-11-08 21:30:21 | WARNING | __main__ |   Total 5m bars: 25920
+2025-11-08 21:30:21 | WARNING | __main__ |   should_trade() rejections: 25905
+2025-11-08 21:30:21 | WARNING | __main__ |   generate_signals() empty: 0
+2025-11-08 21:30:21 | WARNING | __main__ |   Trades executed: 0
+2025-11-08 21:30:21 | WARNING | __main__ | No trades generated!
+2025-11-08 21:30:21 | INFO | __main__ | 
+2025-11-08 21:30:21 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:21 | INFO | __main__ | RESULTS
+2025-11-08 21:30:21 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:21 | INFO | __main__ | Status: NO_TRADES
+2025-11-08 21:30:21 | INFO | __main__ | Total Return: 0.00%
+2025-11-08 21:30:21 | INFO | __main__ | Profit Factor: 0.00
+2025-11-08 21:30:21 | INFO | __main__ | Sharpe Ratio: 0.00
+2025-11-08 21:30:21 | INFO | __main__ | Max Drawdown: 0.00%
+2025-11-08 21:30:21 | INFO | __main__ | Win Rate: 0.00%
+2025-11-08 21:30:21 | INFO | __main__ | Total Trades: 0
+2025-11-08 21:30:21 | INFO | __main__ |   Winners: 0
+2025-11-08 21:30:21 | INFO | __main__ |   Losers: 0
+2025-11-08 21:30:21 | INFO | __main__ | Avg Win: $0.00
+2025-11-08 21:30:21 | INFO | __main__ | Avg Loss: $0.00
+2025-11-08 21:30:21 | INFO | __main__ | Final Capital: $10000.00
+2025-11-08 21:30:21 | INFO | __main__ | ================================================================================
+2025-11-08 21:30:21 | INFO | __main__ | Results saved to: out\backtests\AVAX_USD_90d.json
+
+2025-11-08 21:30:21 | INFO | 
+2025-11-08 21:30:21 | INFO | ================================================================================
+2025-11-08 21:30:21 | INFO | AGGREGATED RESULTS
+2025-11-08 21:30:21 | INFO | ================================================================================
+2025-11-08 21:30:21 | INFO | Pairs successful: 0/5
+2025-11-08 21:30:21 | INFO | Pairs failed: 5/5
+2025-11-08 21:30:21 | INFO | Total trades: 0
+2025-11-08 21:30:21 | INFO | Win rate: 0.00%
+2025-11-08 21:30:21 | INFO | Avg return: 0.00%
+2025-11-08 21:30:21 | INFO | Avg profit factor: 0.00
+2025-11-08 21:30:21 | INFO | Avg Sharpe: 0.00
+2025-11-08 21:30:21 | INFO | Max drawdown: 0.00%
+2025-11-08 21:30:21 | INFO | 
+2025-11-08 21:30:21 | INFO | Individual Pair Results:
+2025-11-08 21:30:21 | INFO |   BTC/USD     : FAILED
+2025-11-08 21:30:21 | INFO |   ETH/USD     : FAILED
+2025-11-08 21:30:21 | INFO |   SOL/USD     : FAILED
+2025-11-08 21:30:21 | INFO |   ADA/USD     : FAILED
+2025-11-08 21:30:21 | INFO |   AVAX/USD    : FAILED
+2025-11-08 21:30:21 | INFO | 
+2025-11-08 21:30:21 | INFO | Results saved to: out\backtests\multi_pair_results.json
+2025-11-08 21:30:21 | INFO | ================================================================================
+2025-11-08 21:30:21 | ERROR | All pairs failed!
