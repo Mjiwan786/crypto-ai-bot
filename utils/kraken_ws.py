@@ -19,6 +19,19 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, field_validator, Field
 
+# Prometheus metrics (optional) - PRD-001 Section 4.1 & 8.2
+try:
+    from prometheus_client import Counter
+    KRAKEN_WS_CONNECTIONS_TOTAL = Counter(
+        'kraken_ws_connections_total',
+        'Total WebSocket connection state changes',
+        ['state']
+    )
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    KRAKEN_WS_CONNECTIONS_TOTAL = None
+
 
 class ConnectionState(str, Enum):
     """WebSocket connection states per PRD-001 Section 4.1"""
@@ -470,6 +483,10 @@ class KrakenWebSocketClient:
             if reason:
                 log_msg += f" ({reason})"
             self.logger.info(log_msg)
+
+            # Emit Prometheus metric (PRD-001 Section 4.1 & 8.2)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_CONNECTIONS_TOTAL:
+                KRAKEN_WS_CONNECTIONS_TOTAL.labels(state=new_state.value).inc()
 
     def get_connection_state(self) -> ConnectionState:
         """Get the current connection state"""

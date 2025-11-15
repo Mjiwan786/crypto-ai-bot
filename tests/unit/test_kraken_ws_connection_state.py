@@ -522,5 +522,97 @@ class TestConnectionTimeout:
         assert client.last_heartbeat > initial_heartbeat
 
 
+class TestPrometheusMetrics:
+    """Test Prometheus metrics for connection state changes per PRD-001 Section 4.1 & 8.2"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_prometheus_counter_exists(self):
+        """Test that Prometheus counter is defined"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_CONNECTIONS_TOTAL
+
+        # Counter should be defined (may be None if prometheus not available)
+        if PROMETHEUS_AVAILABLE:
+            assert KRAKEN_WS_CONNECTIONS_TOTAL is not None
+            assert hasattr(KRAKEN_WS_CONNECTIONS_TOTAL, 'labels')
+
+    def test_counter_increments_on_state_change(self, client):
+        """Test that counter increments when connection state changes"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_CONNECTIONS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial counter values
+        initial_connecting = KRAKEN_WS_CONNECTIONS_TOTAL.labels(state='connecting')._value.get()
+        initial_connected = KRAKEN_WS_CONNECTIONS_TOTAL.labels(state='connected')._value.get()
+
+        # Change to CONNECTING
+        client._set_connection_state(ConnectionState.CONNECTING, "Test")
+
+        # Counter should increment
+        assert KRAKEN_WS_CONNECTIONS_TOTAL.labels(state='connecting')._value.get() == initial_connecting + 1
+
+        # Change to CONNECTED
+        client._set_connection_state(ConnectionState.CONNECTED, "Test")
+
+        # Counter should increment
+        assert KRAKEN_WS_CONNECTIONS_TOTAL.labels(state='connected')._value.get() == initial_connected + 1
+
+    def test_counter_has_correct_labels(self):
+        """Test that counter has all required state labels"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_CONNECTIONS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Should be able to create labels for all states
+        states = ['connecting', 'connected', 'disconnected', 'reconnecting']
+
+        for state in states:
+            metric = KRAKEN_WS_CONNECTIONS_TOTAL.labels(state=state)
+            assert metric is not None
+
+    def test_counter_only_increments_on_actual_change(self, client):
+        """Test that counter doesn't increment when state doesn't change"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_CONNECTIONS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Set to CONNECTING
+        client._set_connection_state(ConnectionState.CONNECTING, "Test")
+        initial_value = KRAKEN_WS_CONNECTIONS_TOTAL.labels(state='connecting')._value.get()
+
+        # Try to set to same state again
+        client._set_connection_state(ConnectionState.CONNECTING, "Test again")
+
+        # Counter should NOT increment (no actual state change)
+        assert KRAKEN_WS_CONNECTIONS_TOTAL.labels(state='connecting')._value.get() == initial_value
+
+    def test_metric_name_and_description(self):
+        """Test that counter has correct name and description"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_CONNECTIONS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Check metric metadata (Prometheus auto-strips '_total' suffix from Counter names)
+        assert KRAKEN_WS_CONNECTIONS_TOTAL._name == 'kraken_ws_connections'
+        assert 'connection state' in KRAKEN_WS_CONNECTIONS_TOTAL._documentation.lower()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
