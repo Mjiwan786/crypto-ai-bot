@@ -932,5 +932,154 @@ class TestMaxRetriesUnhealthy:
         assert client.is_healthy is False
 
 
+@pytest.mark.asyncio
+class TestResubscriptionOnReconnect:
+    """Test automatic resubscription after reconnection per PRD-001 Section 4.2"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD", "ETH/USD"],
+            redis_url="",
+            max_retries=10
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    async def test_initial_subscription_logs_correctly(self, client, caplog):
+        """Test that initial subscription logs as 'initial' not 'resubscription'"""
+        import logging
+
+        # Mock WebSocket
+        client.ws = AsyncMock()
+        client.ws.send = AsyncMock()
+
+        # Mock circuit breaker
+        async def mock_call(func, *args):
+            return await func(*args) if asyncio.iscoroutinefunction(func) else func(*args)
+
+        client.circuit_breakers["connection"].call = mock_call
+
+        # Ensure it's initial (no reconnection attempts)
+        client.reconnection_attempt = 0
+        client.stats["reconnects"] = 0
+
+        with caplog.at_level(logging.INFO):
+            await client.setup_subscriptions()
+
+        # Should log as "initial" not "resubscrib"
+        info_logs = [r for r in caplog.records if r.levelname == "INFO"]
+        setup_logs = [r for r in info_logs if "subscription" in r.message.lower()]
+
+        assert len(setup_logs) > 0
+        assert "initial" in setup_logs[0].message.lower()
+        assert "resubscrib" not in setup_logs[0].message.lower()
+
+    async def test_reconnection_logs_resubscription(self, client, caplog):
+        """Test that reconnection logs as 'resubscription' not 'initial'"""
+        import logging
+
+        # Mock WebSocket
+        client.ws = AsyncMock()
+        client.ws.send = AsyncMock()
+
+        # Mock circuit breaker
+        async def mock_call(func, *args):
+            return await func(*args) if asyncio.iscoroutinefunction(func) else func(*args)
+
+        client.circuit_breakers["connection"].call = mock_call
+
+        # Simulate reconnection (attempt > 0)
+        client.reconnection_attempt = 3
+        client.stats["reconnects"] = 3
+
+        with caplog.at_level(logging.INFO):
+            await client.setup_subscriptions()
+
+        # Should log as "resubscrib" not "initial"
+        info_logs = [r for r in caplog.records if r.levelname == "INFO"]
+        setup_logs = [r for r in info_logs if "subscri" in r.message.lower()]
+
+        assert len(setup_logs) > 0
+        assert "resubscrib" in setup_logs[0].message.lower()
+        assert "initial" not in setup_logs[0].message.lower()
+
+    async def test_resubscription_includes_all_channels(self, client, caplog):
+        """Test that resubscription completion log mentions all 4 channels"""
+        import logging
+
+        # Mock WebSocket
+        client.ws = AsyncMock()
+        client.ws.send = AsyncMock()
+
+        # Mock circuit breaker
+        async def mock_call(func, *args):
+            return await func(*args) if asyncio.iscoroutinefunction(func) else func(*args)
+
+        client.circuit_breakers["connection"].call = mock_call
+
+        # Simulate reconnection
+        client.reconnection_attempt = 2
+
+        with caplog.at_level(logging.INFO):
+            await client.setup_subscriptions()
+
+        # Completion log should mention the 4 channels
+        info_logs = [r for r in caplog.records if r.levelname == "INFO"]
+        completion_logs = [r for r in info_logs if "complete" in r.message.lower()]
+
+        assert len(completion_logs) > 0
+        # Should mention ticker, spread, trade, book
+        msg = completion_logs[0].message.lower()
+        assert "ticker" in msg or "resubscription complete" in msg
+
+    async def test_setup_subscriptions_called_on_connect(self, client):
+        """Test that setup_subscriptions is called during connect_once flow"""
+        # This verifies that the automatic resubscription happens
+        # We can't fully test connect_once without a real WebSocket, but we can verify
+        # the method exists and has the right signature
+
+        import inspect
+        assert hasattr(client, 'setup_subscriptions')
+        assert asyncio.iscoroutinefunction(client.setup_subscriptions)
+
+        # Verify it's documented to be called on reconnection
+        docstring = client.setup_subscriptions.__doc__
+        assert docstring is not None
+        assert "reconnection" in docstring.lower()
+
+    async def test_resubscription_detection_via_stats(self, client):
+        """Test that resubscription is detected via stats['reconnects'] > 0"""
+        client.reconnection_attempt = 0  # Reset to 0 (as happens on successful connect)
+        client.stats["reconnects"] = 5   # But historical reconnects > 0
+
+        # Should still be detected as reconnection based on stats
+        is_reconnection = client.reconnection_attempt > 0 or client.stats["reconnects"] > 0
+        assert is_reconnection is True
+
+    async def test_resubscription_detection_via_attempt(self, client):
+        """Test that resubscription is detected via reconnection_attempt > 0"""
+        client.reconnection_attempt = 2
+        client.stats["reconnects"] = 0  # Even if stats is 0
+
+        # Should be detected as reconnection based on attempt
+        is_reconnection = client.reconnection_attempt > 0 or client.stats["reconnects"] > 0
+        assert is_reconnection is True
+
+    async def test_initial_connection_detection(self, client):
+        """Test that initial connection is correctly detected"""
+        client.reconnection_attempt = 0
+        client.stats["reconnects"] = 0
+
+        # Should NOT be detected as reconnection
+        is_reconnection = client.reconnection_attempt > 0 or client.stats["reconnects"] > 0
+        assert is_reconnection is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

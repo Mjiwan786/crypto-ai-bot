@@ -572,11 +572,26 @@ class KrakenWebSocketClient:
         return False
     
     async def setup_subscriptions(self):
-        """Setup all required subscriptions based on configuration (PRD-001 Section 4.1)"""
+        """
+        Setup all required subscriptions based on configuration (PRD-001 Section 4.1).
+
+        This method is called on every successful connection, including reconnections.
+        It automatically resubscribes to all channels after a reconnection (PRD-001 Section 4.2).
+        """
         subscriptions = []
 
-        # Log subscription setup
-        self.logger.info(f"Setting up Kraken WS subscriptions for {len(self.config.pairs)} pairs: {', '.join(self.config.pairs)}")
+        # Log subscription setup - distinguish initial vs resubscription (PRD-001 Section 4.2)
+        is_reconnection = self.reconnection_attempt > 0 or self.stats["reconnects"] > 0
+        if is_reconnection:
+            self.logger.info(
+                f"Resubscribing to all channels after reconnection for {len(self.config.pairs)} pairs: "
+                f"{', '.join(self.config.pairs)}"
+            )
+        else:
+            self.logger.info(
+                f"Setting up initial Kraken WS subscriptions for {len(self.config.pairs)} pairs: "
+                f"{', '.join(self.config.pairs)}"
+            )
 
         # Ticker data for all pairs (PRD-001 Section 4.1)
         subscriptions.append(
@@ -633,8 +648,16 @@ class KrakenWebSocketClient:
             except Exception as e:
                 self.logger.error(f"Failed to send subscription {sub}: {e}")
 
-        # Log subscription completion at INFO level (PRD-001 Section 8.1)
-        self.logger.info(f"Subscriptions complete: {sent_count}/{len(subscriptions)} sent successfully")
+        # Log subscription completion at INFO level (PRD-001 Section 8.1 & 4.2)
+        if is_reconnection:
+            self.logger.info(
+                f"Resubscription complete: {sent_count}/{len(subscriptions)} channels successfully resubscribed "
+                f"(ticker, spread, trade, book)"
+            )
+        else:
+            self.logger.info(
+                f"Initial subscriptions complete: {sent_count}/{len(subscriptions)} sent successfully"
+            )
     
     async def handle_trade_data(self, channel_id: int, data: List, channel: str, pair: str):
         """Handle trade data with enhanced logging and debugging"""
