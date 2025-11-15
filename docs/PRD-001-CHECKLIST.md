@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 91/248 Complete (36.7%)
+**Status:** 99/248 Complete (39.9%)
 
 ---
 
@@ -145,15 +145,15 @@
 
 **Problem Addressed:** No ML transparency, missing methodology, black-box models
 
-### 3.1 Agent Architecture (8/8)
-- [ ] Implement Regime Detector agent with classify() method returning regime label
-- [ ] Implement Signal Analyst agent with generate_signal() method returning TradingSignal
-- [ ] Implement Risk Manager agent with validate_signal() method returning approved/rejected
-- [ ] Implement Position Manager agent with track_position() and manage_exits() methods
-- [ ] Add agent base class with common logging, metrics, error handling
-- [ ] Log agent lifecycle events (startup, shutdown) at INFO level
-- [ ] Emit Prometheus counter `agent_invocations_total{agent, outcome}` for all agent calls
-- [ ] Add unit tests for each agent in isolation with mocked dependencies
+### 3.1 Agent Architecture (8/8) ✅ COMPLETE
+- [x] Implement Regime Detector agent with classify() method returning regime label - EXISTS (ai_engine/regime_detector/detector.py)
+- [x] Implement Signal Analyst agent with generate_signal() method returning TradingSignal - EXISTS (agents/core/signal_analyst.py)
+- [x] Implement Risk Manager agent with validate_signal() method returning approved/rejected - EXISTS (agents/risk_manager.py)
+- [x] Implement Position Manager agent with track_position() and manage_exits() methods - EXISTS (agents/scalper/execution/position_manager.py)
+- [x] Add agent base class with common logging, metrics, error handling - COMPLETE (agents/base/strategy_agent_base.py)
+- [x] Log agent lifecycle events (startup, shutdown) at INFO level - COMPLETE (_log_lifecycle helper)
+- [x] Emit Prometheus counter `agent_invocations_total{agent, outcome}` for all agent calls - COMPLETE (_emit_metric helper)
+- [x] Add unit tests for each agent in isolation with mocked dependencies - COMPLETE (27/27 tests passing)
 
 ### 3.2 Regime Detector (10/10)
 - [ ] Train regime detector ensemble: Random Forest (60%) + LSTM (40%)
