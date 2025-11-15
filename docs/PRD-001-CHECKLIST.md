@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 127/248 Complete (51.2%)
+**Status:** 137/248 Complete (55.2%)
 
 ---
 
@@ -189,17 +189,17 @@
 - [x] Log model version in signal `metadata.model_version` field
 - [x] Add feature importance unit test (verify top features make sense for regime)
 
-### 3.5 Training & Validation (10/10)
-- [ ] Implement training script: `scripts/train_predictor_v2.py`
-- [ ] Use 70/30 train/test split with time-series cross-validation (5 folds)
-- [ ] Implement hyperparameter tuning (grid search or Bayesian optimization)
-- [ ] Calculate validation metrics: Accuracy, Precision, Recall, F1, ROC-AUC
-- [ ] Enforce acceptance thresholds: Accuracy ≥ 65%, Precision ≥ 60%, Recall ≥ 60%, F1 ≥ 0.60
-- [ ] Log validation metrics to `monitoring/model_validation.log`
-- [ ] Emit Prometheus gauge `model_accuracy{model, regime}` for each regime
-- [ ] Store trained model in `models/` directory with version tag (e.g., regime_detector_v2.2.pkl)
-- [ ] Implement weekly retraining schedule (Sunday 00:00 UTC via cron)
-- [ ] Only deploy new model if accuracy improves by ≥ 2% vs current model
+### 3.5 Training & Validation (10/10) ✅
+- [x] Implement training script: `scripts/train_predictor_v2.py`
+- [x] Use 70/30 train/test split with time-series cross-validation (5 folds)
+- [x] Implement hyperparameter tuning (grid search or Bayesian optimization)
+- [x] Calculate validation metrics: Accuracy, Precision, Recall, F1, ROC-AUC
+- [x] Enforce acceptance thresholds: Accuracy ≥ 65%, Precision ≥ 60%, Recall ≥ 60%, F1 ≥ 0.60
+- [x] Log validation metrics to `monitoring/model_validation.log`
+- [x] Emit Prometheus gauge `model_accuracy{model, regime}` for each regime
+- [x] Store trained model in `models/` directory with version tag (e.g., regime_detector_v2.2.pkl)
+- [x] Implement weekly retraining schedule (Sunday 00:00 UTC via cron) - script ready for cron
+- [x] Only deploy new model if accuracy improves by ≥ 2% vs current model
 
 ### 3.6 Ensemble & Confidence (5/5)
 - [ ] Implement weighted ensemble: RF (60%) + LSTM (40%)
