@@ -246,5 +246,230 @@ class TestMessageValidationIntegration:
         assert client.stats["errors"] == initial_errors
 
 
+class TestSequenceNumberValidation:
+    """Test sequence number extraction and validation per PRD-001 Section 1.3"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_last_sequence_dict_initialized(self, client):
+        """Test that last_sequence dictionary is initialized"""
+        assert hasattr(client, "last_sequence")
+        assert isinstance(client.last_sequence, dict)
+        assert len(client.last_sequence) == 0
+
+    def test_sequence_extraction_from_dict_payload(self, client):
+        """Test extracting sequence number from dict payload"""
+        # Message with sequence in payload
+        data = [
+            123,  # channel_id
+            {"s": 12345, "data": "test"},  # payload with sequence
+            "book",
+            "BTC/USD"
+        ]
+
+        client.extract_and_validate_sequence(data, "book", "BTC/USD")
+
+        # Should have stored the sequence
+        assert "book:BTC/USD" in client.last_sequence
+        assert client.last_sequence["book:BTC/USD"] == 12345
+
+    def test_sequence_extraction_with_sequence_field_name(self, client):
+        """Test extracting sequence number with 'sequence' field name"""
+        data = [
+            123,
+            {"sequence": 999, "data": "test"},
+            "book",
+            "BTC/USD"
+        ]
+
+        client.extract_and_validate_sequence(data, "book", "BTC/USD")
+
+        assert "book:BTC/USD" in client.last_sequence
+        assert client.last_sequence["book:BTC/USD"] == 999
+
+    def test_no_sequence_number_does_not_store(self, client):
+        """Test that messages without sequence numbers don't update tracking"""
+        data = [
+            123,
+            {"data": "test"},  # No sequence field
+            "trade",
+            "BTC/USD"
+        ]
+
+        client.extract_and_validate_sequence(data, "trade", "BTC/USD")
+
+        # Should not have stored anything
+        assert "trade:BTC/USD" not in client.last_sequence
+
+    def test_list_payload_without_sequence(self, client):
+        """Test that list payloads (without sequence) don't cause errors"""
+        data = [
+            123,
+            [{"price": "50000", "volume": "0.1"}],  # List payload
+            "trade",
+            "BTC/USD"
+        ]
+
+        # Should not raise exception
+        client.extract_and_validate_sequence(data, "trade", "BTC/USD")
+
+        assert "trade:BTC/USD" not in client.last_sequence
+
+    def test_sequence_gap_detected_and_logged(self, client, caplog):
+        """Test that sequence gaps are detected and logged"""
+        import logging
+
+        # First message with sequence 100
+        data1 = [123, {"s": 100}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data1, "book", "BTC/USD")
+
+        # Second message with sequence 105 (gap of 4)
+        data2 = [123, {"s": 105}, "book", "BTC/USD"]
+
+        with caplog.at_level(logging.WARNING):
+            client.extract_and_validate_sequence(data2, "book", "BTC/USD")
+
+        # Should log a warning about the gap
+        warning_logs = [record for record in caplog.records if record.levelname == "WARNING"]
+        assert len(warning_logs) > 0
+        assert any("Sequence gap detected" in log.message for log in warning_logs)
+        assert any("expected 101, got 105" in log.message for log in warning_logs)
+        assert any("gap: 5" in log.message for log in warning_logs)  # gap = 105 - 100 = 5
+
+    def test_no_gap_logged_for_sequential_messages(self, client, caplog):
+        """Test that sequential messages don't log gaps"""
+        import logging
+
+        # Message with sequence 100
+        data1 = [123, {"s": 100}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data1, "book", "BTC/USD")
+
+        # Message with sequence 101 (no gap)
+        data2 = [123, {"s": 101}, "book", "BTC/USD"]
+
+        with caplog.at_level(logging.WARNING):
+            client.extract_and_validate_sequence(data2, "book", "BTC/USD")
+
+        # Should NOT log a warning
+        warning_logs = [record for record in caplog.records if record.levelname == "WARNING"]
+        gap_warnings = [log for log in warning_logs if "Sequence gap" in log.message]
+        assert len(gap_warnings) == 0
+
+    def test_different_channels_tracked_separately(self, client):
+        """Test that different channels maintain separate sequence tracking"""
+        # Book channel
+        data_book = [123, {"s": 100}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data_book, "book", "BTC/USD")
+
+        # Trade channel (different channel, same pair)
+        data_trade = [456, {"s": 50}, "trade", "BTC/USD"]
+        client.extract_and_validate_sequence(data_trade, "trade", "BTC/USD")
+
+        # Both should be tracked separately
+        assert "book:BTC/USD" in client.last_sequence
+        assert "trade:BTC/USD" in client.last_sequence
+        assert client.last_sequence["book:BTC/USD"] == 100
+        assert client.last_sequence["trade:BTC/USD"] == 50
+
+    def test_different_pairs_tracked_separately(self, client):
+        """Test that different pairs maintain separate sequence tracking"""
+        # BTC/USD
+        data_btc = [123, {"s": 100}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data_btc, "book", "BTC/USD")
+
+        # ETH/USD
+        data_eth = [456, {"s": 200}, "book", "ETH/USD"]
+        client.extract_and_validate_sequence(data_eth, "book", "ETH/USD")
+
+        # Both should be tracked separately
+        assert client.last_sequence["book:BTC/USD"] == 100
+        assert client.last_sequence["book:ETH/USD"] == 200
+
+    def test_invalid_sequence_format_logged(self, client, caplog):
+        """Test that invalid sequence formats are logged"""
+        import logging
+
+        data = [123, {"s": "not_a_number"}, "book", "BTC/USD"]
+
+        with caplog.at_level(logging.WARNING):
+            client.extract_and_validate_sequence(data, "book", "BTC/USD")
+
+        # Should log warning about invalid format
+        warning_logs = [record for record in caplog.records if record.levelname == "WARNING"]
+        assert any("Invalid sequence number format" in log.message for log in warning_logs)
+
+    def test_sequence_update_after_gap(self, client):
+        """Test that sequence is updated correctly even after a gap"""
+        # First message
+        data1 = [123, {"s": 100}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data1, "book", "BTC/USD")
+
+        # Message with gap
+        data2 = [123, {"s": 105}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data2, "book", "BTC/USD")
+
+        # Sequence should be updated to 105
+        assert client.last_sequence["book:BTC/USD"] == 105
+
+        # Next sequential message should not trigger gap
+        data3 = [123, {"s": 106}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data3, "book", "BTC/USD")
+
+        assert client.last_sequence["book:BTC/USD"] == 106
+
+
+@pytest.mark.asyncio
+class TestSequenceValidationIntegration:
+    """Test sequence validation integration with handle_message"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    async def test_sequence_extracted_during_message_handling(self, client):
+        """Test that sequence extraction happens during message handling"""
+        import json
+
+        # Mock book handler
+        client.handle_book_data = AsyncMock()
+
+        # Message with sequence number
+        message = json.dumps([
+            123,
+            {"s": 999, "as": [], "bs": []},
+            "book-10",
+            "BTC/USD"
+        ])
+
+        await client.handle_message(message)
+
+        # Sequence should have been extracted
+        assert "book-10:BTC/USD" in client.last_sequence
+        assert client.last_sequence["book-10:BTC/USD"] == 999
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+

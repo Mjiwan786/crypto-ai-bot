@@ -466,7 +466,10 @@ class KrakenWebSocketClient:
             "trades_per_minute": 0,
             "last_trade_count_reset": time.time()
         }
-        
+
+        # Sequence number tracking per channel (PRD-001 Section 1.3)
+        self.last_sequence: Dict[str, int] = {}
+
         # Scalping rate limiting
         self.trade_timestamps = []
     
@@ -1027,6 +1030,53 @@ class KrakenWebSocketClient:
         # All validations passed
         return True, ""
 
+    def extract_and_validate_sequence(self, data: list, channel: str, pair: str) -> None:
+        """
+        Extract and validate sequence numbers from Kraken messages (PRD-001 Section 1.3).
+
+        Tracks last sequence number per channel and detects gaps.
+        Currently, sequence numbers are primarily found in book (order book) messages.
+        """
+        # Only list messages can have sequence numbers
+        if not isinstance(data, list) or len(data) < 2:
+            return
+
+        payload = data[1]
+
+        # Extract sequence number from payload (if available)
+        sequence = None
+
+        # For book messages, sequence may be in the payload dict
+        if isinstance(payload, dict):
+            # Try different possible sequence field names
+            sequence = payload.get("s") or payload.get("sequence")
+
+        # If we found a sequence number, validate it
+        if sequence is not None:
+            try:
+                sequence = int(sequence)
+            except (ValueError, TypeError):
+                self.logger.warning(f"Invalid sequence number format for {channel}/{pair}: {sequence}")
+                return
+
+            # Create unique key for this channel/pair combination
+            channel_key = f"{channel}:{pair}"
+
+            # Check for sequence gaps (PRD-001 Section 1.3)
+            if channel_key in self.last_sequence:
+                last_seq = self.last_sequence[channel_key]
+                expected_seq = last_seq + 1
+
+                if sequence != expected_seq:
+                    gap = sequence - last_seq
+                    self.logger.warning(
+                        f"Sequence gap detected for {channel}/{pair}: "
+                        f"expected {expected_seq}, got {sequence} (gap: {gap})"
+                    )
+
+            # Update last sequence for this channel
+            self.last_sequence[channel_key] = sequence
+
     async def handle_message(self, message: str):
         """Handle incoming WebSocket messages with enhanced debugging and validation (PRD-001 Section 1.3)"""
         message_start_time = time.time()
@@ -1064,10 +1114,13 @@ class KrakenWebSocketClient:
                 payload = data[1]
                 channel = data[2]
                 pair = data[3]
-                
+
+                # Extract and validate sequence numbers (PRD-001 Section 1.3)
+                self.extract_and_validate_sequence(data, channel, pair)
+
                 # Log the message type for debugging
                 self.logger.debug(f"📊 Received {channel} data for {pair} (items: {len(payload) if isinstance(payload, list) else 'dict'})")
-                
+
                 # Route to appropriate handler with circuit breaker protection
                 try:
                     if channel.startswith("trade"):
