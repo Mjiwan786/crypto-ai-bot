@@ -59,6 +59,7 @@ class KrakenWSConfig(BaseModel):
     )
     max_retries: int = Field(default=int(os.getenv("WEBSOCKET_MAX_RETRIES", "10")), ge=1, le=100)
     ping_interval: int = Field(default=int(os.getenv("WEBSOCKET_PING_INTERVAL", "30")), ge=5, le=60)
+    ping_timeout: int = Field(default=int(os.getenv("WEBSOCKET_PING_TIMEOUT", "60")), ge=10, le=120)
     close_timeout: int = Field(default=int(os.getenv("WEBSOCKET_CLOSE_TIMEOUT", "5")), ge=1, le=30)
     book_depth: int = Field(default=10, ge=5, le=1000)
     heartbeat_interval: int = Field(default=15, ge=10, le=300)
@@ -1054,10 +1055,20 @@ class KrakenWebSocketClient:
                         f"⚠️ Bot unhealthy: WebSocket disconnected for {time_disconnected:.1f}s (> 2 minutes)"
                     )
 
-                # Check heartbeat
+                # Check heartbeat and PONG timeout (PRD-001 Section 4.1)
                 time_since_heartbeat = current_time - self.last_heartbeat
                 if time_since_heartbeat > 60:
-                    self.logger.warning(f"No heartbeat for {time_since_heartbeat:.1f}s")
+                    self.logger.warning(
+                        f"⚠️ Connection timeout: No PONG/heartbeat for {time_since_heartbeat:.1f}s (> 60s)"
+                    )
+
+                    # Close WebSocket to trigger reconnection (PRD-001 Section 4.1)
+                    if self.ws and self.connection_state == ConnectionState.CONNECTED:
+                        self.logger.warning("Closing WebSocket due to PONG timeout, will reconnect...")
+                        try:
+                            await self.ws.close()
+                        except Exception as close_error:
+                            self.logger.error(f"Error closing WebSocket: {close_error}")
 
                 # Check data flow
                 if self.stats["last_data_time"]:
@@ -1125,6 +1136,7 @@ class KrakenWebSocketClient:
             async with websockets.connect(
                 self.config.url,
                 ping_interval=self.config.ping_interval,
+                ping_timeout=self.config.ping_timeout,  # PRD-001 Section 4.1: PONG timeout detection
                 close_timeout=self.config.close_timeout,
                 compression=None  # Kraken doesn't support compression
             ) as ws:

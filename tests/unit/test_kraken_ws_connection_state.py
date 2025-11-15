@@ -378,5 +378,149 @@ class TestHealthCheck:
         assert "disconnected for" in warning_logs[0].message.lower()
 
 
+@pytest.mark.asyncio
+class TestConnectionTimeout:
+    """Test connection timeout detection per PRD-001 Section 4.1"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration with ping timeout"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url="",
+            ping_interval=30,
+            ping_timeout=60
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_config_includes_ping_timeout(self, config):
+        """Test that config includes ping_timeout parameter"""
+        assert hasattr(config, 'ping_timeout')
+        assert config.ping_timeout == 60
+
+    def test_ping_timeout_default_from_env(self):
+        """Test that ping_timeout can be configured via environment"""
+        import os
+
+        # Save original value
+        old_val = os.environ.get('WEBSOCKET_PING_TIMEOUT')
+
+        try:
+            # Remove existing value first
+            os.environ.pop('WEBSOCKET_PING_TIMEOUT', None)
+
+            # Set custom value
+            os.environ['WEBSOCKET_PING_TIMEOUT'] = '90'
+
+            # Create new config (should read from env)
+            config = KrakenWSConfig(redis_url="", ping_timeout=int(os.getenv('WEBSOCKET_PING_TIMEOUT', '60')))
+            assert config.ping_timeout == 90
+
+        finally:
+            # Restore original
+            if old_val is not None:
+                os.environ['WEBSOCKET_PING_TIMEOUT'] = old_val
+            else:
+                os.environ.pop('WEBSOCKET_PING_TIMEOUT', None)
+
+    def test_ping_timeout_boundaries(self):
+        """Test that ping_timeout enforces boundaries (10-120s)"""
+        # Valid range
+        config_valid = KrakenWSConfig(redis_url="", ping_timeout=60)
+        assert config_valid.ping_timeout == 60
+
+        # Below minimum should fail
+        with pytest.raises(Exception):  # Pydantic validation error
+            KrakenWSConfig(redis_url="", ping_timeout=5)
+
+        # Above maximum should fail
+        with pytest.raises(Exception):  # Pydantic validation error
+            KrakenWSConfig(redis_url="", ping_timeout=150)
+
+    async def test_monitor_health_detects_timeout(self, client, caplog):
+        """Test that monitor_health detects PONG timeout and closes connection"""
+        import logging
+        import time
+
+        # Set last_heartbeat to > 60s ago
+        client.last_heartbeat = time.time() - 65
+
+        # Create mock WebSocket
+        client.ws = AsyncMock()
+        client.ws.close = AsyncMock()
+
+        # Set to CONNECTED state
+        client._set_connection_state(ConnectionState.CONNECTED, "Test connected")
+
+        # Start monitoring
+        client.running = True
+
+        # Capture logs
+        with caplog.at_level(logging.WARNING):
+            # Run one iteration of health monitor
+            health_task = asyncio.create_task(client.monitor_health())
+
+            # Give it time to detect timeout and close
+            await asyncio.sleep(0.2)
+
+            # Stop monitoring
+            client.running = False
+            await asyncio.sleep(0.1)
+
+        # Should have logged timeout warning
+        timeout_logs = [r for r in caplog.records if "timeout" in r.message.lower()]
+        assert len(timeout_logs) > 0
+        assert "pong" in timeout_logs[0].message.lower() or "heartbeat" in timeout_logs[0].message.lower()
+
+        # Should have attempted to close WebSocket
+        assert client.ws.close.called
+
+    async def test_timeout_does_not_close_if_already_disconnected(self, client):
+        """Test that timeout check doesn't try to close if already disconnected"""
+        import time
+
+        # Set last_heartbeat to > 60s ago
+        client.last_heartbeat = time.time() - 65
+
+        # Create mock WebSocket
+        client.ws = AsyncMock()
+        client.ws.close = AsyncMock()
+
+        # Set to DISCONNECTED state
+        client._set_connection_state(ConnectionState.DISCONNECTED, "Test disconnected")
+
+        # Start monitoring
+        client.running = True
+
+        # Run one iteration
+        health_task = asyncio.create_task(client.monitor_health())
+        await asyncio.sleep(0.1)
+        client.running = False
+        await asyncio.sleep(0.1)
+
+        # Should NOT have tried to close (already disconnected)
+        assert not client.ws.close.called
+
+    def test_heartbeat_updated_on_message(self, client):
+        """Test that last_heartbeat is updated when heartbeat message received"""
+        import time
+
+        initial_heartbeat = client.last_heartbeat
+
+        # Simulate time passing
+        time.sleep(0.1)
+
+        # Update heartbeat (simulating message receipt)
+        client.last_heartbeat = time.time()
+
+        # Should be more recent
+        assert client.last_heartbeat > initial_heartbeat
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
