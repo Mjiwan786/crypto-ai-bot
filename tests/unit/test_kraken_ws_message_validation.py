@@ -593,6 +593,286 @@ class TestSequenceValidationIntegration:
         assert client.last_sequence["book-10:BTC/USD"] == 999
 
 
+class TestTimestampValidation:
+    """Test message timestamp validation per PRD-001 Section 1.3"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_recent_timestamp_accepted(self, client):
+        """Test that recent timestamps are accepted"""
+        import time
+
+        # Message with current timestamp
+        current_time = time.time()
+        data = [123, {"timestamp": current_time}, "trade", "BTC/USD"]
+
+        is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        assert is_valid is True
+        assert reason == ""
+
+    def test_stale_message_rejected(self, client, caplog):
+        """Test that messages > 5 seconds old are rejected"""
+        import logging
+        import time
+
+        # Message with timestamp 10 seconds in the past
+        old_time = time.time() - 10.0
+        data = [123, {"timestamp": old_time}, "trade", "BTC/USD"]
+
+        with caplog.at_level(logging.WARNING):
+            is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        assert is_valid is False
+        assert "stale" in reason
+        assert "10." in reason  # Should show ~10s age
+
+        # Should log warning
+        warning_logs = [record for record in caplog.records if record.levelname == "WARNING"]
+        assert any("Rejecting stale message" in log.message for log in warning_logs)
+
+    def test_future_message_rejected(self, client, caplog):
+        """Test that messages > 5 seconds in the future are rejected"""
+        import logging
+        import time
+
+        # Message with timestamp 10 seconds in the future
+        future_time = time.time() + 10.0
+        data = [123, {"timestamp": future_time}, "trade", "BTC/USD"]
+
+        with caplog.at_level(logging.WARNING):
+            is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        assert is_valid is False
+        assert "future" in reason
+        assert "10." in reason  # Should show ~10s delta
+
+        # Should log warning
+        warning_logs = [record for record in caplog.records if record.levelname == "WARNING"]
+        assert any("Rejecting future-dated message" in log.message for log in warning_logs)
+
+    def test_timestamp_exactly_5_seconds_old_accepted(self, client):
+        """Test boundary: exactly 5 seconds old should be accepted"""
+        import time
+
+        # Message exactly 5 seconds old
+        boundary_time = time.time() - 5.0
+        data = [123, {"timestamp": boundary_time}, "trade", "BTC/USD"]
+
+        is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        # Should be accepted (5.0 is not > 5.0)
+        assert is_valid is True
+        assert reason == ""
+
+    def test_timestamp_slightly_over_5_seconds_rejected(self, client):
+        """Test boundary: just over 5 seconds old should be rejected"""
+        import time
+
+        # Message 5.1 seconds old
+        boundary_time = time.time() - 5.1
+        data = [123, {"timestamp": boundary_time}, "trade", "BTC/USD"]
+
+        is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        # Should be rejected
+        assert is_valid is False
+        assert "stale" in reason
+
+    def test_message_without_timestamp_accepted(self, client):
+        """Test that messages without timestamps are accepted"""
+        data = [123, {"data": "no_timestamp"}, "trade", "BTC/USD"]
+
+        is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        # Should be accepted (no timestamp to validate)
+        assert is_valid is True
+        assert reason == ""
+
+    def test_timestamp_in_ts_field(self, client):
+        """Test timestamp extraction from 'ts' field"""
+        import time
+
+        # Message with 'ts' field instead of 'timestamp'
+        current_time = time.time()
+        data = [123, {"ts": current_time}, "book", "BTC/USD"]
+
+        is_valid, reason = client.validate_message_timestamp(data, "book")
+
+        assert is_valid is True
+        assert reason == ""
+
+    def test_timestamp_in_time_field(self, client):
+        """Test timestamp extraction from 'time' field"""
+        import time
+
+        # Message with 'time' field
+        current_time = time.time()
+        data = [123, {"time": current_time}, "spread", "BTC/USD"]
+
+        is_valid, reason = client.validate_message_timestamp(data, "spread")
+
+        assert is_valid is True
+        assert reason == ""
+
+    def test_timestamp_in_list_payload(self, client):
+        """Test timestamp extraction from list payload"""
+        import time
+
+        current_time = time.time()
+        data = [123, [{"timestamp": current_time}], "trade", "BTC/USD"]
+
+        is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        assert is_valid is True
+        assert reason == ""
+
+    def test_invalid_timestamp_format_accepted(self, client, caplog):
+        """Test that invalid timestamp formats don't cause rejection"""
+        import logging
+
+        data = [123, {"timestamp": "not_a_number"}, "trade", "BTC/USD"]
+
+        with caplog.at_level(logging.DEBUG):
+            is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        # Should be accepted (can't parse, so don't reject)
+        assert is_valid is True
+        assert reason == ""
+
+        # Should log debug message
+        debug_logs = [record for record in caplog.records if record.levelname == "DEBUG"]
+        assert any("Could not parse timestamp" in log.message for log in debug_logs)
+
+    def test_string_timestamp_converted(self, client):
+        """Test that string timestamps are converted to float"""
+        import time
+
+        current_time = str(time.time())
+        data = [123, {"timestamp": current_time}, "trade", "BTC/USD"]
+
+        is_valid, reason = client.validate_message_timestamp(data, "trade")
+
+        assert is_valid is True
+        assert reason == ""
+
+
+class TestStaleMessagePrometheusMetrics:
+    """Test Prometheus metrics for stale messages per PRD-001 Section 1.3"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_stale_messages_counter_exists(self):
+        """Test that Prometheus stale messages counter is defined"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_STALE_MESSAGES_TOTAL
+
+        if PROMETHEUS_AVAILABLE:
+            assert KRAKEN_WS_STALE_MESSAGES_TOTAL is not None
+            assert hasattr(KRAKEN_WS_STALE_MESSAGES_TOTAL, 'labels')
+
+    def test_counter_increments_on_stale_message(self, client):
+        """Test that counter increments when stale message is rejected"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_STALE_MESSAGES_TOTAL
+        import time
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial counter value
+        initial_value = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='trade', reason='stale')._value.get()
+
+        # Stale message (10 seconds old)
+        old_time = time.time() - 10.0
+        data = [123, {"timestamp": old_time}, "trade", "BTC/USD"]
+        client.validate_message_timestamp(data, "trade")
+
+        # Counter should have incremented
+        final_value = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='trade', reason='stale')._value.get()
+        assert final_value == initial_value + 1
+
+    def test_counter_increments_on_future_message(self, client):
+        """Test that counter increments when future message is rejected"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_STALE_MESSAGES_TOTAL
+        import time
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial counter value
+        initial_value = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='book', reason='future')._value.get()
+
+        # Future message (10 seconds ahead)
+        future_time = time.time() + 10.0
+        data = [123, {"timestamp": future_time}, "book", "BTC/USD"]
+        client.validate_message_timestamp(data, "book")
+
+        # Counter should have incremented
+        final_value = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='book', reason='future')._value.get()
+        assert final_value == initial_value + 1
+
+    def test_counter_has_channel_and_reason_labels(self):
+        """Test that counter has both channel and reason labels"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_STALE_MESSAGES_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Should be able to create labels for different channels and reasons
+        metric1 = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='trade', reason='stale')
+        metric2 = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='book', reason='future')
+
+        assert metric1 is not None
+        assert metric2 is not None
+
+    def test_different_reasons_counted_separately(self, client):
+        """Test that stale and future rejections are counted separately"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_STALE_MESSAGES_TOTAL
+        import time
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial values
+        stale_initial = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='trade', reason='stale')._value.get()
+        future_initial = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='trade', reason='future')._value.get()
+
+        # Reject one stale and one future
+        client.validate_message_timestamp([123, {"timestamp": time.time() - 10}, "trade", "BTC/USD"], "trade")
+        client.validate_message_timestamp([123, {"timestamp": time.time() + 10}, "trade", "BTC/USD"], "trade")
+
+        # Both should have incremented
+        stale_final = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='trade', reason='stale')._value.get()
+        future_final = KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel='trade', reason='future')._value.get()
+
+        assert stale_final == stale_initial + 1
+        assert future_final == future_initial + 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
 

@@ -36,12 +36,18 @@ try:
         'Total message sequence gaps detected',
         ['channel']
     )
+    KRAKEN_WS_STALE_MESSAGES_TOTAL = Counter(
+        'kraken_ws_stale_messages_total',
+        'Total stale or future-dated messages rejected',
+        ['channel', 'reason']
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
     KRAKEN_WS_CONNECTIONS_TOTAL = None
     KRAKEN_WS_RECONNECTS_TOTAL = None
     KRAKEN_WS_MESSAGE_GAPS_TOTAL = None
+    KRAKEN_WS_STALE_MESSAGES_TOTAL = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -1087,6 +1093,87 @@ class KrakenWebSocketClient:
             # Update last sequence for this channel
             self.last_sequence[channel_key] = sequence
 
+    def validate_message_timestamp(self, data: list, channel: str) -> tuple[bool, str]:
+        """
+        Validate message timestamp (PRD-001 Section 1.3).
+
+        Rejects messages that are:
+        - More than 5 seconds old (stale data protection)
+        - More than 5 seconds in the future (clock skew protection)
+
+        Returns:
+            tuple[bool, str]: (is_valid, rejection_reason)
+        """
+        # Only list messages can have timestamps
+        if not isinstance(data, list) or len(data) < 2:
+            return True, ""
+
+        payload = data[1]
+        timestamp = None
+
+        # Extract timestamp from payload
+        # Different message types have timestamps in different locations
+        if isinstance(payload, dict):
+            # Book messages might have timestamp in the dict
+            timestamp = payload.get("timestamp") or payload.get("ts") or payload.get("time")
+        elif isinstance(payload, list) and len(payload) > 0:
+            # Trade/OHLC messages often have timestamp as last element in each trade
+            # Try to find a timestamp field
+            for item in payload:
+                if isinstance(item, dict):
+                    timestamp = item.get("timestamp") or item.get("ts") or item.get("time")
+                    if timestamp:
+                        break
+
+        # If we found a timestamp, validate it
+        if timestamp is not None:
+            try:
+                # Convert to float if it's a string
+                if isinstance(timestamp, str):
+                    message_time = float(timestamp)
+                else:
+                    message_time = float(timestamp)
+
+                current_time = time.time()
+                time_delta = current_time - message_time
+
+                # Reject if more than 5 seconds old (stale data)
+                if time_delta > 5.0:
+                    reason = f"stale (age: {time_delta:.2f}s)"
+                    self.logger.warning(
+                        f"Rejecting stale message for {channel}: "
+                        f"timestamp {message_time:.2f}, current {current_time:.2f}, "
+                        f"delta {time_delta:.2f}s"
+                    )
+
+                    # Emit Prometheus counter (PRD-001 Section 1.3)
+                    if PROMETHEUS_AVAILABLE and KRAKEN_WS_STALE_MESSAGES_TOTAL:
+                        KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel=channel, reason='stale').inc()
+
+                    return False, reason
+
+                # Reject if more than 5 seconds in the future (clock skew)
+                if time_delta < -5.0:
+                    reason = f"future (delta: {abs(time_delta):.2f}s)"
+                    self.logger.warning(
+                        f"Rejecting future-dated message for {channel}: "
+                        f"timestamp {message_time:.2f}, current {current_time:.2f}, "
+                        f"delta {time_delta:.2f}s"
+                    )
+
+                    # Emit Prometheus counter (PRD-001 Section 1.3)
+                    if PROMETHEUS_AVAILABLE and KRAKEN_WS_STALE_MESSAGES_TOTAL:
+                        KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel=channel, reason='future').inc()
+
+                    return False, reason
+
+            except (ValueError, TypeError) as e:
+                self.logger.debug(f"Could not parse timestamp for {channel}: {e}")
+                # Don't reject on parse errors - might not be a timestamp field
+
+        # No timestamp found or timestamp is valid
+        return True, ""
+
     async def handle_message(self, message: str):
         """Handle incoming WebSocket messages with enhanced debugging and validation (PRD-001 Section 1.3)"""
         message_start_time = time.time()
@@ -1127,6 +1214,13 @@ class KrakenWebSocketClient:
 
                 # Extract and validate sequence numbers (PRD-001 Section 1.3)
                 self.extract_and_validate_sequence(data, channel, pair)
+
+                # Validate message timestamp (PRD-001 Section 1.3)
+                is_valid_timestamp, rejection_reason = self.validate_message_timestamp(data, channel)
+                if not is_valid_timestamp:
+                    self.logger.debug(f"Message rejected due to timestamp: {rejection_reason}")
+                    self.stats["errors"] += 1
+                    return
 
                 # Log the message type for debugging
                 self.logger.debug(f"📊 Received {channel} data for {pair} (items: {len(payload) if isinstance(payload, list) else 'dict'})")
