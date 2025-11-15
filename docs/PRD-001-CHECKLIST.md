@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 203/248 Complete (81.9%)
+**Status:** 209/248 Complete (84.3%)
 
 ---
 
@@ -305,13 +305,13 @@
 
 **Problem Addressed:** Missing methodology, no strategy validation before production
 
-### 6.1 Data Requirements (6/6)
-- [ ] Fetch 1 year (365 days) historical OHLCV data for BTC/USD, ETH/USD, SOL/USD
-- [ ] Use Kraken exchange as data source (via CCXT or cached data)
-- [ ] Implement slippage model: 5 bps (0.05%) per trade
-- [ ] Implement fee calculation: Kraken fee tiers (maker 16 bps, taker 26 bps)
-- [ ] Simulate realistic order fills (limit orders require depth check, market orders use slippage)
-- [ ] Store historical data in cache for reuse (`data/ohlcv/`)
+### 6.1 Data Requirements (6/6) ✅
+- [x] Fetch 1 year (365 days) historical OHLCV data for BTC/USD, ETH/USD, SOL/USD
+- [x] Use Kraken exchange as data source (via CCXT or cached data)
+- [x] Implement slippage model: 5 bps (0.05%) per trade
+- [x] Implement fee calculation: Kraken fee tiers (maker 16 bps, taker 26 bps)
+- [x] Simulate realistic order fills (limit orders require depth check, market orders use slippage)
+- [x] Store historical data in cache for reuse (`data/ohlcv/`)
 
 ### 6.2 Backtest Metrics (8/8)
 - [ ] Calculate total return % for backtest period

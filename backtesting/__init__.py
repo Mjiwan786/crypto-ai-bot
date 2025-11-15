@@ -54,15 +54,45 @@ pure functions as live trading.
 
 from __future__ import annotations
 
-from .data_loader import DataLoader
-from .engine import BacktestEngine, BacktestConfig
-from .metrics import BacktestResults, Trade, calculate_metrics
+# PRD-001 Section 6.1: Import PRD-compliant data provider
+from .prd_data_provider import (
+    PRDBacktestDataProvider,
+    get_data_provider,
+    DEFAULT_PAIRS,
+    SLIPPAGE_BPS,
+    MAKER_FEE_BPS,
+    TAKER_FEE_BPS
+)
 
-__all__ = [
-    "DataLoader",
-    "BacktestEngine",
-    "BacktestConfig",
-    "BacktestResults",
-    "Trade",
-    "calculate_metrics",
-]
+# Legacy imports (may have dependency issues)
+try:
+    from .data_loader import DataLoader
+    from .engine import BacktestEngine, BacktestConfig
+    from .metrics import BacktestResults, Trade, calculate_metrics
+
+    __all__ = [
+        # PRD-001 Section 6.1
+        "PRDBacktestDataProvider",
+        "get_data_provider",
+        "DEFAULT_PAIRS",
+        "SLIPPAGE_BPS",
+        "MAKER_FEE_BPS",
+        "TAKER_FEE_BPS",
+        # Legacy
+        "DataLoader",
+        "BacktestEngine",
+        "BacktestConfig",
+        "BacktestResults",
+        "Trade",
+        "calculate_metrics",
+    ]
+except ImportError:
+    # If legacy imports fail, only export PRD-compliant components
+    __all__ = [
+        "PRDBacktestDataProvider",
+        "get_data_provider",
+        "DEFAULT_PAIRS",
+        "SLIPPAGE_BPS",
+        "MAKER_FEE_BPS",
+        "TAKER_FEE_BPS",
+    ]
