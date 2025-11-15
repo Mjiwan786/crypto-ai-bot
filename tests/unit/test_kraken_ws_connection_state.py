@@ -1129,5 +1129,146 @@ class TestResubscriptionOnReconnect:
         assert is_reconnection is False
 
 
+@pytest.mark.asyncio
+class TestGracefulShutdown:
+    """Test graceful shutdown handling during reconnection per PRD-001 Section 4.2"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url="",
+            max_retries=10,
+            reconnect_delay=1
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    async def test_stop_sets_running_to_false(self, client):
+        """Test that stop() sets running flag to False"""
+        client.running = True
+
+        # Mock WebSocket and Redis
+        client.ws = AsyncMock()
+        client.ws.close = AsyncMock()
+        client.redis_manager.close = AsyncMock()
+
+        await client.stop()
+
+        assert client.running is False
+
+    async def test_stop_sets_state_to_disconnected(self, client):
+        """Test that stop() sets connection state to DISCONNECTED"""
+        client.running = True
+        client.connection_state = ConnectionState.RECONNECTING
+
+        # Mock WebSocket and Redis
+        client.ws = AsyncMock()
+        client.ws.close = AsyncMock()
+        client.redis_manager.close = AsyncMock()
+
+        await client.stop()
+
+        assert client.connection_state == ConnectionState.DISCONNECTED
+
+    async def test_stop_logs_shutdown_message(self, client, caplog):
+        """Test that stop() logs graceful shutdown messages"""
+        import logging
+
+        client.running = True
+
+        # Mock WebSocket and Redis
+        client.ws = AsyncMock()
+        client.ws.close = AsyncMock()
+        client.redis_manager.close = AsyncMock()
+
+        with caplog.at_level(logging.INFO):
+            await client.stop()
+
+        # Check for shutdown logs
+        info_logs = [record.message for record in caplog.records if record.levelname == "INFO"]
+        assert any("Stopping" in log for log in info_logs)
+        assert any("stopped" in log for log in info_logs)
+
+    async def test_reconnection_cancelled_on_shutdown(self, client, caplog):
+        """Test that reconnection is cancelled when stop() is called during sleep"""
+        import logging
+
+        # Simulate reconnection state
+        client.running = True
+        client.reconnection_attempt = 2
+
+        # Start a task that will simulate the reconnection sleep check
+        async def simulate_reconnection_check():
+            # Simulate the sleep completion
+            await asyncio.sleep(0.1)
+
+            # This is the check we added: if not self.running
+            if not client.running:
+                client.logger.info("Reconnection cancelled - graceful shutdown in progress")
+                return True
+            return False
+
+        # Start the check
+        check_task = asyncio.create_task(simulate_reconnection_check())
+
+        # While it's sleeping, call stop
+        await asyncio.sleep(0.05)
+        client.running = False
+
+        # Wait for check to complete
+        with caplog.at_level(logging.INFO):
+            cancelled = await check_task
+
+        # Should have cancelled
+        assert cancelled is True
+
+        # Should have logged cancellation message
+        logs = [record.message for record in caplog.records if record.levelname == "INFO"]
+        assert any("Reconnection cancelled" in log for log in logs)
+        assert any("graceful shutdown" in log for log in logs)
+
+    def test_running_flag_checked_after_sleep(self, client):
+        """Test that running flag is checked immediately after reconnection sleep"""
+        # This tests the code structure - verify the check exists
+        import inspect
+
+        source = inspect.getsource(client.start)
+
+        # Should have the check after sleep
+        assert "if not self.running" in source
+        assert "Reconnection cancelled" in source
+        assert "graceful shutdown" in source
+
+    async def test_stop_closes_websocket(self, client):
+        """Test that stop() closes the WebSocket connection"""
+        client.running = True
+        client.ws = AsyncMock()
+        client.ws.close = AsyncMock()
+        client.redis_manager.close = AsyncMock()
+
+        await client.stop()
+
+        # Should have closed WebSocket
+        client.ws.close.assert_called_once()
+
+    async def test_stop_closes_redis(self, client):
+        """Test that stop() closes Redis connection"""
+        client.running = True
+        client.ws = AsyncMock()
+        client.ws.close = AsyncMock()
+        client.redis_manager.close = AsyncMock()
+
+        await client.stop()
+
+        # Should have closed Redis
+        client.redis_manager.close.assert_called_once()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

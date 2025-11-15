@@ -1320,6 +1320,11 @@ class KrakenWebSocketClient:
 
                 await asyncio.sleep(backoff_with_jitter)
 
+                # Check if shutdown requested during sleep (PRD-001 Section 4.2)
+                if not self.running:
+                    self.logger.info("Reconnection cancelled - graceful shutdown in progress")
+                    break
+
                 # Exponential backoff: double each time (PRD-001 Section 4.2)
                 backoff = min(backoff * 2, max_backoff)
 
