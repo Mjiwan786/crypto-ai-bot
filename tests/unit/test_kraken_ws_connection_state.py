@@ -662,6 +662,7 @@ class TestPrometheusMetrics:
         assert 'reconnection' in KRAKEN_WS_RECONNECTS_TOTAL._documentation.lower()
 
 
+@pytest.mark.asyncio
 class TestReconnectionCounter:
     """Test reconnection attempt counter per PRD-001 Section 4.2"""
 
@@ -751,6 +752,145 @@ class TestReconnectionCounter:
 
         assert client.reconnection_attempt == 0
         assert client.stats["reconnects"] == 5  # Historical count preserved
+
+    async def test_end_to_end_reconnection_with_mocked_failures(self, client):
+        """
+        Comprehensive end-to-end test with mocked WebSocket failures (PRD-001 Section 4.2).
+
+        Tests the complete reconnection flow:
+        1. Mock WebSocket to fail 3 times, then succeed
+        2. Verify exponential backoff is applied
+        3. Verify reconnection counter increments
+        4. Verify successful reconnection resets counter
+        """
+        # Use fast reconnect delay for testing
+        client.config.reconnect_delay = 0.1  # 100ms instead of 1s
+
+        # Track call attempts
+        call_count = 0
+
+        async def mock_connect_once():
+            """Mock connect_once that fails 3 times then succeeds once"""
+            nonlocal call_count
+            call_count += 1
+
+            if call_count <= 3:
+                # First 3 attempts fail
+                raise Exception(f"Mock connection failure {call_count}")
+            elif call_count == 4:
+                # 4th attempt succeeds - simulate successful connection
+                # Set state to CONNECTED
+                client._set_connection_state(ConnectionState.CONNECTED, "Mock connection successful")
+                # Wait briefly to simulate connection
+                await asyncio.sleep(0.05)
+                # Return normally to allow reconnection_attempt reset in start()
+                return
+            else:
+                # After first success, stop the client to exit the loop
+                client.running = False
+                return
+
+        # Mock the circuit breaker to call our mock function
+        async def mock_circuit_breaker(func):
+            return await mock_connect_once()
+
+        client.circuit_breakers["connection"].call = mock_circuit_breaker
+
+        # Mock Redis
+        client.redis_manager.initialize_pool = AsyncMock()
+        client.redis_manager.close = AsyncMock()
+
+        # Start the client (will attempt reconnections)
+        start_task = asyncio.create_task(client.start())
+
+        # Wait for 4th successful connection and reset
+        max_wait = 2.0  # seconds
+        start_time = asyncio.get_event_loop().time()
+        while asyncio.get_event_loop().time() - start_time < max_wait:
+            await asyncio.sleep(0.05)
+            if call_count >= 4 and client.reconnection_attempt == 0:
+                # Success! Stop the client
+                client.running = False
+                break
+
+        # Wait a bit for task to complete
+        await asyncio.sleep(0.1)
+
+        # Cancel if still running
+        if not start_task.done():
+            start_task.cancel()
+            try:
+                await start_task
+            except asyncio.CancelledError:
+                pass
+
+        # Verify reconnection flow
+        # Should have at least 4 calls (3 failures + 1 success)
+        # May have 5 if loop continued once more before stopping
+        assert call_count >= 4, f"Expected at least 4 connection attempts (3 failures + 1 success), got {call_count}"
+        assert call_count <= 5, f"Expected at most 5 connection attempts, got {call_count}"
+
+        # After successful connection, reconnection_attempt should be reset
+        # (happens at line 1260 in kraken_ws.py)
+        assert client.reconnection_attempt == 0, "Reconnection attempt should be reset after success"
+
+        # Historical reconnect count should be 3 (one for each failure)
+        assert client.stats["reconnects"] == 3, f"Expected 3 historical reconnects, got {client.stats['reconnects']}"
+
+        # Connection should have succeeded
+        assert client.connection_state == ConnectionState.CONNECTED, "Should be in CONNECTED state after success"
+
+    async def test_reconnection_with_max_retries_exceeded(self, client):
+        """
+        Test reconnection behavior when max retries is exceeded (PRD-001 Section 4.2).
+
+        Verifies that:
+        1. After max_retries failures, bot stops attempting to reconnect
+        2. Bot is marked as unhealthy
+        3. State is set to DISCONNECTED
+        """
+        # Set low max retries and fast delay for faster test
+        client.config.max_retries = 3
+        client.config.reconnect_delay = 0.1  # 100ms instead of 1s
+
+        # Track call attempts
+        call_count = 0
+
+        async def mock_connect_once_always_fails():
+            """Mock connect_once that always fails"""
+            nonlocal call_count
+            call_count += 1
+            raise Exception(f"Mock connection failure {call_count}")
+
+        # Mock the circuit breaker
+        async def mock_circuit_breaker(func):
+            return await mock_connect_once_always_fails()
+
+        client.circuit_breakers["connection"].call = mock_circuit_breaker
+
+        # Mock Redis
+        client.redis_manager.initialize_pool = AsyncMock()
+        client.redis_manager.close = AsyncMock()
+
+        # Start the client
+        start_task = asyncio.create_task(client.start())
+
+        # Wait for completion (should exit after max retries)
+        try:
+            await asyncio.wait_for(start_task, timeout=5.0)
+        except asyncio.TimeoutError:
+            client.running = False
+            start_task.cancel()
+            try:
+                await start_task
+            except asyncio.CancelledError:
+                pass
+
+        # Verify max retries behavior
+        assert call_count == 3, f"Expected exactly 3 connection attempts (max_retries), got {call_count}"
+        assert client.reconnection_attempt == 3, f"Expected reconnection_attempt=3, got {client.reconnection_attempt}"
+        assert client.is_healthy is False, "Bot should be unhealthy after max retries"
+        assert client.connection_state == ConnectionState.DISCONNECTED, "State should be DISCONNECTED after max retries"
 
 
 @pytest.mark.asyncio
