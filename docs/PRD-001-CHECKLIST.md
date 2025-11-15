@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 119/248 Complete (48.0%)
+**Status:** 127/248 Complete (51.2%)
 
 ---
 
@@ -179,15 +179,15 @@
 - [x] Emit Prometheus counter `signals_generated_total{pair, strategy, side}` on signal creation
 - [x] Add signal analyst unit tests for each strategy (scalper, trend, mean_reversion, breakout)
 
-### 3.4 Model Transparency (8/8)
-- [ ] Log feature importance for every prediction (top 5 features with weights)
-- [ ] Store feature importance in `metadata.feature_importance` field (optional for v1)
-- [ ] Use SHAP values for LSTM model explainability
-- [ ] Publish model predictions to `events:bus` stream for audit trail
-- [ ] Document all features in `docs/ML_FEATURES.md` (feature name, formula, purpose, expected range)
-- [ ] Version control feature dictionary (update on feature changes)
-- [ ] Log model version in signal `metadata.model_version` field
-- [ ] Add feature importance unit test (verify top features make sense for regime)
+### 3.4 Model Transparency (8/8) ✅
+- [x] Log feature importance for every prediction (top 5 features with weights)
+- [x] Store feature importance in `metadata.feature_importance` field (optional for v1)
+- [x] Use SHAP values for LSTM model explainability
+- [x] Publish model predictions to `events:bus` stream for audit trail
+- [x] Document all features in `docs/ML_FEATURES.md` (feature name, formula, purpose, expected range)
+- [x] Version control feature dictionary (update on feature changes)
+- [x] Log model version in signal `metadata.model_version` field
+- [x] Add feature importance unit test (verify top features make sense for regime)
 
 ### 3.5 Training & Validation (10/10)
 - [ ] Implement training script: `scripts/train_predictor_v2.py`
