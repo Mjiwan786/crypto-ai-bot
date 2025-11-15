@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 79/248 Complete (31.9%)
+**Status:** 84/248 Complete (33.9%)
 
 ---
 
@@ -123,12 +123,12 @@
 - [x] Add publish timeout (5s max) to prevent hanging
 - [x] Queue failed publishes in memory (max 1000) for retry on Redis reconnection
 
-### 2.4 Performance (5/5)
-- [ ] Measure P95 publish latency (target < 20ms)
-- [ ] Emit Prometheus histogram `redis_publish_latency_ms{stream}` for publish operations
-- [ ] Handle 50+ signals/second publish rate without backpressure
-- [ ] Implement backpressure: queue depth > 1000 → reject new signals, log ERROR
-- [ ] Emit Prometheus gauge `redis_publish_queue_depth{stream}` for queue monitoring
+### 2.4 Performance (5/5) ✅ COMPLETE
+- [x] Measure P95 publish latency (target < 20ms)
+- [x] Emit Prometheus histogram `redis_publish_latency_ms{stream}` for publish operations
+- [x] Handle 50+ signals/second publish rate without backpressure
+- [x] Implement backpressure: queue depth > 1000 → reject new signals, log ERROR
+- [x] Emit Prometheus gauge `redis_publish_queue_depth{stream}` for queue monitoring
 
 ### 2.5 Data Integrity (7/7)
 - [ ] Generate timestamps using `datetime.now(timezone.utc)` (server-side clock)

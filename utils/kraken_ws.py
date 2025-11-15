@@ -91,6 +91,18 @@ try:
         'Total duplicate signal IDs rejected',
         ['stream']
     )
+    # PRD-001 Section 2.4 Performance
+    REDIS_PUBLISH_LATENCY_MS = Histogram(
+        'redis_publish_latency_ms',
+        'Redis publish operation latency in milliseconds',
+        ['stream'],
+        buckets=[1, 2, 5, 10, 20, 50, 100, 250, 500, 1000]  # Target < 20ms
+    )
+    REDIS_PUBLISH_QUEUE_DEPTH = Gauge(
+        'redis_publish_queue_depth',
+        'Current depth of publish queue',
+        ['stream']
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -107,6 +119,8 @@ except ImportError:
     REDIS_PUBLISH_ERRORS_TOTAL = None
     SIGNAL_SCHEMA_ERRORS_TOTAL = None
     SIGNAL_DUPLICATES_REJECTED_TOTAL = None
+    REDIS_PUBLISH_LATENCY_MS = None
+    REDIS_PUBLISH_QUEUE_DEPTH = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -417,6 +431,10 @@ class RedisConnectionManager:
 
         # Failed publish queue (PRD-001 Section 2.3)
         self.failed_publishes: deque = deque(maxlen=1000)  # Max 1000 failed publishes
+
+        # Publish queue tracking (PRD-001 Section 2.4)
+        self.publish_queue_depth: Dict[str, int] = {}  # Track in-progress publishes per stream
+        self.publish_backpressure_threshold = 1000  # PRD-001 Section 2.4: reject when depth > 1000
     
     @asynccontextmanager
     async def get_connection(self):
@@ -657,11 +675,12 @@ class RedisConnectionManager:
         timeout: float = 5.0
     ) -> bool:
         """
-        Publish signal to Redis stream with PRD-001 Section 2.3 guarantees:
+        Publish signal to Redis stream with PRD-001 Section 2.3 & 2.4 guarantees:
         - UUID v4 message ID for idempotency
         - Pydantic validation before publish
         - Retry logic with exponential backoff
         - Comprehensive error handling and metrics
+        - P95 latency tracking (target < 20ms)
 
         Args:
             signal_data: Signal data dict to publish
@@ -671,6 +690,9 @@ class RedisConnectionManager:
         Returns:
             bool: True if published successfully, False otherwise
         """
+        # PRD-001 Section 2.4: Start latency tracking
+        start_time = time.time()
+
         if not self.redis_client:
             self.logger.error("Cannot publish signal: Redis not connected")
             self.failed_publishes.append((signal_data, stream_name))
@@ -680,139 +702,169 @@ class RedisConnectionManager:
         if stream_name is None:
             stream_name = self.config.get_signal_stream_name()
 
-        # PRD-001 Section 2.3: Generate UUID v4 for idempotency
-        signal_id = str(uuid.uuid4())
-
-        # PRD-001 Section 2.3: Validate with Pydantic schema BEFORE adding signal_id
-        if PRD_SCHEMA_AVAILABLE and PRDSignalSchema:
-            try:
-                validated_signal = PRDSignalSchema(**signal_data)
-                signal_data_copy = validated_signal.model_dump()
-            except ValidationError as e:
-                error_reason = str(e.errors()[0]['type']) if e.errors() else 'unknown'
-                self.logger.error(
-                    f"Signal schema validation failed for signal_id={signal_id}: {e}"
-                )
-
-                # PRD-001 Section 2.3: Emit schema error counter
-                if PROMETHEUS_AVAILABLE and SIGNAL_SCHEMA_ERRORS_TOTAL:
-                    SIGNAL_SCHEMA_ERRORS_TOTAL.labels(reason=error_reason).inc()
-
-                return False
-        else:
-            signal_data_copy = signal_data.copy()
-
-        # Add signal_id AFTER validation
-        signal_data_copy['signal_id'] = signal_id
-
-        # PRD-001 Section 2.3: Serialize to JSON with UTF-8 encoding
-        try:
-            serialized_data = orjson.dumps(signal_data_copy).decode('utf-8')
-        except Exception as e:
-            self.logger.error(f"Failed to serialize signal data for signal_id={signal_id}: {e}")
-            if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
-                REDIS_PUBLISH_ERRORS_TOTAL.labels(stream=stream_name, error_type='serialization').inc()
+        # PRD-001 Section 2.4: Check backpressure before publishing
+        current_depth = self.publish_queue_depth.get(stream_name, 0)
+        if current_depth > self.publish_backpressure_threshold:
+            self.logger.error(
+                f"Backpressure detected: queue depth {current_depth} > threshold "
+                f"{self.publish_backpressure_threshold} for stream {stream_name}. "
+                f"Rejecting new signal to prevent overload."
+            )
             return False
 
-        # PRD-001 Section 2.3: Retry logic with exponential backoff (100ms, 200ms, 400ms)
-        max_retries = 3
-        backoff_delays = [0.1, 0.2, 0.4]  # 100ms, 200ms, 400ms
+        # PRD-001 Section 2.4: Increment queue depth
+        self.publish_queue_depth[stream_name] = current_depth + 1
 
-        for attempt in range(max_retries):
-            try:
-                # PRD-001 Section 2.3: Add timeout to prevent hanging (5s max)
-                await asyncio.wait_for(
-                    self.redis_client.xadd(
-                        stream_name,
-                        {'data': serialized_data},
-                        id=signal_id,
-                        maxlen=self.config.stream_maxlen.get('signals', 10000),
-                        approximate=True  # Use ~ for performance
-                    ),
-                    timeout=timeout
-                )
+        # PRD-001 Section 2.4: Emit queue depth gauge
+        if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_QUEUE_DEPTH:
+            REDIS_PUBLISH_QUEUE_DEPTH.labels(stream=stream_name).set(self.publish_queue_depth[stream_name])
 
-                self.logger.debug(
-                    f"Published signal to {stream_name} with signal_id={signal_id}"
-                )
-                return True
+        try:
+            # PRD-001 Section 2.3: Generate UUID v4 for idempotency
+            signal_id = str(uuid.uuid4())
 
-            except redis_exceptions.ResponseError as e:
-                # PRD-001 Section 2.3: Handle duplicate ID rejection
-                if "ID" in str(e) and "equal or smaller" in str(e):
-                    self.logger.debug(
-                        f"Duplicate signal_id rejected: {signal_id} for stream {stream_name}"
+            # PRD-001 Section 2.3: Validate with Pydantic schema BEFORE adding signal_id
+            if PRD_SCHEMA_AVAILABLE and PRDSignalSchema:
+                try:
+                    validated_signal = PRDSignalSchema(**signal_data)
+                    signal_data_copy = validated_signal.model_dump()
+                except ValidationError as e:
+                    error_reason = str(e.errors()[0]['type']) if e.errors() else 'unknown'
+                    self.logger.error(
+                        f"Signal schema validation failed for signal_id={signal_id}: {e}"
                     )
 
-                    # PRD-001 Section 2.3: Emit duplicate counter
-                    if PROMETHEUS_AVAILABLE and SIGNAL_DUPLICATES_REJECTED_TOTAL:
-                        SIGNAL_DUPLICATES_REJECTED_TOTAL.labels(stream=stream_name).inc()
+                    # PRD-001 Section 2.3: Emit schema error counter
+                    if PROMETHEUS_AVAILABLE and SIGNAL_SCHEMA_ERRORS_TOTAL:
+                        SIGNAL_SCHEMA_ERRORS_TOTAL.labels(reason=error_reason).inc()
 
-                    return False  # Don't retry duplicates
-                else:
-                    # Other Redis errors - retry with backoff
+                    return False
+            else:
+                signal_data_copy = signal_data.copy()
+
+            # Add signal_id AFTER validation
+            signal_data_copy['signal_id'] = signal_id
+
+            # PRD-001 Section 2.3: Serialize to JSON with UTF-8 encoding
+            try:
+                serialized_data = orjson.dumps(signal_data_copy).decode('utf-8')
+            except Exception as e:
+                self.logger.error(f"Failed to serialize signal data for signal_id={signal_id}: {e}")
+                if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
+                    REDIS_PUBLISH_ERRORS_TOTAL.labels(stream=stream_name, error_type='serialization').inc()
+                return False
+
+            # PRD-001 Section 2.3: Retry logic with exponential backoff (100ms, 200ms, 400ms)
+            max_retries = 3
+            backoff_delays = [0.1, 0.2, 0.4]  # 100ms, 200ms, 400ms
+
+            for attempt in range(max_retries):
+                try:
+                    # PRD-001 Section 2.3: Add timeout to prevent hanging (5s max)
+                    await asyncio.wait_for(
+                        self.redis_client.xadd(
+                            stream_name,
+                            {'data': serialized_data},
+                            id=signal_id,
+                            maxlen=self.config.stream_maxlen.get('signals', 10000),
+                            approximate=True  # Use ~ for performance
+                        ),
+                        timeout=timeout
+                    )
+
+                    self.logger.debug(
+                        f"Published signal to {stream_name} with signal_id={signal_id}"
+                    )
+
+                    # PRD-001 Section 2.4: Emit latency histogram
+                    latency_ms = (time.time() - start_time) * 1000
+                    if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_LATENCY_MS:
+                        REDIS_PUBLISH_LATENCY_MS.labels(stream=stream_name).observe(latency_ms)
+
+                    return True
+
+                except redis_exceptions.ResponseError as e:
+                    # PRD-001 Section 2.3: Handle duplicate ID rejection
+                    if "ID" in str(e) and "equal or smaller" in str(e):
+                        self.logger.debug(
+                            f"Duplicate signal_id rejected: {signal_id} for stream {stream_name}"
+                        )
+
+                        # PRD-001 Section 2.3: Emit duplicate counter
+                        if PROMETHEUS_AVAILABLE and SIGNAL_DUPLICATES_REJECTED_TOTAL:
+                            SIGNAL_DUPLICATES_REJECTED_TOTAL.labels(stream=stream_name).inc()
+
+                        return False  # Don't retry duplicates
+                    else:
+                        # Other Redis errors - retry with backoff
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(backoff_delays[attempt])
+                            continue
+                        else:
+                            # PRD-001 Section 2.3: Log publish failure at ERROR level
+                            self.logger.error(
+                                f"Failed to publish signal after {max_retries} attempts. "
+                                f"signal_id={signal_id}, stream={stream_name}, error={e}"
+                            )
+
+                            # PRD-001 Section 2.3: Emit error counter
+                            if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
+                                REDIS_PUBLISH_ERRORS_TOTAL.labels(
+                                    stream=stream_name,
+                                    error_type='redis_error'
+                                ).inc()
+
+                            # PRD-001 Section 2.3: Queue for retry on reconnection
+                            self.failed_publishes.append((signal_data, stream_name))
+                            return False
+
+                except asyncio.TimeoutError:
+                    # PRD-001 Section 2.3: Timeout handling
                     if attempt < max_retries - 1:
                         await asyncio.sleep(backoff_delays[attempt])
                         continue
                     else:
-                        # PRD-001 Section 2.3: Log publish failure at ERROR level
                         self.logger.error(
-                            f"Failed to publish signal after {max_retries} attempts. "
-                            f"signal_id={signal_id}, stream={stream_name}, error={e}"
+                            f"Publish timeout after {timeout}s for signal_id={signal_id}, "
+                            f"stream={stream_name}"
                         )
 
-                        # PRD-001 Section 2.3: Emit error counter
                         if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
                             REDIS_PUBLISH_ERRORS_TOTAL.labels(
                                 stream=stream_name,
-                                error_type='redis_error'
+                                error_type='timeout'
                             ).inc()
 
-                        # PRD-001 Section 2.3: Queue for retry on reconnection
                         self.failed_publishes.append((signal_data, stream_name))
                         return False
 
-            except asyncio.TimeoutError:
-                # PRD-001 Section 2.3: Timeout handling
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(backoff_delays[attempt])
-                    continue
-                else:
-                    self.logger.error(
-                        f"Publish timeout after {timeout}s for signal_id={signal_id}, "
-                        f"stream={stream_name}"
-                    )
+                except Exception as e:
+                    # Generic error handling
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(backoff_delays[attempt])
+                        continue
+                    else:
+                        self.logger.error(
+                            f"Unexpected error publishing signal. signal_id={signal_id}, "
+                            f"stream={stream_name}, error={e}"
+                        )
 
-                    if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
-                        REDIS_PUBLISH_ERRORS_TOTAL.labels(
-                            stream=stream_name,
-                            error_type='timeout'
-                        ).inc()
+                        if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
+                            REDIS_PUBLISH_ERRORS_TOTAL.labels(
+                                stream=stream_name,
+                                error_type='unknown'
+                            ).inc()
 
-                    self.failed_publishes.append((signal_data, stream_name))
-                    return False
+                        self.failed_publishes.append((signal_data, stream_name))
+                        return False
 
-            except Exception as e:
-                # Generic error handling
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(backoff_delays[attempt])
-                    continue
-                else:
-                    self.logger.error(
-                        f"Unexpected error publishing signal. signal_id={signal_id}, "
-                        f"stream={stream_name}, error={e}"
-                    )
+            return False
 
-                    if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
-                        REDIS_PUBLISH_ERRORS_TOTAL.labels(
-                            stream=stream_name,
-                            error_type='unknown'
-                        ).inc()
-
-                    self.failed_publishes.append((signal_data, stream_name))
-                    return False
-
-        return False
+        finally:
+            # PRD-001 Section 2.4: Decrement queue depth
+            self.publish_queue_depth[stream_name] = self.publish_queue_depth.get(stream_name, 1) - 1
+            if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_QUEUE_DEPTH:
+                REDIS_PUBLISH_QUEUE_DEPTH.labels(stream=stream_name).set(self.publish_queue_depth[stream_name])
 
     async def close(self):
         """Close Redis connection"""
