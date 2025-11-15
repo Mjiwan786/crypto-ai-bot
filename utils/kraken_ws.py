@@ -47,6 +47,11 @@ try:
         'Total duplicate messages rejected',
         ['channel']
     )
+    KRAKEN_WS_ERRORS_TOTAL = Counter(
+        'kraken_ws_errors_total',
+        'Total WebSocket errors by type',
+        ['error_type']
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -55,6 +60,7 @@ except ImportError:
     KRAKEN_WS_MESSAGE_GAPS_TOTAL = None
     KRAKEN_WS_STALE_MESSAGES_TOTAL = None
     KRAKEN_WS_DUPLICATES_REJECTED_TOTAL = None
+    KRAKEN_WS_ERRORS_TOTAL = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -677,7 +683,10 @@ class KrakenWebSocketClient:
                 sent_count += 1
                 await asyncio.sleep(0.1)  # Rate limiting
             except Exception as e:
-                self.logger.error(f"Failed to send subscription {sub}: {e}")
+                self.logger.error(f"Failed to send subscription {sub}: {e}")  # PRD-001 Section 1.4
+                # Emit Prometheus counter (PRD-001 Section 1.4)
+                if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                    KRAKEN_WS_ERRORS_TOTAL.labels(error_type='subscription').inc()
 
         # Log subscription completion at INFO level (PRD-001 Section 8.1 & 4.2)
         if is_reconnection:
@@ -1334,17 +1343,26 @@ class KrakenWebSocketClient:
                         self.logger.debug(f"🤷 Unknown channel type: {channel}")
                 except Exception as e:
                     self.logger.error(f"Handler error for {channel}: {e}")
+                    # Emit Prometheus counter (PRD-001 Section 1.4)
+                    if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                        KRAKEN_WS_ERRORS_TOTAL.labels(error_type='handler_error').inc()
                     # Don't raise - continue processing other messages
             else:
                 self.logger.debug(f"📋 Received data structure: {type(data)} with length {len(data) if hasattr(data, '__len__') else 'unknown'}")
-            
+
         except json.JSONDecodeError as e:
             self.stats["errors"] += 1
-            self.logger.error(f"Failed to parse message: {e}")
-            self.logger.debug(f"Raw message: {message[:100]}...")  # First 100 chars
+            self.logger.warning(f"Message parsing error: {e}")  # PRD-001 Section 1.4: WARNING level for parsing errors
+            self.logger.debug(f"Raw message: {message[:200]}...")  # First 200 chars for debugging
+            # Emit Prometheus counter (PRD-001 Section 1.4)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                KRAKEN_WS_ERRORS_TOTAL.labels(error_type='json_decode').inc()
         except Exception as e:
             self.stats["errors"] += 1
             self.logger.error(f"Error handling message: {e}")
+            # Emit Prometheus counter (PRD-001 Section 1.4)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                KRAKEN_WS_ERRORS_TOTAL.labels(error_type='message_handling').inc()
             # Don't raise - continue processing
         finally:
             # Track message processing latency
@@ -1531,7 +1549,10 @@ class KrakenWebSocketClient:
         except Exception as e:
             # Set state to DISCONNECTED on error (PRD-001 Section 4.1)
             self._set_connection_state(ConnectionState.DISCONNECTED, f"Connection error: {str(e)}")
-            self.logger.error(f"Kraken WS connection error: {e}")
+            self.logger.error(f"Kraken WS connection error: {e}")  # PRD-001 Section 1.4: ERROR level with exception details
+            # Emit Prometheus counter (PRD-001 Section 1.4)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                KRAKEN_WS_ERRORS_TOTAL.labels(error_type='connection').inc()
             raise
 
     async def start(self):
