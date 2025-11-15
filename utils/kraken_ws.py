@@ -499,6 +499,12 @@ class KrakenWebSocketClient:
         # Store last 100 message IDs per channel to detect duplicates
         self.dedup_cache: Dict[str, deque] = {}
 
+        # Data cache for graceful degradation (PRD-001 Section 1.4)
+        # Store latest data for each channel:pair with timestamp
+        # Cache TTL: 5 minutes (300 seconds)
+        self.data_cache: Dict[str, Dict[str, Any]] = {}
+        self.cache_ttl = 300  # 5 minutes in seconds
+
         # Scalping rate limiting
         self.trade_timestamps = []
     
@@ -747,11 +753,14 @@ class KrakenWebSocketClient:
             if not trades:
                 self.logger.warning(f"⚠️ No valid trades parsed from {len(data)} records for {pair}")
                 return
-            
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, trades)
+
             # Check scalping rate limits
             if self.config.scalp_enabled:
                 await self.check_scalping_rate_limit()
-            
+
             # Stream to Redis only if available - with better error handling
             if self.redis_manager.redis_client:
                 try:
@@ -832,10 +841,13 @@ class KrakenWebSocketClient:
             # Calculate spread in basis points
             spread_bps = ((spread_info["ask"] - spread_info["bid"]) / spread_info["bid"]) * 10000
             spread_info["spread_bps"] = spread_bps
-            
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, spread_info)
+
             # Check spread circuit breaker
             await self.check_spread_circuit_breaker(spread_bps, pair)
-            
+
             # Stream to Redis only if available - Redis Cloud optimized
             if self.redis_manager.redis_client:
                 try:
@@ -887,14 +899,17 @@ class KrakenWebSocketClient:
         try:
             book_data = {
                 "pair": pair,
-                "bids": [[float(price), float(volume), float(timestamp)] 
+                "bids": [[float(price), float(volume), float(timestamp)]
                         for price, volume, timestamp in data.get("bs", [])],
-                "asks": [[float(price), float(volume), float(timestamp)] 
+                "asks": [[float(price), float(volume), float(timestamp)]
                         for price, volume, timestamp in data.get("as", [])],
                 "checksum": data.get("c"),
                 "received_at": time.time()
             }
-            
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, book_data)
+
             # Stream to Redis only if available - Redis Cloud optimized
             if self.redis_manager.redis_client:
                 try:
@@ -964,7 +979,10 @@ class KrakenWebSocketClient:
                 "count": int(data[9]) if len(data) > 9 else 0,
                 "received_at": time.time()
             }
-            
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, ohlc)
+
             # Stream to Redis only if available - Redis Cloud optimized
             if self.redis_manager.redis_client:
                 try:
@@ -1228,6 +1246,92 @@ class KrakenWebSocketClient:
         id_parts.append(str(hash(payload_str)))
 
         return ":".join(id_parts)
+
+    def cache_data(self, channel: str, pair: str, data: Any) -> None:
+        """
+        Cache latest data for graceful degradation (PRD-001 Section 1.4).
+
+        Stores data with timestamp for 5-minute TTL.
+
+        Args:
+            channel: Channel name (e.g., 'trade', 'spread', 'ticker', 'book')
+            pair: Trading pair (e.g., 'BTC/USD')
+            data: Data to cache
+        """
+        cache_key = f"{channel}:{pair}"
+        self.data_cache[cache_key] = {
+            "data": data,
+            "timestamp": time.time(),
+            "channel": channel,
+            "pair": pair
+        }
+        self.logger.debug(f"Cached data for {cache_key}")
+
+    def get_cached_data(self, channel: str, pair: str) -> Optional[Dict[str, Any]]:
+        """
+        Get cached data if available and not stale (PRD-001 Section 1.4).
+
+        Returns cached data only if:
+        - Cache entry exists
+        - Cache age < TTL (5 minutes)
+        - WebSocket has been unavailable > 30 seconds
+
+        Args:
+            channel: Channel name
+            pair: Trading pair
+
+        Returns:
+            Cached data dict with 'data', 'timestamp', 'age' keys, or None
+        """
+        cache_key = f"{channel}:{pair}"
+
+        # Check if we have cached data
+        if cache_key not in self.data_cache:
+            return None
+
+        cached = self.data_cache[cache_key]
+        cache_age = time.time() - cached["timestamp"]
+
+        # Check if cache is still valid (< 5 minutes old)
+        if cache_age > self.cache_ttl:
+            self.logger.debug(f"Cache expired for {cache_key} (age: {cache_age:.1f}s)")
+            return None
+
+        # Only serve cached data if WebSocket has been unavailable > 30 seconds
+        time_since_connection = time.time() - self.connection_state_changed_at
+        if self.connection_state == ConnectionState.CONNECTED or time_since_connection < 30:
+            return None  # Don't serve cache if recently connected
+
+        self.logger.info(
+            f"Serving cached data for {cache_key} "
+            f"(age: {cache_age:.1f}s, disconnected: {time_since_connection:.1f}s)"
+        )
+
+        return {
+            "data": cached["data"],
+            "timestamp": cached["timestamp"],
+            "age": cache_age,
+            "cached": True
+        }
+
+    def is_cache_valid(self, channel: str, pair: str) -> bool:
+        """
+        Check if cached data exists and is valid (PRD-001 Section 1.4).
+
+        Args:
+            channel: Channel name
+            pair: Trading pair
+
+        Returns:
+            True if cache exists and age < TTL (5 minutes)
+        """
+        cache_key = f"{channel}:{pair}"
+
+        if cache_key not in self.data_cache:
+            return False
+
+        cache_age = time.time() - self.data_cache[cache_key]["timestamp"]
+        return cache_age <= self.cache_ttl
 
     def check_duplicate(self, data: list, channel: str, pair: str) -> bool:
         """
@@ -1534,10 +1638,44 @@ class KrakenWebSocketClient:
                             message = message.decode('utf-8')
                         await self.handle_message(message)
                         
-                except websockets.exceptions.ConnectionClosed:
-                    # Set state to DISCONNECTED (PRD-001 Section 4.1)
-                    self._set_connection_state(ConnectionState.DISCONNECTED, "WebSocket connection closed")
-                    self.logger.info("Kraken WS disconnected")
+                except websockets.exceptions.ConnectionClosed as e:
+                    # Handle WebSocket protocol errors (PRD-001 Section 1.4)
+                    close_code = e.code if hasattr(e, 'code') else None
+                    close_reason = e.reason if hasattr(e, 'reason') else "Unknown"
+
+                    # Log based on close code
+                    if close_code == 1000:
+                        # Normal closure
+                        self.logger.info(f"Kraken WS closed normally (code 1000): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Normal closure")
+                    elif close_code == 1001:
+                        # Going away
+                        self.logger.info(f"Kraken WS endpoint going away (code 1001): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Endpoint going away")
+                    elif close_code == 1006:
+                        # Abnormal closure (connection lost)
+                        self.logger.warning(f"Kraken WS abnormal closure (code 1006): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Abnormal closure - connection lost")
+                        # Emit error counter for abnormal closures
+                        if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                            KRAKEN_WS_ERRORS_TOTAL.labels(error_type='protocol_error_1006').inc()
+                    elif close_code == 1011:
+                        # Server error
+                        self.logger.error(f"Kraken WS server error (code 1011): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Server error")
+                        if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                            KRAKEN_WS_ERRORS_TOTAL.labels(error_type='protocol_error_1011').inc()
+                    elif close_code == 1012:
+                        # Service restart
+                        self.logger.info(f"Kraken WS service restarting (code 1012): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Service restart")
+                    else:
+                        # Other close codes
+                        self.logger.warning(f"Kraken WS closed with code {close_code}: {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, f"Closed with code {close_code}")
+                        if close_code and close_code >= 1002:  # Error codes start at 1002
+                            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                                KRAKEN_WS_ERRORS_TOTAL.labels(error_type=f'protocol_error_{close_code}').inc()
                 finally:
                     if health_task:
                         health_task.cancel()
@@ -1546,6 +1684,13 @@ class KrakenWebSocketClient:
                         except asyncio.CancelledError:
                             pass
 
+        except websockets.exceptions.WebSocketException as e:
+            # Handle other WebSocket exceptions (PRD-001 Section 1.4)
+            self._set_connection_state(ConnectionState.DISCONNECTED, f"WebSocket error: {str(e)}")
+            self.logger.error(f"Kraken WS protocol error: {e}")
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                KRAKEN_WS_ERRORS_TOTAL.labels(error_type='websocket_protocol').inc()
+            raise
         except Exception as e:
             # Set state to DISCONNECTED on error (PRD-001 Section 4.1)
             self._set_connection_state(ConnectionState.DISCONNECTED, f"Connection error: {str(e)}")

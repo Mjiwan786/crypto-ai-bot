@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 39/248 Complete (15.7%)
+**Status:** 43/248 Complete (17.3%)
 
 ---
 
@@ -61,15 +61,15 @@
 - [x] Check incoming messages against deduplication cache before processing
 - [x] Emit Prometheus counter `kraken_ws_duplicates_rejected_total{channel}` on duplicate detection
 
-### 1.4 Error Handling (4/8)
+### 1.4 Error Handling (8/8) ✅ COMPLETE
 - [x] Wrap all WebSocket operations in try/except blocks
 - [x] Log connection errors at ERROR level with exception details
 - [x] Log message parsing errors at WARNING level with raw message data
 - [x] Emit Prometheus counter `kraken_ws_errors_total{error_type}` for all error types
-- [ ] Handle WebSocket protocol errors (close codes 1000, 1001, 1006, etc.)
-- [ ] Implement graceful degradation: serve cached data if WebSocket unavailable > 30s
-- [ ] Add cache TTL (5 minutes) for stale data fallback
-- [ ] Mark health check unhealthy during sustained failures (> 2 min)
+- [x] Handle WebSocket protocol errors (close codes 1000, 1001, 1006, 1011, 1012, etc.)
+- [x] Implement graceful degradation: serve cached data if WebSocket unavailable > 30s
+- [x] Add cache TTL (5 minutes) for stale data fallback
+- [x] Mark health check unhealthy during sustained failures (> 2 min)
 
 ### 1.5 Performance (5/5)
 - [ ] Measure P95 latency from Kraken message receipt → processing complete (target < 50ms)
