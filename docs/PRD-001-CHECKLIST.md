@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 67/248 Complete (27.0%)
+**Status:** 79/248 Complete (31.9%)
 
 ---
 
@@ -109,19 +109,19 @@
 - [x] Log stream configuration at INFO level on startup
 - [x] Emit Prometheus gauge `redis_stream_length{stream}` for all streams
 
-### 2.3 Publishing Guarantees (12/12)
-- [ ] Use `signal_id` (UUID v4) as Redis message ID for idempotency
-- [ ] Validate signal with Pydantic `TradingSignal` model before XADD
-- [ ] Serialize signal to JSON with UTF-8 encoding
-- [ ] Publish all signal fields atomically in single XADD command
-- [ ] Handle Redis XADD duplicate ID rejection (log at DEBUG level, emit metric)
-- [ ] Implement retry logic: 3 attempts with exponential backoff (100ms, 200ms, 400ms) on publish failure
-- [ ] Log publish failures at ERROR level with signal_id and error details
-- [ ] Emit Prometheus counter `redis_publish_errors_total{stream, error_type}` on failures
-- [ ] Emit Prometheus counter `signal_schema_errors_total{reason}` on validation failures
-- [ ] Emit Prometheus counter `signal_duplicates_rejected_total{stream}` on duplicate IDs
-- [ ] Add publish timeout (5s max) to prevent hanging
-- [ ] Queue failed publishes in memory (max 1000) for retry on Redis reconnection
+### 2.3 Publishing Guarantees (12/12) ✅ COMPLETE
+- [x] Use `signal_id` (UUID v4) as Redis message ID for idempotency
+- [x] Validate signal with Pydantic `TradingSignal` model before XADD
+- [x] Serialize signal to JSON with UTF-8 encoding
+- [x] Publish all signal fields atomically in single XADD command
+- [x] Handle Redis XADD duplicate ID rejection (log at DEBUG level, emit metric)
+- [x] Implement retry logic: 3 attempts with exponential backoff (100ms, 200ms, 400ms) on publish failure
+- [x] Log publish failures at ERROR level with signal_id and error details
+- [x] Emit Prometheus counter `redis_publish_errors_total{stream, error_type}` on failures
+- [x] Emit Prometheus counter `signal_schema_errors_total{reason}` on validation failures
+- [x] Emit Prometheus counter `signal_duplicates_rejected_total{stream}` on duplicate IDs
+- [x] Add publish timeout (5s max) to prevent hanging
+- [x] Queue failed publishes in memory (max 1000) for retry on Redis reconnection
 
 ### 2.4 Performance (5/5)
 - [ ] Measure P95 publish latency (target < 20ms)
