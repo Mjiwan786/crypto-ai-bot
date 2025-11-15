@@ -28,6 +28,19 @@ from enum import Enum
 
 import redis.asyncio as redis
 
+# PRD-001 Section 3.1: Prometheus metrics
+try:
+    from prometheus_client import Counter
+    AGENT_INVOCATIONS_TOTAL = Counter(
+        'agent_invocations_total',
+        'Total agent method invocations by agent and outcome',
+        ['agent', 'method', 'outcome']
+    )
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    AGENT_INVOCATIONS_TOTAL = None
+
 
 # =============================================================================
 # AGENT METADATA
@@ -164,17 +177,22 @@ class StrategyAgentBase(ABC):
         This method is called once when the agent is registered and started.
         Use it to set up connections, load models, etc.
 
+        PRD-001 Section 3.1: Agents should call self._log_lifecycle() and
+        self._emit_metric() to log lifecycle events at INFO level and emit metrics.
+
         Args:
             config: Configuration dictionary specific to this agent
             redis_client: Optional Redis client for publishing signals
 
         Example:
             async def initialize(self, config, redis_client):
+                self._log_lifecycle("startup", "Starting initialization")
                 self.config = config
                 self.redis = redis_client
                 self.lookback_period = config.get("lookback_period", 20)
                 self._initialized = True
-                self.logger.info(f"{self.get_metadata().name} initialized")
+                self._log_lifecycle("startup", "Initialized successfully")
+                self._emit_metric("initialize", "success")
         """
         pass
 
@@ -247,12 +265,17 @@ class StrategyAgentBase(ABC):
         Called when the agent is being stopped. Use this to close
         connections, save state, etc.
 
+        PRD-001 Section 3.1: Agents should call self._log_lifecycle()
+        to log shutdown events at INFO level.
+
         Example:
             async def shutdown(self):
-                self.logger.info(f"{self.get_metadata().name} shutting down")
+                self._log_lifecycle("shutdown", "Starting shutdown")
                 if self.redis:
                     await self.redis.close()
                 self._shutdown = True
+                self._log_lifecycle("shutdown", "Shutdown complete")
+                self._emit_metric("shutdown", "success")
         """
         pass
 
@@ -319,6 +342,41 @@ class StrategyAgentBase(ABC):
     # =========================================================================
     # HELPER METHODS (Available to all agents)
     # =========================================================================
+
+    def _log_lifecycle(self, event: str, message: str) -> None:
+        """
+        Log agent lifecycle events at INFO level (PRD-001 Section 3.1).
+
+        Args:
+            event: Event type (startup, shutdown, etc.)
+            message: Log message
+
+        Example:
+            self._log_lifecycle("startup", "Agent initialized with config X")
+            self._log_lifecycle("shutdown", "Agent shutting down gracefully")
+        """
+        agent_name = self.get_metadata().name
+        self.logger.info(f"[{agent_name}] {event.upper()}: {message}")
+
+    def _emit_metric(self, method: str, outcome: str) -> None:
+        """
+        Emit Prometheus metric for agent invocation (PRD-001 Section 3.1).
+
+        Args:
+            method: Method name (initialize, generate_signals, shutdown, etc.)
+            outcome: Outcome (success, error, rejected, etc.)
+
+        Example:
+            self._emit_metric("generate_signals", "success")
+            self._emit_metric("validate_signal", "rejected")
+        """
+        if PROMETHEUS_AVAILABLE and AGENT_INVOCATIONS_TOTAL:
+            agent_name = self.get_metadata().name
+            AGENT_INVOCATIONS_TOTAL.labels(
+                agent=agent_name,
+                method=method,
+                outcome=outcome
+            ).inc()
 
     def validate_signal(self, signal: Dict[str, Any]) -> bool:
         """
