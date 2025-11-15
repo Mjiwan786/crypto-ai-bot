@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 12/248 Complete (4.8%)
+**Status:** 13/248 Complete (5.2%)
 
 ---
 
@@ -25,8 +25,8 @@
 
 **Problem Addressed:** Dropped WebSocket messages, no reconnection strategy, missing heartbeat, no exception handling
 
-### 1.1 Connection Management (4/8)
-- [ ] Subscribe to Kraken WS feeds: ticker, spread, trade, book (L2) for all pairs (BTC/USD, ETH/USD, SOL/USD, MATIC/USD, LINK/USD)
+### 1.1 Connection Management (5/8)
+- [x] Subscribe to Kraken WS feeds: ticker, spread, trade, book (L2) for all pairs (BTC/USD, ETH/USD, SOL/USD, MATIC/USD, LINK/USD)
 - [x] Implement WebSocket connection to wss://ws.kraken.com with configurable timeout (30s default)
 - [x] Implement PING/PONG heartbeat monitoring every 30 seconds
 - [x] Add connection state tracking (CONNECTING, CONNECTED, DISCONNECTED, RECONNECTING)

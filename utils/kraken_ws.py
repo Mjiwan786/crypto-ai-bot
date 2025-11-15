@@ -37,7 +37,7 @@ class KrakenWSConfig(BaseModel):
     url: str = Field(default="wss://ws.kraken.com", pattern=r"^wss?://.*")
     pairs: List[str] = Field(
         default_factory=lambda: os.getenv(
-            "TRADING_PAIRS", "BTC/USD,ETH/USD,SOL/USD,ADA/USD"
+            "TRADING_PAIRS", "BTC/USD,ETH/USD,SOL/USD,MATIC/USD,LINK/USD"
         ).split(",")
     )
     timeframes: List[str] = Field(
@@ -45,8 +45,9 @@ class KrakenWSConfig(BaseModel):
     )
     redis_url: str = Field(default_factory=lambda: os.getenv("REDIS_URL", ""))
     redis_streams: Dict[str, str] = Field(default_factory=lambda: {
+        "ticker": "kraken:ticker",
         "trade": "kraken:trade",
-        "spread": "kraken:spread", 
+        "spread": "kraken:spread",
         "book": "kraken:book",
         "ohlc": "kraken:ohlc",
         "scalp_signals": "kraken:scalp"
@@ -521,24 +522,32 @@ class KrakenWebSocketClient:
         return False
     
     async def setup_subscriptions(self):
-        """Setup all required subscriptions based on configuration"""
+        """Setup all required subscriptions based on configuration (PRD-001 Section 4.1)"""
         subscriptions = []
-        
+
+        # Log subscription setup
+        self.logger.info(f"Setting up Kraken WS subscriptions for {len(self.config.pairs)} pairs: {', '.join(self.config.pairs)}")
+
+        # Ticker data for all pairs (PRD-001 Section 4.1)
+        subscriptions.append(
+            self.create_subscription("ticker", self.config.pairs)
+        )
+
         # Trade data for all pairs
         subscriptions.append(
             self.create_subscription("trade", self.config.pairs)
         )
-        
-        # Spread data for all pairs  
+
+        # Spread data for all pairs
         subscriptions.append(
             self.create_subscription("spread", self.config.pairs)
         )
-        
-        # Order book data (configurable depth)
+
+        # Order book data (L2, configurable depth) (PRD-001 Section 4.1)
         subscriptions.append(
             self.create_subscription(
-                "book", 
-                self.config.pairs, 
+                "book",
+                self.config.pairs,
                 depth=self.config.book_depth
             )
         )
@@ -562,15 +571,20 @@ class KrakenWebSocketClient:
                     )
         
         # Send all subscriptions with circuit breaker protection
+        sent_count = 0
         for sub in subscriptions:
             try:
                 await self.circuit_breakers["connection"].call(
                     self.ws.send, json.dumps(sub)
                 )
                 self.logger.debug(f"Sent subscription: {sub}")
+                sent_count += 1
                 await asyncio.sleep(0.1)  # Rate limiting
             except Exception as e:
                 self.logger.error(f"Failed to send subscription {sub}: {e}")
+
+        # Log subscription completion at INFO level (PRD-001 Section 8.1)
+        self.logger.info(f"Subscriptions complete: {sent_count}/{len(subscriptions)} sent successfully")
     
     async def handle_trade_data(self, channel_id: int, data: List, channel: str, pair: str):
         """Handle trade data with enhanced logging and debugging"""
