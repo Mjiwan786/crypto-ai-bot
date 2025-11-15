@@ -247,5 +247,136 @@ class TestReconnectionBackoff:
             assert -0.2 <= jitter <= 0.2
 
 
+@pytest.mark.asyncio
+class TestHealthCheck:
+    """Test health check based on connection state per PRD-001 Section 4.1"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url="",
+            max_retries=10
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_is_healthy_when_connected(self, client):
+        """Test that bot is healthy when connected"""
+        client._set_connection_state(ConnectionState.CONNECTED, "Test connection")
+        assert client.is_healthy is True
+
+    def test_is_healthy_when_connecting(self, client):
+        """Test that bot is healthy when connecting"""
+        client._set_connection_state(ConnectionState.CONNECTING, "Test connecting")
+        assert client.is_healthy is True
+
+    def test_is_healthy_when_reconnecting(self, client):
+        """Test that bot is healthy when reconnecting"""
+        client._set_connection_state(ConnectionState.RECONNECTING, "Test reconnecting")
+        assert client.is_healthy is True
+
+    def test_is_healthy_when_just_disconnected(self, client):
+        """Test that bot is still healthy immediately after disconnection"""
+        client._set_connection_state(ConnectionState.DISCONNECTED, "Test disconnection")
+        assert client.is_healthy is True
+
+    def test_is_unhealthy_after_2_minutes_disconnected(self, client):
+        """Test that bot becomes unhealthy after > 2 minutes disconnected"""
+        import time
+
+        # Set to disconnected
+        client._set_connection_state(ConnectionState.DISCONNECTED, "Test long disconnection")
+
+        # Simulate 2 minutes + 1 second passing
+        client.connection_state_changed_at = time.time() - 121
+
+        # Should be unhealthy
+        assert client.is_healthy is False
+
+    def test_health_transitions_correctly(self, client):
+        """Test that health status transitions correctly through states"""
+        import time
+
+        # Start connected - should be healthy
+        client._set_connection_state(ConnectionState.CONNECTED, "Initial connection")
+        assert client.is_healthy is True
+
+        # Disconnect - still healthy initially
+        client._set_connection_state(ConnectionState.DISCONNECTED, "Connection lost")
+        assert client.is_healthy is True
+
+        # Simulate 1 minute - still healthy
+        client.connection_state_changed_at = time.time() - 60
+        assert client.is_healthy is True
+
+        # Simulate 2.5 minutes - now unhealthy
+        client.connection_state_changed_at = time.time() - 150
+        assert client.is_healthy is False
+
+        # Reconnect - healthy again
+        client._set_connection_state(ConnectionState.CONNECTED, "Reconnected")
+        assert client.is_healthy is True
+
+    def test_get_stats_includes_health_status(self, client):
+        """Test that get_stats() includes is_healthy field"""
+        stats = client.get_stats()
+
+        # Should have is_healthy field
+        assert "is_healthy" in stats
+        assert isinstance(stats["is_healthy"], bool)
+
+        # Should be True for newly created client (DISCONNECTED but < 2 min)
+        assert stats["is_healthy"] is True
+
+    def test_health_boundary_at_120_seconds(self, client):
+        """Test health check boundary exactly at 120 seconds"""
+        import time
+
+        client._set_connection_state(ConnectionState.DISCONNECTED, "Test boundary")
+
+        # At exactly 120 seconds - should still be healthy
+        client.connection_state_changed_at = time.time() - 120
+        assert client.is_healthy is True
+
+        # At 120.1 seconds - should be unhealthy
+        client.connection_state_changed_at = time.time() - 120.1
+        assert client.is_healthy is False
+
+    async def test_monitor_health_logs_unhealthy_state(self, client, caplog):
+        """Test that monitor_health logs WARNING when unhealthy"""
+        import logging
+        import time
+
+        # Set to unhealthy state
+        client._set_connection_state(ConnectionState.DISCONNECTED, "Test unhealthy")
+        client.connection_state_changed_at = time.time() - 150  # 2.5 minutes ago
+
+        # Start monitoring
+        client.running = True
+
+        # Capture logs
+        with caplog.at_level(logging.WARNING):
+            # Run one iteration of health monitor
+            health_task = asyncio.create_task(client.monitor_health())
+
+            # Give it time to log
+            await asyncio.sleep(0.1)
+
+            # Stop monitoring
+            client.running = False
+            await asyncio.sleep(0.1)
+
+        # Should have logged unhealthy warning
+        warning_logs = [r for r in caplog.records if "unhealthy" in r.message.lower()]
+        assert len(warning_logs) > 0
+        assert "disconnected for" in warning_logs[0].message.lower()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

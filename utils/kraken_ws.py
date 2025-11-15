@@ -390,6 +390,7 @@ class KrakenWebSocketClient:
 
         # Connection state tracking (PRD-001 Section 4.1)
         self.connection_state = ConnectionState.DISCONNECTED
+        self.connection_state_changed_at = time.time()  # Track when state changed
 
         # Resource management
         self.redis_manager = RedisConnectionManager(config)
@@ -460,6 +461,7 @@ class KrakenWebSocketClient:
         if self.connection_state != new_state:
             old_state = self.connection_state
             self.connection_state = new_state
+            self.connection_state_changed_at = time.time()  # Track timestamp for health check
             timestamp = datetime.now().isoformat()
 
             # Log state change at INFO level with timestamp (PRD-001 Section 8.1)
@@ -471,7 +473,21 @@ class KrakenWebSocketClient:
     def get_connection_state(self) -> ConnectionState:
         """Get the current connection state"""
         return self.connection_state
-    
+
+    @property
+    def is_healthy(self) -> bool:
+        """
+        Check if bot is healthy based on connection state (PRD-001 Section 4.1).
+
+        Returns False if WebSocket has been disconnected for > 2 minutes.
+        """
+        if self.connection_state != ConnectionState.DISCONNECTED:
+            return True
+
+        # Check how long we've been disconnected (2 minutes = 120 seconds)
+        time_disconnected = time.time() - self.connection_state_changed_at
+        return time_disconnected <= 120
+
     async def trigger_circuit_breaker(self, breaker_name: str, reason: str):
         """Trigger a circuit breaker"""
         self.stats["circuit_breaker_trips"] += 1
@@ -1030,12 +1046,19 @@ class KrakenWebSocketClient:
         while self.running:
             try:
                 current_time = time.time()
-                
+
+                # Check overall health status (PRD-001 Section 4.1)
+                if not self.is_healthy:
+                    time_disconnected = current_time - self.connection_state_changed_at
+                    self.logger.warning(
+                        f"⚠️ Bot unhealthy: WebSocket disconnected for {time_disconnected:.1f}s (> 2 minutes)"
+                    )
+
                 # Check heartbeat
                 time_since_heartbeat = current_time - self.last_heartbeat
                 if time_since_heartbeat > 60:
                     self.logger.warning(f"No heartbeat for {time_since_heartbeat:.1f}s")
-                
+
                 # Check data flow
                 if self.stats["last_data_time"]:
                     time_since_data = current_time - self.stats["last_data_time"]
@@ -1061,6 +1084,8 @@ class KrakenWebSocketClient:
                         async with self.redis_manager.get_connection() as redis_conn:
                             health_data = {
                                 "timestamp": str(current_time),
+                                "is_healthy": str(self.is_healthy),  # PRD-001 Section 4.1
+                                "connection_state": self.connection_state.value,  # PRD-001 Section 4.1
                                 "messages_received": str(self.stats["messages_received"]),
                                 "reconnects": str(self.stats["reconnects"]),
                                 "time_since_heartbeat": str(time_since_heartbeat),
@@ -1213,6 +1238,7 @@ class KrakenWebSocketClient:
             **self.stats,
             "running": self.running,
             "connection_state": self.connection_state.value,  # PRD-001 Section 4.1
+            "is_healthy": self.is_healthy,  # PRD-001 Section 4.1 - Health based on connection duration
             "redis_connected": self.redis_manager.redis_client is not None,
             "latency_stats": latency_stats,
             "circuit_breakers": cb_statuses,
