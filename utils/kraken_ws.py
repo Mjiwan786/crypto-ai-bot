@@ -984,20 +984,63 @@ class KrakenWebSocketClient:
             error_msg = data.get("errorMessage", "Unknown error")
             self.logger.error(f"❌ Subscription error for {channel}: {error_msg}")
     
+    def validate_message_schema(self, data) -> tuple[bool, str]:
+        """
+        Validate Kraken message schema (PRD-001 Section 1.3).
+
+        Returns:
+            tuple[bool, str]: (is_valid, error_message)
+        """
+        # Event messages (dict) are valid - they have different schema
+        if isinstance(data, dict):
+            return True, ""
+
+        # Data messages must be arrays with at least 4 elements (PRD-001 Section 1.3)
+        if not isinstance(data, list):
+            return False, f"Invalid message type: expected list or dict, got {type(data).__name__}"
+
+        if len(data) < 4:
+            return False, f"Invalid message length: expected >= 4, got {len(data)}"
+
+        # Check required fields: channel_id (int), payload (dict/list), channel (str), pair (str)
+        channel_id = data[0]
+        payload = data[1]
+        channel = data[2]
+        pair = data[3]
+
+        # Validate channel_id is numeric
+        if not isinstance(channel_id, (int, float)):
+            return False, f"Invalid channel_id type: expected int, got {type(channel_id).__name__}"
+
+        # Validate payload is dict or list
+        if not isinstance(payload, (dict, list)):
+            return False, f"Invalid payload type: expected dict or list, got {type(payload).__name__}"
+
+        # Validate channel is string
+        if not isinstance(channel, str):
+            return False, f"Invalid channel type: expected str, got {type(channel).__name__}"
+
+        # Validate pair is string
+        if not isinstance(pair, str):
+            return False, f"Invalid pair type: expected str, got {type(pair).__name__}"
+
+        # All validations passed
+        return True, ""
+
     async def handle_message(self, message: str):
-        """Handle incoming WebSocket messages with enhanced debugging"""
+        """Handle incoming WebSocket messages with enhanced debugging and validation (PRD-001 Section 1.3)"""
         message_start_time = time.time()
-        
+
         try:
             data = json.loads(message)
             self.stats["messages_received"] += 1
             self.stats["last_data_time"] = time.time()
-            
+
             # Enhanced logging for debugging
             if isinstance(data, dict):
                 event_type = data.get("event", "unknown")
                 self.logger.debug(f"📨 Received event: {event_type}")
-                
+
                 if data.get("event") == "subscriptionStatus":
                     await self.handle_subscription_status(data)
                 elif data.get("event") == "systemStatus":
@@ -1007,7 +1050,14 @@ class KrakenWebSocketClient:
                     self.last_heartbeat = time.time()
                     self.logger.debug("💓 Heartbeat received")
                 return
-            
+
+            # Validate message schema (PRD-001 Section 1.3)
+            is_valid, error_msg = self.validate_message_schema(data)
+            if not is_valid:
+                self.logger.warning(f"Invalid message schema: {error_msg}")
+                self.stats["errors"] += 1
+                return
+
             # Handle data messages (arrays) with enhanced logging
             if isinstance(data, list) and len(data) >= 4:
                 channel_id = data[0]

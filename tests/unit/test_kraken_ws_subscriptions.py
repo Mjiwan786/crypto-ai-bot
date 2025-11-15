@@ -159,8 +159,8 @@ class TestKrakenWSSubscriptions:
         assert len(setup_log) > 0
         assert "5 pairs" in setup_log[0].message  # Should mention 5 pairs
 
-        # Verify completion log
-        completion_log = [log for log in info_logs if "Subscriptions complete" in log.message]
+        # Verify completion log (may say "Initial subscriptions" or "Resubscription")
+        completion_log = [log for log in info_logs if "subscriptions complete" in log.message.lower()]
         assert len(completion_log) > 0
 
     @pytest.mark.asyncio
