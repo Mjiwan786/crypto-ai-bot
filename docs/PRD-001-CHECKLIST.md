@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 209/248 Complete (84.3%)
+**Status:** 217/248 Complete (87.5%)
 
 ---
 
@@ -313,15 +313,15 @@
 - [x] Simulate realistic order fills (limit orders require depth check, market orders use slippage)
 - [x] Store historical data in cache for reuse (`data/ohlcv/`)
 
-### 6.2 Backtest Metrics (8/8)
-- [ ] Calculate total return % for backtest period
-- [ ] Calculate Sharpe ratio: (mean_return - risk_free_rate) / std_deviation
-- [ ] Calculate max drawdown: max peak-to-trough decline
-- [ ] Calculate win rate: winning_trades / total_trades
-- [ ] Calculate profit factor: gross_profit / gross_loss
-- [ ] Calculate average trade duration in hours
-- [ ] Count total trades in backtest period
-- [ ] Log all metrics to `out/backtests/{strategy}_{date}.json`
+### 6.2 Backtest Metrics (8/8) ✅
+- [x] Calculate total return % for backtest period
+- [x] Calculate Sharpe ratio: (mean_return - risk_free_rate) / std_deviation
+- [x] Calculate max drawdown: max peak-to-trough decline
+- [x] Calculate win rate: winning_trades / total_trades
+- [x] Calculate profit factor: gross_profit / gross_loss
+- [x] Calculate average trade duration in hours
+- [x] Count total trades in backtest period
+- [x] Log all metrics to `out/backtests/{strategy}_{date}.json`
 
 ### 6.3 Acceptance Criteria (7/7)
 - [ ] Enforce Sharpe ratio ≥ 1.5 for production deployment
