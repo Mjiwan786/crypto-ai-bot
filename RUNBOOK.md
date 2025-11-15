@@ -1,738 +1,622 @@
-# Crypto AI Bot - Operations Runbook
+# Crypto-AI-Bot Publisher Runbook
 
-Production deployment and operations guide for Fly.io 24/7 worker deployment.
+> **📋 System Requirements Specification: [PRD-001: Crypto AI Bot - Core Intelligence Engine](docs/PRD-001-CRYPTO-AI-BOT.md)**
 
-## Table of Contents
+## Overview
 
-- [Prerequisites](#prerequisites)
-- [Initial Setup](#initial-setup)
-- [Deployment](#deployment)
-- [Verification](#verification)
-- [Monitoring](#monitoring)
-- [Common Operations](#common-operations)
-- [Troubleshooting](#troubleshooting)
-- [Rollback Procedures](#rollback-procedures)
-- [Emergency Procedures](#emergency-procedures)
+Production operations guide for **crypto-ai-bot publisher** - a continuous signal publishing service with health monitoring and rate limiting.
+
+**Purpose**: Publishes trading signals, PnL points, and heartbeats to Redis streams for consumption by signals-api.
+
+**Health Endpoint**: http://localhost:8080/health (when running locally)
+
+**Note**: All operational procedures must comply with the requirements, SLOs, and safety standards defined in PRD-001.
 
 ---
 
-## Prerequisites
+## Running the Publisher
 
-### Required Tools
-
-- **Fly.io CLI** (v0.1.0+)
-  ```bash
-  # Windows (PowerShell)
-  iwr https://fly.io/install.ps1 -useb | iex
-
-  # macOS/Linux
-  curl -L https://fly.io/install.sh | sh
-  ```
-
-- **Docker** (for local testing)
-  ```bash
-  docker --version  # Should be 20.10+
-  ```
-
-- **Git** (for version control)
-
-### Required Credentials
-
-- ✅ Fly.io account (https://fly.io/app/sign-up)
-- ✅ Redis Cloud URL with TLS (rediss://)
-- ✅ Kraken API credentials (API Key + Secret)
-- ✅ Discord bot token (optional, for alerts)
-- ✅ Redis CA certificate (`config/certs/redis_ca.pem`)
-
-### Preflight Checklist
-
-Before deploying, run:
+### Local Development
 
 ```bash
-# Run comprehensive preflight checks
-make preflight
+# Activate conda environment
+conda activate crypto-bot
 
-# Or manually:
-python scripts/check_redis_tls.py
-python scripts/check_kraken_api.py
+# Run publisher with health server
+python publisher_with_health.py
+
+# Verify health
+curl http://localhost:8080/health
 ```
 
-**All checks must pass before deployment.**
+### Background Process
+
+```bash
+# Run in background with nohup
+nohup python publisher_with_health.py > publisher.log 2>&1 &
+
+# Get process ID
+echo $! > publisher.pid
+
+# Check status
+ps aux | grep publisher_with_health
+
+# View logs
+tail -f publisher.log
+
+# Stop publisher
+kill $(cat publisher.pid)
+```
+
+### Systemd Service (Linux)
+
+Create `/etc/systemd/system/crypto-publisher.service`:
+
+```ini
+[Unit]
+Description=Crypto AI Bot Signal Publisher
+After=network.target
+
+[Service]
+Type=simple
+User=<your_user>
+WorkingDirectory=/path/to/crypto_ai_bot
+Environment="PATH=/opt/conda/envs/crypto-bot/bin"
+ExecStart=/opt/conda/envs/crypto-bot/bin/python publisher_with_health.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable crypto-publisher
+sudo systemctl start crypto-publisher
+
+# Check status
+sudo systemctl status crypto-publisher
+
+# View logs
+sudo journalctl -u crypto-publisher -f
+
+# Restart service
+sudo systemctl restart crypto-publisher
+```
+
+### Windows Service (Optional)
+
+Use **NSSM** (Non-Sucking Service Manager):
+
+```cmd
+# Install NSSM
+choco install nssm
+
+# Create service
+nssm install CryptoPublisher "C:\path\to\conda\envs\crypto-bot\python.exe" "publisher_with_health.py"
+nssm set CryptoPublisher AppDirectory "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot"
+
+# Start service
+nssm start CryptoPublisher
+
+# Check status
+nssm status CryptoPublisher
+
+# Stop service
+nssm stop CryptoPublisher
+```
 
 ---
 
-## Initial Setup
+## Configuration
 
-### 1. Install Fly.io CLI
+### Environment Variables
 
-```bash
-# Windows
-iwr https://fly.io/install.ps1 -useb | iex
+Required secrets in `.env.prod`:
 
-# Verify installation
-fly version
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `REDIS_URL` | Redis Cloud connection | `rediss://default:<pass>@host:port` |
+| `REDIS_CA_CERT` | Path to Redis CA certificate | `./config/certs/redis_ca.pem` |
+
+### Publisher Settings
+
+Configured in `publisher_with_health.py`:
+
+```python
+MAX_PUBLISH_RATE = 2.0  # signals per second
+MIN_PUBLISH_INTERVAL = 0.5  # seconds
+MAX_BACKOFF_SECONDS = 60  # max exponential backoff
+HEALTH_PORT = 8080  # health server port
 ```
 
-### 2. Authenticate with Fly.io
+### Stream Bounds
 
-```bash
-fly auth login
+```python
+# Signals stream
+maxlen=10000  # Keep last 10k signals
+
+# PnL stream
+maxlen=1000  # Keep last 1k PnL points
+
+# Heartbeat stream
+maxlen=100  # Keep last 100 heartbeats
 ```
-
-This will open your browser for authentication.
-
-### 3. Create Fly.io App
-
-```bash
-# Launch app (DO NOT deploy yet)
-fly launch --name crypto-ai-bot --no-deploy --region ewr
-
-# This creates fly.toml (already exists in repo)
-```
-
-**Important:** Choose region `ewr` (Newark, NJ) - closest to Redis Cloud `us-east-1-4`.
 
 ---
 
-## Deployment
+## Secrets & Rotation
 
-### Step 1: Configure Secrets
-
-⚠️ **CRITICAL: Never commit secrets to git!**
+### View Current Configuration
 
 ```bash
-# Required secrets
-fly secrets set \
-  REDIS_URL="rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0" \
-  KRAKEN_API_KEY="your_kraken_api_key_here" \
-  KRAKEN_API_SECRET="your_kraken_api_secret_here" \
-  DISCORD_BOT_TOKEN="your_discord_bot_token" \
-  DISCORD_CHANNEL_ID="your_discord_channel_id"
+# Check .env.prod (DO NOT commit this file)
+cat .env.prod
 
-# Verify secrets are set
-fly secrets list
+# Test Redis connection
+redis-cli -u "redis://default:<password>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem" PING
 ```
 
-**Expected output:**
-```
-NAME                  DIGEST                    CREATED AT
-REDIS_URL             xxxxxxxxxxxxxxxxxxxx      1m ago
-KRAKEN_API_KEY        xxxxxxxxxxxxxxxxxxxx      1m ago
-KRAKEN_API_SECRET     xxxxxxxxxxxxxxxxxxxx      1m ago
-DISCORD_BOT_TOKEN     xxxxxxxxxxxxxxxxxxxx      1m ago
-DISCORD_CHANNEL_ID    xxxxxxxxxxxxxxxxxxxx      1m ago
-```
-
-### Step 2: Build Docker Image
-
-Test the build locally before deploying:
+### Rotate Redis Credentials
 
 ```bash
-# Build image (optional - Fly.io will do this)
-docker build -t crypto-ai-bot:latest .
+# 1. Get new credentials from Redis Cloud dashboard
+# URL: https://app.redislabs.com/
 
-# Test locally (with .env.prod)
-docker run --env-file .env.prod -p 8080:8080 crypto-ai-bot:latest
+# 2. Update .env.prod
+nano .env.prod
+
+# Change REDIS_URL to:
+# REDIS_URL=rediss://default:<new_encoded_password>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+
+# 3. URL-encode special characters:
+#   * -> %2A
+#   $ -> %24
+#   @ -> %40
+#   : -> %3A
+
+# Example password: Salam78614**$$
+# Encoded: Salam78614%2A%2A%24%24
+
+# 4. Restart publisher
+pkill -f publisher_with_health
+python publisher_with_health.py &
 ```
 
-### Step 3: Deploy to Fly.io
+### Update Redis CA Certificate
 
 ```bash
-# Initial deployment (paper trading mode by default)
-fly deploy
+# 1. Download new certificate from Redis Cloud dashboard
+# Save to: config/certs/redis_ca_new.pem
 
-# Monitor deployment
-fly status
+# 2. Test connection with new cert
+redis-cli -u "$REDIS_URL" --tls --cacert "config/certs/redis_ca_new.pem" PING
+
+# 3. Replace old certificate
+cp config/certs/redis_ca.pem config/certs/redis_ca_backup.pem
+cp config/certs/redis_ca_new.pem config/certs/redis_ca.pem
+
+# 4. Update .env.prod if path changed
+# REDIS_CA_CERT=./config/certs/redis_ca.pem
+
+# 5. Restart publisher
 ```
 
-**Expected output:**
-```
-ID              PROCESS VERSION REGION  STATE   CHECKS          RESTARTS
-abcd1234        app     1       ewr     running 1 total         0
+---
+
+## Redis TLS Troubleshooting
+
+### Connection Issues
+
+**Error: "SSL: CERTIFICATE_VERIFY_FAILED"**
+
+```python
+# Fix 1: Use absolute path to CA cert
+REDIS_CA_CERT = "C:\\Users\\Maith\\OneDrive\\Desktop\\crypto_ai_bot\\config\\certs\\redis_ca.pem"
+
+# Fix 2: Download fresh CA cert from Redis Cloud dashboard
+# Settings -> Security -> Download CA certificate
+
+# Fix 3: Use certifi (for Docker/production)
+import certifi
+ssl_ca_certs=certifi.where()
 ```
 
-### Step 4: Verify Deployment
+**Error: "ConnectionRefusedError"**
 
 ```bash
-# Check application status
-fly status
+# Check Redis is accessible
+nc -zv redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com 19818
 
-# View logs (real-time)
-fly logs
-
-# Check health endpoint
-fly ssh console -C "curl http://localhost:8080/health"
+# Check firewall rules
+# Redis Cloud: Settings -> Security -> Allow your IP address
 ```
 
-**Expected health response:**
-```json
+**Error: "Authentication failed"**
+
+```bash
+# Password not URL-encoded correctly
+# Use Python to encode:
+python -c "from urllib.parse import quote; print(quote('Salam78614**\$\$', safe=''))"
+
+# Output: Salam78614%2A%2A%24%24
+
+# Update REDIS_URL:
+# rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+```
+
+### Test Redis Connection
+
+```bash
+# Method 1: redis-cli
+redis-cli -u "redis://default:<password>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
+  --tls \
+  --cacert "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem" \
+  PING
+
+# Expected: PONG
+
+# Method 2: Python
+python << 'EOF'
+import redis
+import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv('.env.prod')
+ca_cert = Path('config/certs/redis_ca.pem').absolute()
+
+client = redis.from_url(
+    os.getenv('REDIS_URL'),
+    decode_responses=True,
+    ssl_cert_reqs='required',
+    ssl_ca_certs=str(ca_cert)
+)
+
+print(f"PING: {client.ping()}")
+print(f"Redis version: {client.info('server')['redis_version']}")
+EOF
+```
+
+### Check Stream Status
+
+```bash
+# Activate environment
+conda activate crypto-bot
+
+# Check signals stream
+python -c "
+import redis, os
+from dotenv import load_dotenv
+load_dotenv('.env.prod')
+r = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True, ssl_cert_reqs='required', ssl_ca_certs='config/certs/redis_ca.pem')
+info = r.execute_command('XINFO', 'STREAM', 'signals:paper')
+print('signals:paper length:', [v for k,v in zip(info[::2], info[1::2]) if k == 'length'][0])
+"
+
+# Check PnL stream
+python -c "
+import redis, os
+from dotenv import load_dotenv
+load_dotenv('.env.prod')
+r = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True, ssl_cert_reqs='required', ssl_ca_certs='config/certs/redis_ca.pem')
+print('metrics:pnl:equity length:', r.xlen('metrics:pnl:equity'))
+"
+
+# Check heartbeat stream
+python -c "
+import redis, os
+from dotenv import load_dotenv
+load_dotenv('.env.prod')
+r = redis.from_url(os.getenv('REDIS_URL'), decode_responses=True, ssl_cert_reqs='required', ssl_ca_certs='config/certs/redis_ca.pem')
+print('ops:heartbeat length:', r.xlen('ops:heartbeat'))
+"
+```
+
+---
+
+## Chaos Testing
+
+### Test 1: Publisher Crash & Recovery
+
+**Purpose**: Verify exponential backoff and auto-reconnect to Redis.
+
+```bash
+# 1. Start publisher
+python publisher_with_health.py &
+PUBLISHER_PID=$!
+
+# 2. Monitor health
+watch -n 1 curl -s http://localhost:8080/health
+
+# 3. Kill publisher
+kill $PUBLISHER_PID
+
+# 4. Restart after 30 seconds
+sleep 30
+python publisher_with_health.py &
+
+# 5. Verify recovery
+curl http://localhost:8080/health
+
+# Expected: status=healthy, total_published increasing
+```
+
+**Expected Behavior:**
+- Publisher exits cleanly on SIGTERM
+- Closes Redis connection properly
+- On restart, resumes publishing immediately
+- No duplicate signals (Redis stream IDs are unique)
+
+### Test 2: Redis Connection Loss
+
+**Purpose**: Verify exponential backoff prevents hammering Redis.
+
+```bash
+# 1. Start publisher
+python publisher_with_health.py &
+
+# 2. Simulate Redis outage (firewall block or pause in Redis Cloud dashboard)
+# Wait 2-3 minutes
+
+# 3. Check health degradation
+curl http://localhost:8080/health
+
+# Expected: status=degraded, last_publish_seconds_ago > 30
+
+# 4. Restore Redis
+
+# 5. Verify auto-recovery within 60 seconds
+sleep 60
+curl http://localhost:8080/health
+
+# Expected: status=healthy, total_errors increased but publishing resumed
+```
+
+**Expected Behavior:**
+- Consecutive errors trigger exponential backoff: 1s → 2s → 4s → 8s → ... → 60s max
+- Health status degrades after 30s without publish
+- Auto-reconnect when Redis restored
+- No data loss (just delayed publishing)
+
+### Test 3: Rate Limiting Verification
+
+**Purpose**: Ensure publisher doesn't exceed 2 signals/second.
+
+```bash
+# 1. Start publisher
+python publisher_with_health.py &
+
+# 2. Monitor publish rate
+watch -n 5 'curl -s http://localhost:8080/health | jq .total_published'
+
+# 3. Calculate rate over 60 seconds
+# Formula: (total_published_t60 - total_published_t0) / 60
+
+# Expected: ~2.0 signals/second (±0.1)
+```
+
+**Expected Behavior:**
+- Publish rate never exceeds 2.0/sec
+- MIN_PUBLISH_INTERVAL enforced between publishes
+- No bursts or spikes
+
+---
+
+## Health Monitoring
+
+### Health Check Endpoint
+
+```bash
+# Check health
+curl http://localhost:8080/health
+
+# Expected output:
 {
-  "status": "healthy",
-  "timestamp": "2025-01-15T10:30:00Z",
-  "uptime_seconds": 120,
-  "redis": {
-    "connected": true,
-    "latency_ms": 12.5,
-    "ssl_enabled": true
-  },
-  "environment": "prod",
-  "version": "0.5.0"
+  "status": "healthy",  # or "degraded"
+  "reason": "Publishing normally",
+  "last_publish_seconds_ago": 0.45,
+  "uptime_seconds": 3421.88,
+  "total_published": 6843,
+  "total_errors": 0,
+  "publish_rate": "2/sec"
 }
 ```
 
+### Health Status Transitions
+
+| Status | Condition | Reason |
+|--------|-----------|--------|
+| `healthy` | Last publish < 30s ago | Publishing normally |
+| `degraded` | Last publish > 30s ago | No publish in Xs (>30s threshold) |
+
+### Monitor Logs
+
+```bash
+# Real-time logs
+tail -f publisher.log
+
+# Search for errors
+grep "ERROR" publisher.log
+
+# Count signals published
+grep "BTC-USD\|ETH-USD" publisher.log | wc -l
+
+# Check heartbeats
+grep "💓 Heartbeat sent" publisher.log
+```
+
 ---
 
-## Verification
+## Deployment (Optional: Fly.io)
 
-### Check 1: Application Running
-
-```bash
-fly status
-```
-
-**Expected:** Status = `running`, Checks = `passing`
-
-### Check 2: Health Endpoint
+**Note**: Currently publisher runs locally. If deploying to Fly.io:
 
 ```bash
-# From Fly.io SSH
-fly ssh console -C "curl -s http://localhost:8080/health | jq"
+# Create Fly app
+fly apps create crypto-ai-bot-publisher
 
-# Or use Fly.io proxy
-fly proxy 8080:8080
-# Then visit: http://localhost:8080/health
+# Set secrets
+fly secrets set REDIS_URL="<rediss_url>" -a crypto-ai-bot-publisher
+
+# Deploy
+fly deploy -a crypto-ai-bot-publisher
+
+# Check status
+fly status -a crypto-ai-bot-publisher
+
+# View logs
+fly logs -a crypto-ai-bot-publisher
+
+# SSH into machine
+fly ssh console -a crypto-ai-bot-publisher
 ```
 
-### Check 3: Redis Connectivity
+---
 
-Look for Redis heartbeats in logs:
+## Common Issues
+
+### Issue: Health status `degraded` but publisher is running
+
+**Symptoms:**
+- Health returns `status: "degraded"`
+- `last_publish_seconds_ago > 30`
+
+**Diagnosis:**
 
 ```bash
-fly logs | grep -i redis
+# Check publisher logs for errors
+tail -n 50 publisher.log | grep -E "ERROR|FAIL"
+
+# Test Redis connection
+redis-cli -u "$REDIS_URL" --tls --cacert "config/certs/redis_ca.pem" PING
 ```
 
-**Expected log entries:**
-```
-✓ Redis connected (latency: 12.5ms)
-✓ PING successful
-✓ Stream operations working
-```
-
-### Check 4: Kraken Connectivity
+**Fix:**
 
 ```bash
-fly logs | grep -i kraken
+# 1. Check Redis is accessible
+curl https://app.redislabs.com/
+
+# 2. Verify REDIS_URL is correct in .env.prod
+cat .env.prod | grep REDIS_URL
+
+# 3. Restart publisher
+pkill -f publisher_with_health
+python publisher_with_health.py &
 ```
 
-**Expected log entries:**
-```
-✓ Kraken API connected
-✓ Asset pairs loaded: BTC/USD, ETH/USD, SOL/USD
-✓ System status: online
-```
+---
 
-### Check 5: Trading System Active
+### Issue: "SSL: CERTIFICATE_VERIFY_FAILED"
+
+**Symptoms:**
+- Publisher fails to connect to Redis
+- Logs show SSL certificate errors
+
+**Diagnosis:**
 
 ```bash
-fly logs | grep -i "trading system"
+# Check if CA cert file exists
+ls -lh config/certs/redis_ca.pem
+
+# Verify file is not empty
+cat config/certs/redis_ca.pem
 ```
 
-**Expected log entries:**
+**Fix:**
+
+```bash
+# 1. Re-download CA cert from Redis Cloud dashboard
+# Settings -> Security -> Download CA certificate
+
+# 2. Save to config/certs/redis_ca.pem
+
+# 3. Update path in .env.prod
+# REDIS_CA_CERT=./config/certs/redis_ca.pem
+
+# 4. Restart publisher
 ```
-TRADING SYSTEM IS NOW RUNNING
-Mode: PAPER
+
+---
+
+### Issue: "Total errors" increasing
+
+**Symptoms:**
+- Health shows `total_errors` > 0 and growing
+- `consecutive_errors` in logs
+
+**Diagnosis:**
+
+```bash
+# Check error pattern in logs
+grep -A 5 "✗ ERROR" publisher.log | tail -30
+
+# Common causes:
+# - Redis connection timeout
+# - Authentication failure
+# - Network issues
+```
+
+**Fix:**
+
+```bash
+# 1. Verify Redis is up
+redis-cli -u "$REDIS_URL" --tls --cacert "config/certs/redis_ca.pem" PING
+
+# 2. Check Redis Cloud dashboard for alerts
+
+# 3. Increase backoff if transient errors:
+# Edit publisher_with_health.py:
+# MAX_BACKOFF_SECONDS = 120  # Increase from 60
+
+# 4. Restart publisher
 ```
 
 ---
 
 ## Monitoring
 
-### Real-Time Logs
+### Key Metrics
 
 ```bash
-# Stream all logs
-fly logs
+# Publish rate
+curl -s http://localhost:8080/health | jq '.total_published'
 
-# Filter by keyword
-fly logs | grep ERROR
-fly logs | grep "Redis"
-fly logs | grep "signal"
+# Error rate
+curl -s http://localhost:8080/health | jq '.total_errors'
 
-# Last 100 lines
-fly logs --tail 100
+# Health status
+curl -s http://localhost:8080/health | jq '.status'
+
+# Stream lag (from signals-api)
+curl -s https://crypto-signals-api.fly.dev/health | jq '.stream_lag_ms'
 ```
 
-### Health Dashboard
+### Alert Thresholds
 
-```bash
-# Open Fly.io dashboard
-fly dashboard
-
-# Or visit: https://fly.io/apps/crypto-ai-bot
-```
-
-### Metrics
-
-Access Prometheus metrics:
-
-```bash
-# Proxy metrics port
-fly proxy 9091:9091
-
-# View metrics
-curl http://localhost:9091/metrics
-```
-
-**Key metrics to monitor:**
-- `trading_signals_total`: Total signals generated
-- `orders_executed_total`: Total orders executed
-- `redis_connection_status`: Redis health (1=up, 0=down)
-- `pnl_realized_total`: Realized PnL
-
-### SSH into Container
-
-```bash
-# Open interactive shell
-fly ssh console
-
-# Run commands
-fly ssh console -C "ps aux"
-fly ssh console -C "df -h"
-fly ssh console -C "free -m"
-```
+| Metric | Warning | Critical |
+|--------|---------|----------|
+| `last_publish_seconds_ago` | > 30s | > 120s |
+| `status` | `degraded` | N/A |
+| `total_errors` rate | > 5/min | > 20/min |
+| Health endpoint | Timeout | Down |
 
 ---
 
-## Common Operations
+## References
 
-### Restart Application
-
-```bash
-# Graceful restart
-fly apps restart crypto-ai-bot
-
-# Or force restart
-fly machine restart <machine-id>
-```
-
-### Scale Resources
-
-```bash
-# Scale to 2GB RAM
-fly scale memory 2048
-
-# Scale to 2 CPUs
-fly scale count 2
-
-# Check current scaling
-fly scale show
-```
-
-### Update Application
-
-```bash
-# Pull latest code
-git pull origin main
-
-# Deploy update
-fly deploy
-
-# Monitor deployment
-fly status
-fly logs
-```
-
-### View Application Info
-
-```bash
-# App details
-fly info
-
-# VM status
-fly status
-
-# Scale info
-fly scale show
-
-# Secrets (names only)
-fly secrets list
-```
-
-### Change Secrets
-
-```bash
-# Update a secret
-fly secrets set KRAKEN_API_KEY="new_api_key"
-
-# Remove a secret
-fly secrets unset SECRET_NAME
-
-# Import from file
-fly secrets import < secrets.txt
-```
+- **PRD**: `PRD-001 – Crypto-AI-Bot Core Intelligence Engine`
+- **Redis Cloud Dashboard**: https://app.redislabs.com/
+- **Signals-API Health**: https://crypto-signals-api.fly.dev/health
+- **Conda Environment**: `crypto-bot`
 
 ---
 
-## Troubleshooting
-
-### Issue: Application Not Starting
-
-**Symptoms:**
-- Status shows `pending` or `error`
-- Logs show crash loop
-
-**Diagnosis:**
-```bash
-fly logs | tail -50
-fly status
-```
-
-**Solutions:**
-
-1. **Check environment variables:**
-   ```bash
-   fly ssh console -C "env | grep REDIS_URL"
-   ```
-
-2. **Verify secrets are set:**
-   ```bash
-   fly secrets list
-   ```
-
-3. **Check health endpoint:**
-   ```bash
-   fly ssh console -C "curl http://localhost:8080/health"
-   ```
-
-4. **Review logs for errors:**
-   ```bash
-   fly logs | grep -i error
-   ```
-
-### Issue: Redis Connection Failed
-
-**Symptoms:**
-- Logs show `Connection failed: invalid username-password pair`
-- Health endpoint returns `redis_connected: false`
-
-**Solutions:**
-
-1. **Verify Redis URL format:**
-   ```bash
-   # Should be: rediss:// (with double 's' for TLS)
-   fly secrets list | grep REDIS_URL
-   ```
-
-2. **Check URL encoding:**
-   ```bash
-   # Special characters in password must be URL-encoded
-   # Example: ** becomes %2A%2A, $$ becomes %24%24
-   ```
-
-3. **Test Redis connection:**
-   ```bash
-   fly ssh console
-   python scripts/check_redis_tls.py
-   ```
-
-4. **Verify CA certificate exists:**
-   ```bash
-   fly ssh console -C "ls -la config/certs/redis_ca.pem"
-   ```
-
-### Issue: Health Checks Failing
-
-**Symptoms:**
-- Fly.io dashboard shows failing health checks
-- App keeps restarting
-
-**Solutions:**
-
-1. **Check health endpoint manually:**
-   ```bash
-   fly ssh console -C "curl -v http://localhost:8080/health"
-   ```
-
-2. **Verify port 8080 is exposed:**
-   ```bash
-   fly ssh console -C "netstat -tlnp | grep 8080"
-   ```
-
-3. **Review health.py logs:**
-   ```bash
-   fly logs | grep health
-   ```
-
-### Issue: High Memory Usage
-
-**Symptoms:**
-- OOM (Out of Memory) errors in logs
-- Application crashes intermittently
-
-**Solutions:**
-
-1. **Check current memory usage:**
-   ```bash
-   fly ssh console -C "free -m"
-   ```
-
-2. **Scale up memory:**
-   ```bash
-   fly scale memory 2048  # 2GB
-   ```
-
-3. **Review memory-intensive operations:**
-   ```bash
-   fly logs | grep -i memory
-   ```
-
-### Issue: Trading System Not Responding
-
-**Symptoms:**
-- No signal generation in logs
-- No orders being executed
-
-**Solutions:**
-
-1. **Check if kill switch is activated:**
-   ```bash
-   fly ssh console
-   redis-cli -u $REDIS_URL --tls GET control:halt_all
-   ```
-
-2. **Verify trading mode:**
-   ```bash
-   fly logs | grep "Trading mode"
-   ```
-
-3. **Check strategy router:**
-   ```bash
-   fly logs | grep -i strategy
-   ```
-
----
-
-## Rollback Procedures
-
-### Rollback to Previous Version
-
-```bash
-# List recent releases
-fly releases
-
-# Rollback to previous version
-fly releases rollback
-
-# Or specific version
-fly releases rollback --version <version-number>
-```
-
-### Emergency Shutdown
-
-```bash
-# Stop application immediately
-fly scale count 0
-
-# Or suspend app
-fly apps suspend crypto-ai-bot
-```
-
-### Restore from Backup
-
-```bash
-# Pull previous git commit
-git log --oneline -5
-git checkout <commit-hash>
-
-# Redeploy
-fly deploy
-```
-
----
-
-## Emergency Procedures
-
-### Kill Switch Activation
-
-**When to use:** Trading anomalies, unexpected losses, system instability
-
-```bash
-# Method 1: Via Redis
-fly ssh console
-redis-cli -u $REDIS_URL --tls SET control:halt_all "EMERGENCY_STOP"
-
-# Method 2: Scale to zero
-fly scale count 0
-
-# Method 3: Suspend app
-fly apps suspend crypto-ai-bot
-```
-
-### Deactivate Kill Switch
-
-```bash
-fly ssh console
-redis-cli -u $REDIS_URL --tls DEL control:halt_all
-
-# Restart if needed
-fly apps restart crypto-ai-bot
-```
-
-### Enable Live Trading
-
-⚠️ **EXTREME CAUTION REQUIRED**
-
-```bash
-# 1. Verify paper trading performance
-fly logs | grep "PnL"
-
-# 2. Set live trading secrets
-fly secrets set \
-  PAPER_TRADING_ENABLED="false" \
-  LIVE_TRADING_CONFIRMATION="I-accept-the-risk"
-
-# 3. Redeploy with live mode
-fly deploy
-
-# 4. Monitor closely
-fly logs -f
-```
-
-### Disable Live Trading (Emergency)
-
-```bash
-# Immediately revert to paper trading
-fly secrets set PAPER_TRADING_ENABLED="true"
-
-# Or stop trading entirely
-fly scale count 0
-```
-
----
-
-## Deployment Checklist
-
-Before each deployment:
-
-- [ ] Run `make preflight` - all checks pass
-- [ ] Review recent code changes
-- [ ] Test locally with Docker
-- [ ] Verify secrets are current
-- [ ] Check Redis Cloud connectivity
-- [ ] Review Kraken API status
-- [ ] Backup current configuration
-- [ ] Notify team of deployment
-- [ ] Monitor logs for 30 minutes post-deployment
-- [ ] Verify health endpoint responds
-- [ ] Check trading signals are being generated
-- [ ] Confirm Redis heartbeats in logs
-
----
-
-## Useful Commands Reference
-
-```bash
-# === Application Management ===
-fly status                           # Check app status
-fly apps restart crypto-ai-bot       # Restart app
-fly apps suspend crypto-ai-bot       # Stop app
-fly apps resume crypto-ai-bot        # Start app
-fly scale count 0                    # Scale to zero (emergency stop)
-
-# === Logs & Monitoring ===
-fly logs                             # Stream logs
-fly logs -f                          # Follow logs
-fly logs | grep ERROR                # Filter errors
-fly dashboard                        # Open web dashboard
-
-# === Deployment ===
-fly deploy                           # Deploy current code
-fly deploy --build-only              # Test build without deploying
-fly releases                         # List releases
-fly releases rollback                # Rollback to previous
-
-# === Secrets Management ===
-fly secrets list                     # List secret names
-fly secrets set KEY=VALUE            # Set secret
-fly secrets unset KEY                # Remove secret
-fly secrets import < file.txt        # Import from file
-
-# === SSH & Debugging ===
-fly ssh console                      # Interactive shell
-fly ssh console -C "command"         # Run command
-fly proxy 8080:8080                  # Local port forwarding
-
-# === Scaling ===
-fly scale memory 2048                # Scale RAM
-fly scale count 2                    # Scale instances
-fly scale show                       # Show current scale
-
-# === Health Checks ===
-curl http://localhost:8080/health    # Health endpoint (via proxy)
-fly ssh console -C "curl http://localhost:8080/health | jq"
-```
-
----
-
-## Support & Escalation
-
-### Level 1: Automated Monitoring
-
-- Health checks (30s interval)
-- Discord alerts (errors, trading anomalies)
-- Prometheus metrics
-
-### Level 2: Manual Checks
-
-- Review logs daily
-- Check PnL metrics
-- Verify Redis connectivity
-- Monitor resource usage
-
-### Level 3: Incident Response
-
-1. Activate kill switch if needed
-2. Scale to zero if critical
-3. Review logs for root cause
-4. Apply hotfix or rollback
-5. Document incident
-6. Post-mortem analysis
-
----
-
-## Maintenance Schedule
-
-### Daily
-
-- Review logs for errors
-- Check PnL performance
-- Verify health endpoint
-- Monitor resource usage
-
-### Weekly
-
-- Update dependencies (if needed)
-- Review and optimize strategies
-- Analyze trading performance
-- Test backup/restore procedures
-
-### Monthly
-
-- Security audit
-- Cost optimization review
-- Capacity planning
-- Update documentation
-
----
-
-## Version History
-
-| Version | Date       | Changes                           |
-|---------|------------|-----------------------------------|
-| 1.0.0   | 2025-01-15 | Initial Fly.io deployment runbook |
-
----
-
-**Last Updated:** 2025-01-15
-**Maintained By:** Crypto AI Bot Team
-**Emergency Contact:** [Your contact info]
+## Emergency Contacts
+
+- **On-Call Engineer**: [Add contact info]
+- **Redis Cloud Support**: support@redis.com
+- **Redis Cloud Dashboard**: https://app.redislabs.com/

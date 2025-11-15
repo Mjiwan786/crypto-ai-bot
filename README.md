@@ -9,11 +9,24 @@
 
 ## 🚀 Highlights
 
-• **Multi-Agent Architecture** - AutoGen + LangGraph orchestration with specialized trading agents  
-• **Real-Time Data Pipeline** - Redis streams with TLS, circuit breakers, and idempotency guarantees  
-• **Production SLOs** - P95 latency <500ms, 99.5% uptime, <0.1% duplicate rate  
-• **Risk Management** - Configurable drawdown limits, position sizing, and emergency stops  
-• **Zero-Config Deployment** - Docker Compose with health checks and monitoring  
+• **Multi-Agent Architecture** - AutoGen + LangGraph orchestration with specialized trading agents
+• **Real-Time Data Pipeline** - Redis streams with TLS, circuit breakers, and idempotency guarantees
+• **Production SLOs** - P95 latency <500ms, 99.5% uptime, <0.1% duplicate rate
+• **Risk Management** - Configurable drawdown limits, position sizing, and emergency stops
+• **Zero-Config Deployment** - Docker Compose with health checks and monitoring
+
+## 📋 Product Requirements
+
+**👉 [PRD-001: Crypto AI Bot - Core Intelligence Engine](docs/PRD-001-CRYPTO-AI-BOT.md)**
+
+This is the **authoritative product specification** for this repository. It defines:
+- Complete functional requirements for all subsystems
+- Canonical signal schema (shared across all 3 repos)
+- Data integrity & risk management requirements
+- ML transparency & testing standards
+- Success criteria & measurable KPIs
+
+**All development, testing, and deployment must align with PRD-001.**
 
 ## Architecture
 
@@ -39,8 +52,10 @@
 ### Architecture Deep Dive
 
 For detailed technical documentation:
+- **[PRD-001](docs/PRD-001-CRYPTO-AI-BOT.md)** - Authoritative product requirements & system specification
 - **[Agents Overview](docs/AGENTS_OVERVIEW.md)** - System dataflow, Redis streams, and component breakdown (2-min read)
 - [Project Skeleton](docs/PROJECT_SKELETON.md) - Complete project structure and file organization
+- [Architecture Overview](docs/README-ARCH.md) - Design philosophy and directory layout
 
 ## Runtime Compatibility
 
@@ -261,6 +276,7 @@ The sale preparation script performs:
 - ✅ Discord alerting integration
 
 ### Documentation
+- ✅ **[PRD-001](docs/PRD-001-CRYPTO-AI-BOT.md)** - Authoritative product requirements
 - ✅ Architecture diagrams
 - ✅ API documentation
 - ✅ Deployment guides

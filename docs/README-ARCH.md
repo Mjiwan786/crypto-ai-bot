@@ -1,6 +1,10 @@
 # Architecture Overview
 
-This document provides a high‑level overview of the recommended architecture for a crypto trading bot.  The goal is to separate concerns cleanly, making it easier to extend, test and maintain your code.
+> **📋 For authoritative requirements and specifications, see [PRD-001: Crypto AI Bot - Core Intelligence Engine](PRD-001-CRYPTO-AI-BOT.md)**
+
+This document provides a high‑level overview of the recommended architecture for a crypto trading bot. The goal is to separate concerns cleanly, making it easier to extend, test and maintain your code.
+
+All architectural decisions must align with the requirements defined in **PRD-001**, which serves as the single source of truth for this repository.
 
 ## Directory layout
 
