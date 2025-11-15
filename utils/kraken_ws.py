@@ -19,7 +19,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, field_validator, Field
 
-# Prometheus metrics (optional) - PRD-001 Section 4.1, 4.2 & 8.2
+# Prometheus metrics (optional) - PRD-001 Section 4.1, 4.2, 1.3 & 8.2
 try:
     from prometheus_client import Counter
     KRAKEN_WS_CONNECTIONS_TOTAL = Counter(
@@ -31,11 +31,17 @@ try:
         'kraken_ws_reconnects_total',
         'Total WebSocket reconnection attempts'
     )
+    KRAKEN_WS_MESSAGE_GAPS_TOTAL = Counter(
+        'kraken_ws_message_gaps_total',
+        'Total message sequence gaps detected',
+        ['channel']
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
     KRAKEN_WS_CONNECTIONS_TOTAL = None
     KRAKEN_WS_RECONNECTS_TOTAL = None
+    KRAKEN_WS_MESSAGE_GAPS_TOTAL = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -1073,6 +1079,10 @@ class KrakenWebSocketClient:
                         f"Sequence gap detected for {channel}/{pair}: "
                         f"expected {expected_seq}, got {sequence} (gap: {gap})"
                     )
+
+                    # Emit Prometheus counter for sequence gaps (PRD-001 Section 1.3)
+                    if PROMETHEUS_AVAILABLE and KRAKEN_WS_MESSAGE_GAPS_TOTAL:
+                        KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel=channel).inc()
 
             # Update last sequence for this channel
             self.last_sequence[channel_key] = sequence

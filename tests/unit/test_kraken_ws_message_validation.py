@@ -430,6 +430,129 @@ class TestSequenceNumberValidation:
         assert client.last_sequence["book:BTC/USD"] == 106
 
 
+class TestSequenceGapPrometheusMetrics:
+    """Test Prometheus metrics for sequence gaps per PRD-001 Section 1.3"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_message_gaps_counter_exists(self):
+        """Test that Prometheus message gaps counter is defined"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_MESSAGE_GAPS_TOTAL
+
+        # Counter should be defined (may be None if prometheus not available)
+        if PROMETHEUS_AVAILABLE:
+            assert KRAKEN_WS_MESSAGE_GAPS_TOTAL is not None
+            assert hasattr(KRAKEN_WS_MESSAGE_GAPS_TOTAL, 'labels')
+
+    def test_gap_counter_increments_on_gap_detection(self, client):
+        """Test that counter increments when sequence gap is detected"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_MESSAGE_GAPS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial counter value for 'book' channel
+        initial_value = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='book')._value.get()
+
+        # First message with sequence 100
+        data1 = [123, {"s": 100}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data1, "book", "BTC/USD")
+
+        # Second message with gap (sequence 105)
+        data2 = [123, {"s": 105}, "book", "BTC/USD"]
+        client.extract_and_validate_sequence(data2, "book", "BTC/USD")
+
+        # Counter should have incremented by 1
+        final_value = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='book')._value.get()
+        assert final_value == initial_value + 1
+
+    def test_gap_counter_not_incremented_without_gap(self, client):
+        """Test that counter doesn't increment for sequential messages"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_MESSAGE_GAPS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial counter value
+        initial_value = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='trade')._value.get()
+
+        # Sequential messages (no gap)
+        data1 = [123, {"s": 100}, "trade", "BTC/USD"]
+        client.extract_and_validate_sequence(data1, "trade", "BTC/USD")
+
+        data2 = [123, {"s": 101}, "trade", "BTC/USD"]
+        client.extract_and_validate_sequence(data2, "trade", "BTC/USD")
+
+        # Counter should NOT have incremented
+        final_value = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='trade')._value.get()
+        assert final_value == initial_value
+
+    def test_gap_counter_has_channel_label(self):
+        """Test that counter has channel label"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_MESSAGE_GAPS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Should be able to create labels for different channels
+        book_metric = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='book')
+        trade_metric = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='trade')
+        spread_metric = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='spread')
+
+        assert book_metric is not None
+        assert trade_metric is not None
+        assert spread_metric is not None
+
+    def test_different_channels_counted_separately(self, client):
+        """Test that gaps in different channels are counted separately"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_MESSAGE_GAPS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial values for both channels
+        book_initial = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='book')._value.get()
+        trade_initial = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='trade')._value.get()
+
+        # Create gap in book channel
+        client.extract_and_validate_sequence([123, {"s": 100}, "book", "BTC/USD"], "book", "BTC/USD")
+        client.extract_and_validate_sequence([123, {"s": 105}, "book", "BTC/USD"], "book", "BTC/USD")
+
+        # Create gap in trade channel
+        client.extract_and_validate_sequence([456, {"s": 200}, "trade", "BTC/USD"], "trade", "BTC/USD")
+        client.extract_and_validate_sequence([456, {"s": 210}, "trade", "BTC/USD"], "trade", "BTC/USD")
+
+        # Both channels should have incremented
+        book_final = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='book')._value.get()
+        trade_final = KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel='trade')._value.get()
+
+        assert book_final == book_initial + 1
+        assert trade_final == trade_initial + 1
+
+    def test_metric_name_and_description(self):
+        """Test that counter has correct name and description"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_MESSAGE_GAPS_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Check metric metadata (Prometheus auto-strips '_total' suffix from Counter names)
+        assert KRAKEN_WS_MESSAGE_GAPS_TOTAL._name == 'kraken_ws_message_gaps'
+        assert 'gap' in KRAKEN_WS_MESSAGE_GAPS_TOTAL._documentation.lower()
+
+
 @pytest.mark.asyncio
 class TestSequenceValidationIntegration:
     """Test sequence validation integration with handle_message"""
