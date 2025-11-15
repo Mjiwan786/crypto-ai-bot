@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 192/248 Complete (77.4%)
+**Status:** 200/248 Complete (80.6%)
 
 ---
 
@@ -284,15 +284,15 @@
 - [x] Add custom validator to ensure take_profit > entry_price for LONG, take_profit < entry_price for SHORT
 - [x] Add custom validator to ensure stop_loss < entry_price for LONG, stop_loss > entry_price for SHORT
 
-### 5.2 Schema Validation (8/8)
-- [ ] Validate every signal with TradingSignal.parse_obj() before Redis publish
-- [ ] Catch Pydantic ValidationError and log at ERROR level with field details
-- [ ] Emit Prometheus counter `signal_schema_errors_total{field, error_type}` on validation failures
-- [ ] Reject invalid signals (do not publish to Redis)
-- [ ] Add schema validation unit tests for valid signal (should pass)
-- [ ] Add schema validation unit tests for invalid signals (missing fields, wrong types, out-of-range values)
-- [ ] Add regression test to ensure signal schema matches API expectations (field names, types)
-- [ ] Document canonical schema in PRD Section 5 (this is already done)
+### 5.2 Schema Validation (8/8) ✅
+- [x] Validate every signal with TradingSignal.model_validate() before Redis publish
+- [x] Catch Pydantic ValidationError and log at ERROR level with field details
+- [x] Emit Prometheus counter `signal_schema_errors_total{field, error_type}` on validation failures
+- [x] Reject invalid signals (do not publish to Redis)
+- [x] Add schema validation unit tests for valid signal (should pass)
+- [x] Add schema validation unit tests for invalid signals (missing fields, wrong types, out-of-range values)
+- [x] Add regression test to ensure signal schema matches API expectations (field names, types)
+- [x] Document canonical schema in PRD Section 5 (this is already done)
 
 ### 5.3 Example Signal (3/3)
 - [ ] Create example_signal.json file with valid signal matching schema
