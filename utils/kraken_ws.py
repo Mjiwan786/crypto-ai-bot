@@ -19,7 +19,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, field_validator, Field
 
-# Prometheus metrics (optional) - PRD-001 Section 4.1 & 8.2
+# Prometheus metrics (optional) - PRD-001 Section 4.1, 4.2 & 8.2
 try:
     from prometheus_client import Counter
     KRAKEN_WS_CONNECTIONS_TOTAL = Counter(
@@ -27,10 +27,15 @@ try:
         'Total WebSocket connection state changes',
         ['state']
     )
+    KRAKEN_WS_RECONNECTS_TOTAL = Counter(
+        'kraken_ws_reconnects_total',
+        'Total WebSocket reconnection attempts'
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
     KRAKEN_WS_CONNECTIONS_TOTAL = None
+    KRAKEN_WS_RECONNECTS_TOTAL = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -1258,6 +1263,10 @@ class KrakenWebSocketClient:
             except Exception as e:
                 self.reconnection_attempt += 1
                 self.stats["reconnects"] += 1  # Keep historical total
+
+                # Emit Prometheus counter for reconnection attempts (PRD-001 Section 4.2)
+                if PROMETHEUS_AVAILABLE and KRAKEN_WS_RECONNECTS_TOTAL:
+                    KRAKEN_WS_RECONNECTS_TOTAL.inc()
 
                 # Set state to RECONNECTING (PRD-001 Section 4.1)
                 self._set_connection_state(
