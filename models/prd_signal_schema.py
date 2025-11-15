@@ -18,7 +18,7 @@ import time
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class SignalType(str, Enum):
@@ -316,6 +316,195 @@ RECOMMENDED ACTION:
 # =============================================================================
 # EXAMPLE USAGE
 # =============================================================================
+
+# =============================================================================
+# PRD-001 Section 5.1: Comprehensive Signal Schema with Enums and Validators
+# =============================================================================
+
+from datetime import datetime as dt
+
+# PRD-001 Section 5.1: Side enum
+class Side(str, Enum):
+    """Trading side enumeration."""
+    LONG = "LONG"
+    SHORT = "SHORT"
+
+
+# PRD-001 Section 5.1: Strategy enum
+class Strategy(str, Enum):
+    """Trading strategy enumeration."""
+    SCALPER = "SCALPER"
+    TREND = "TREND"
+    MEAN_REVERSION = "MEAN_REVERSION"
+    BREAKOUT = "BREAKOUT"
+
+
+# PRD-001 Section 5.1: Regime enum
+class Regime(str, Enum):
+    """Market regime enumeration."""
+    TRENDING_UP = "TRENDING_UP"
+    TRENDING_DOWN = "TRENDING_DOWN"
+    RANGING = "RANGING"
+    VOLATILE = "VOLATILE"
+
+
+# PRD-001 Section 5.1: MACDSignal enum
+class MACDSignal(str, Enum):
+    """MACD signal enumeration."""
+    BULLISH = "BULLISH"
+    BEARISH = "BEARISH"
+    NEUTRAL = "NEUTRAL"
+
+
+# PRD-001 Section 5.1: Indicators model
+class Indicators(BaseModel):
+    """Technical indicators model with validation."""
+    rsi_14: float = Field(..., description="RSI(14) value")
+    macd_signal: MACDSignal = Field(..., description="MACD signal")
+    atr_14: float = Field(..., description="ATR(14) value")
+    volume_ratio: float = Field(..., description="Volume ratio")
+
+    @field_validator('rsi_14')
+    @classmethod
+    def validate_rsi_14(cls, v):
+        """Validate rsi_14 is in [0, 100]."""
+        if not 0 <= v <= 100:
+            raise ValueError(f"rsi_14 must be in [0, 100], got {v}")
+        return v
+
+    @field_validator('atr_14')
+    @classmethod
+    def validate_atr_14(cls, v):
+        """Validate atr_14 > 0."""
+        if v <= 0:
+            raise ValueError(f"atr_14 must be > 0, got {v}")
+        return v
+
+    @field_validator('volume_ratio')
+    @classmethod
+    def validate_volume_ratio(cls, v):
+        """Validate volume_ratio > 0."""
+        if v <= 0:
+            raise ValueError(f"volume_ratio must be > 0, got {v}")
+        return v
+
+
+# PRD-001 Section 5.1: Metadata model
+class SignalMetadata(BaseModel):
+    """Signal metadata model."""
+    model_version: str = Field(..., description="ML model version")
+    backtest_sharpe: Optional[float] = Field(None, description="Backtest Sharpe ratio")
+    latency_ms: Optional[float] = Field(None, description="Latency in milliseconds")
+
+
+# PRD-001 Section 5.1: Comprehensive TradingSignal model
+class TradingSignal(BaseModel):
+    """
+    PRD-001 Section 5.1 compliant comprehensive trading signal model.
+
+    All required fields with comprehensive validation.
+    """
+    signal_id: str = Field(..., description="Unique signal identifier")
+    timestamp: dt = Field(..., description="Signal generation timestamp")
+    trading_pair: str = Field(..., description="Trading pair (e.g., BTC/USD)")
+    side: Side = Field(..., description="Trading side (LONG/SHORT)")
+    strategy: Strategy = Field(..., description="Trading strategy")
+    regime: Regime = Field(..., description="Market regime")
+    entry_price: float = Field(..., description="Entry price")
+    take_profit: float = Field(..., description="Take profit price")
+    stop_loss: float = Field(..., description="Stop loss price")
+    confidence: float = Field(..., description="Signal confidence [0, 1]")
+    position_size_usd: float = Field(..., description="Position size in USD")
+    indicators: Indicators = Field(..., description="Technical indicators")
+    metadata: Optional[SignalMetadata] = Field(None, description="Optional metadata")
+
+    @field_validator('entry_price')
+    @classmethod
+    def validate_entry_price(cls, v):
+        """Validate entry_price > 0."""
+        if v <= 0:
+            raise ValueError(f"entry_price must be > 0, got {v}")
+        return v
+
+    @field_validator('take_profit')
+    @classmethod
+    def validate_take_profit(cls, v):
+        """Validate take_profit > 0."""
+        if v <= 0:
+            raise ValueError(f"take_profit must be > 0, got {v}")
+        return v
+
+    @field_validator('stop_loss')
+    @classmethod
+    def validate_stop_loss(cls, v):
+        """Validate stop_loss > 0."""
+        if v <= 0:
+            raise ValueError(f"stop_loss must be > 0, got {v}")
+        return v
+
+    @field_validator('confidence')
+    @classmethod
+    def validate_confidence(cls, v):
+        """Validate confidence in [0, 1]."""
+        if not 0 <= v <= 1:
+            raise ValueError(f"confidence must be in [0, 1], got {v}")
+        return v
+
+    @field_validator('position_size_usd')
+    @classmethod
+    def validate_position_size_usd(cls, v):
+        """Validate position_size_usd > 0 and <= 2000."""
+        if v <= 0:
+            raise ValueError(f"position_size_usd must be > 0, got {v}")
+        if v > 2000:
+            raise ValueError(f"position_size_usd must be <= 2000, got {v}")
+        return v
+
+    @field_validator('trading_pair')
+    @classmethod
+    def validate_trading_pair_format(cls, v):
+        """Ensure trading pair is in standard format."""
+        if "/" not in v and "-" not in v:
+            raise ValueError(f"Invalid trading_pair format: {v}")
+        return v.upper()
+
+    @model_validator(mode='after')
+    def validate_price_relationships(self):
+        """
+        PRD-001 Section 5.1: Validate price relationships based on side.
+
+        For LONG:
+          - take_profit must be > entry_price
+          - stop_loss must be < entry_price
+
+        For SHORT:
+          - take_profit must be < entry_price
+          - stop_loss must be > entry_price
+        """
+        if self.side == Side.LONG:
+            if self.take_profit <= self.entry_price:
+                raise ValueError(
+                    f"LONG signal: take_profit ({self.take_profit}) must be > entry_price ({self.entry_price})"
+                )
+            if self.stop_loss >= self.entry_price:
+                raise ValueError(
+                    f"LONG signal: stop_loss ({self.stop_loss}) must be < entry_price ({self.entry_price})"
+                )
+        elif self.side == Side.SHORT:
+            if self.take_profit >= self.entry_price:
+                raise ValueError(
+                    f"SHORT signal: take_profit ({self.take_profit}) must be < entry_price ({self.entry_price})"
+                )
+            if self.stop_loss <= self.entry_price:
+                raise ValueError(
+                    f"SHORT signal: stop_loss ({self.stop_loss}) must be > entry_price ({self.entry_price})"
+                )
+
+        return self
+
+    class Config:
+        use_enum_values = True
+
 
 if __name__ == "__main__":
     import json

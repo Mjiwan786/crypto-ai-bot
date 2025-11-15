@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 180/248 Complete (72.6%)
+**Status:** 192/248 Complete (77.4%)
 
 ---
 
@@ -270,19 +270,19 @@
 
 **Problem Addressed:** Schema drift between repos, inconsistent field names
 
-### 5.1 Pydantic Models (12/12)
-- [ ] Implement Side enum (LONG, SHORT)
-- [ ] Implement Strategy enum (SCALPER, TREND, MEAN_REVERSION, BREAKOUT)
-- [ ] Implement Regime enum (TRENDING_UP, TRENDING_DOWN, RANGING, VOLATILE)
-- [ ] Implement MACDSignal enum (BULLISH, BEARISH, NEUTRAL)
-- [ ] Implement Indicators model with fields: rsi_14, macd_signal, atr_14, volume_ratio
-- [ ] Implement Metadata model with fields: model_version, backtest_sharpe, latency_ms
-- [ ] Implement TradingSignal model with all required fields (signal_id, timestamp, pair, side, etc.)
-- [ ] Add Pydantic field validators: entry_price > 0, take_profit > 0, stop_loss > 0, confidence in [0,1]
-- [ ] Add Pydantic field validators: position_size_usd > 0 and <= 2000
-- [ ] Add Pydantic field validators: rsi_14 in [0, 100], atr_14 > 0, volume_ratio > 0
-- [ ] Add custom validator to ensure take_profit > entry_price for LONG, take_profit < entry_price for SHORT
-- [ ] Add custom validator to ensure stop_loss < entry_price for LONG, stop_loss > entry_price for SHORT
+### 5.1 Pydantic Models (12/12) ✅
+- [x] Implement Side enum (LONG, SHORT)
+- [x] Implement Strategy enum (SCALPER, TREND, MEAN_REVERSION, BREAKOUT)
+- [x] Implement Regime enum (TRENDING_UP, TRENDING_DOWN, RANGING, VOLATILE)
+- [x] Implement MACDSignal enum (BULLISH, BEARISH, NEUTRAL)
+- [x] Implement Indicators model with fields: rsi_14, macd_signal, atr_14, volume_ratio
+- [x] Implement Metadata model with fields: model_version, backtest_sharpe, latency_ms
+- [x] Implement TradingSignal model with all required fields (signal_id, timestamp, pair, side, etc.)
+- [x] Add Pydantic field validators: entry_price > 0, take_profit > 0, stop_loss > 0, confidence in [0,1]
+- [x] Add Pydantic field validators: position_size_usd > 0 and <= 2000
+- [x] Add Pydantic field validators: rsi_14 in [0, 100], atr_14 > 0, volume_ratio > 0
+- [x] Add custom validator to ensure take_profit > entry_price for LONG, take_profit < entry_price for SHORT
+- [x] Add custom validator to ensure stop_loss < entry_price for LONG, stop_loss > entry_price for SHORT
 
 ### 5.2 Schema Validation (8/8)
 - [ ] Validate every signal with TradingSignal.parse_obj() before Redis publish
