@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 153/248 Complete (61.7%)
+**Status:** 160/248 Complete (64.5%)
 
 ---
 
@@ -229,14 +229,14 @@
 - [x] Log volatility adjustments at INFO level with ATR ratio
 - [x] Emit Prometheus counter `risk_filter_rejections_total{reason="high_volatility", pair}`
 
-### 4.3 Daily Drawdown Circuit Breaker (7/7)
-- [ ] Track P&L from midnight UTC daily reset
-- [ ] Calculate daily drawdown: (current_equity - start_of_day_equity) / start_of_day_equity
-- [ ] If daily drawdown < -5%, halt new signals until next day (00:00 UTC)
-- [ ] Log circuit breaker activation at CRITICAL level with drawdown %
-- [ ] Emit Prometheus counter `circuit_breaker_triggered{reason="daily_drawdown"}`
-- [ ] Emit Prometheus gauge `current_drawdown_pct` (updated real-time)
-- [ ] Add daily drawdown unit test with simulated losing trades
+### 4.3 Daily Drawdown Circuit Breaker (7/7) ✅
+- [x] Track P&L from midnight UTC daily reset
+- [x] Calculate daily drawdown: (current_equity - start_of_day_equity) / start_of_day_equity
+- [x] If daily drawdown < -5%, halt new signals until next day (00:00 UTC)
+- [x] Log circuit breaker activation at CRITICAL level with drawdown %
+- [x] Emit Prometheus counter `circuit_breaker_triggered{reason="daily_drawdown"}`
+- [x] Emit Prometheus gauge `current_drawdown_pct` (updated real-time)
+- [x] Add daily drawdown unit test with simulated losing trades
 
 ### 4.4 Position Sizing (8/8)
 - [ ] Implement position sizing formula: `size = base_size * confidence * (avg_ATR / ATR)`
