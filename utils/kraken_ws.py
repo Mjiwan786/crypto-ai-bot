@@ -1228,7 +1228,7 @@ class KrakenWebSocketClient:
                 )
 
                 self.logger.error(
-                    f"Kraken WS connection failed (attempt {self.reconnection_attempt}): {e}"
+                    f"Kraken WS connection failed (attempt {self.reconnection_attempt}/{self.config.max_retries}): {e}"
                 )
 
                 if self.reconnection_attempt >= self.config.max_retries:
@@ -1239,9 +1239,16 @@ class KrakenWebSocketClient:
 
                 # Calculate backoff with ±20% jitter (PRD-001 Section 4.2)
                 jitter = random.uniform(-0.2, 0.2)
+                jitter_pct = jitter * 100
                 backoff_with_jitter = backoff * (1 + jitter)
 
-                self.logger.warning(f"Kraken WS retry in {backoff_with_jitter:.1f} seconds...")
+                # Log reconnection attempt with attempt number and wait time (PRD-001 Section 4.2 & 8.1)
+                self.logger.info(
+                    f"Reconnection attempt {self.reconnection_attempt}/{self.config.max_retries}: "
+                    f"waiting {backoff_with_jitter:.1f}s before retry "
+                    f"(base: {backoff}s, jitter: {jitter_pct:+.0f}%)"
+                )
+
                 await asyncio.sleep(backoff_with_jitter)
 
                 # Exponential backoff: double each time (PRD-001 Section 4.2)

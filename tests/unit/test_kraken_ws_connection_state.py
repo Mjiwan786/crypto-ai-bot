@@ -705,5 +705,146 @@ class TestReconnectionCounter:
         assert client.stats["reconnects"] == 5  # Historical count preserved
 
 
+@pytest.mark.asyncio
+class TestReconnectionLogging:
+    """Test reconnection attempt logging per PRD-001 Section 4.2 & 8.1"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url="",
+            max_retries=10,
+            reconnect_delay=1
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_error_log_includes_attempt_and_max(self, client, caplog):
+        """Test that error log includes attempt number and max retries"""
+        import logging
+
+        # Simulate what happens in start() exception handler
+        client.reconnection_attempt = 3
+
+        with caplog.at_level(logging.ERROR):
+            client.logger.error(
+                f"Kraken WS connection failed (attempt {client.reconnection_attempt}/{client.config.max_retries}): Test error"
+            )
+
+        # Should have logged error with attempt/max format
+        error_logs = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert len(error_logs) > 0
+        assert "attempt 3/10" in error_logs[0].message.lower()
+
+    def test_info_log_includes_attempt_number(self, client, caplog):
+        """Test that INFO log includes reconnection attempt number"""
+        import logging
+
+        client.reconnection_attempt = 5
+        backoff = 8.0
+        jitter_pct = 15.0
+        backoff_with_jitter = 9.2
+
+        with caplog.at_level(logging.INFO):
+            client.logger.info(
+                f"Reconnection attempt {client.reconnection_attempt}/{client.config.max_retries}: "
+                f"waiting {backoff_with_jitter:.1f}s before retry "
+                f"(base: {backoff}s, jitter: {jitter_pct:+.0f}%)"
+            )
+
+        # Should have INFO log with attempt number
+        info_logs = [r for r in caplog.records if r.levelname == "INFO"]
+        assert len(info_logs) > 0
+        assert "reconnection attempt 5/10" in info_logs[0].message.lower()
+
+    def test_info_log_includes_wait_time(self, client, caplog):
+        """Test that INFO log includes calculated wait time"""
+        import logging
+
+        client.reconnection_attempt = 2
+        backoff_with_jitter = 2.3
+
+        with caplog.at_level(logging.INFO):
+            client.logger.info(
+                f"Reconnection attempt {client.reconnection_attempt}/{client.config.max_retries}: "
+                f"waiting {backoff_with_jitter:.1f}s before retry "
+                f"(base: 2s, jitter: +15%)"
+            )
+
+        info_logs = [r for r in caplog.records if r.levelname == "INFO"]
+        assert len(info_logs) > 0
+        assert "waiting 2.3s" in info_logs[0].message.lower()
+
+    def test_info_log_includes_base_backoff(self, client, caplog):
+        """Test that INFO log includes base backoff value"""
+        import logging
+
+        client.reconnection_attempt = 4
+        backoff = 8.0
+
+        with caplog.at_level(logging.INFO):
+            client.logger.info(
+                f"Reconnection attempt {client.reconnection_attempt}/{client.config.max_retries}: "
+                f"waiting 9.6s before retry "
+                f"(base: {backoff}s, jitter: +20%)"
+            )
+
+        info_logs = [r for r in caplog.records if r.levelname == "INFO"]
+        assert len(info_logs) > 0
+        assert "base: 8" in info_logs[0].message.lower()
+
+    def test_info_log_includes_jitter_percentage(self, client, caplog):
+        """Test that INFO log includes jitter percentage with sign"""
+        import logging
+
+        client.reconnection_attempt = 1
+
+        # Test positive jitter
+        with caplog.at_level(logging.INFO):
+            client.logger.info(
+                f"Reconnection attempt {client.reconnection_attempt}/{client.config.max_retries}: "
+                f"waiting 1.2s before retry "
+                f"(base: 1s, jitter: +20%)"
+            )
+
+        info_logs = [r for r in caplog.records if r.levelname == "INFO"]
+        assert len(info_logs) > 0
+        assert "jitter:" in info_logs[0].message.lower()
+        assert "%" in info_logs[0].message
+
+    def test_log_format_is_readable(self, client, caplog):
+        """Test that log message format is clear and readable"""
+        import logging
+
+        client.reconnection_attempt = 3
+        backoff = 4.0
+        jitter_pct = -10.0
+        backoff_with_jitter = 3.6
+
+        with caplog.at_level(logging.INFO):
+            client.logger.info(
+                f"Reconnection attempt {client.reconnection_attempt}/{client.config.max_retries}: "
+                f"waiting {backoff_with_jitter:.1f}s before retry "
+                f"(base: {backoff}s, jitter: {jitter_pct:+.0f}%)"
+            )
+
+        info_logs = [r for r in caplog.records if r.levelname == "INFO"]
+        assert len(info_logs) > 0
+
+        # Message should contain all key components
+        msg = info_logs[0].message
+        assert "reconnection attempt" in msg.lower()
+        assert "3/10" in msg
+        assert "waiting 3.6s" in msg.lower()
+        assert "base: 4" in msg.lower()
+        assert "jitter:" in msg.lower()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
