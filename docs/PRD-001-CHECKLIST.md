@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 53/248 Complete (21.4%)
+**Status:** 59/248 Complete (23.8%)
 
 ---
 
@@ -91,13 +91,13 @@
 
 **Problem Addressed:** Schema drift, dropped signals, no sequence numbers, missing idempotency
 
-### 2.1 Connection Management (6/6)
-- [ ] Connect to Redis Cloud via TLS (rediss://) using connection string from REDIS_URL env var
-- [ ] Load TLS certificate from `config/certs/redis_ca.pem`
-- [ ] Implement connection pooling with max 10 connections
-- [ ] Add Redis PING health check every 60 seconds
-- [ ] Track Redis connection state (CONNECTED, DISCONNECTED, RECONNECTING)
-- [ ] Emit Prometheus gauge `redis_connected{instance}` (1=connected, 0=disconnected)
+### 2.1 Connection Management (6/6) ✅ COMPLETE
+- [x] Connect to Redis Cloud via TLS (rediss://) using connection string from REDIS_URL env var
+- [x] Load TLS certificate from `config/certs/redis_ca.pem`
+- [x] Implement connection pooling with max 10 connections
+- [x] Add Redis PING health check every 60 seconds
+- [x] Track Redis connection state (CONNECTED, DISCONNECTED, RECONNECTING)
+- [x] Emit Prometheus gauge `redis_connected{instance}` (1=connected, 0=disconnected)
 
 ### 2.2 Stream Configuration (8/8)
 - [ ] Configure signal stream name based on TRADING_MODE: `signals:paper` or `signals:live`

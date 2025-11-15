@@ -20,9 +20,9 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, field_validator, Field
 
-# Prometheus metrics (optional) - PRD-001 Section 4.1, 4.2, 1.3, 1.4 & 1.5
+# Prometheus metrics (optional) - PRD-001 Section 4.1, 4.2, 1.3, 1.4, 1.5 & 2.1
 try:
-    from prometheus_client import Counter, Histogram
+    from prometheus_client import Counter, Histogram, Gauge
     KRAKEN_WS_CONNECTIONS_TOTAL = Counter(
         'kraken_ws_connections_total',
         'Total WebSocket connection state changes',
@@ -63,6 +63,11 @@ try:
         'Total backpressure events (queue depth > 1000)',
         ['action']
     )
+    REDIS_CONNECTED = Gauge(
+        'redis_connected',
+        'Redis connection status (1=connected, 0=disconnected)',
+        ['instance']
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -74,6 +79,7 @@ except ImportError:
     KRAKEN_WS_ERRORS_TOTAL = None
     KRAKEN_WS_LATENCY_MS = None
     KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL = None
+    REDIS_CONNECTED = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -330,13 +336,26 @@ class LatencyTracker:
         }
 
 
+class RedisConnectionState(str, Enum):
+    """Redis connection states (PRD-001 Section 2.1)"""
+    CONNECTED = "CONNECTED"
+    DISCONNECTED = "DISCONNECTED"
+    RECONNECTING = "RECONNECTING"
+
+
 class RedisConnectionManager:
-    """Manage Redis connections with pooling - Redis Cloud Optimized with Fixes"""
-    
+    """Manage Redis connections with pooling - Redis Cloud Optimized (PRD-001 Section 2.1)"""
+
     def __init__(self, config: KrakenWSConfig):
         self.config = config
         self.redis_client: Optional[redis.Redis] = None
         self.logger = logging.getLogger(__name__)
+
+        # Connection state tracking (PRD-001 Section 2.1)
+        self.connection_state = RedisConnectionState.DISCONNECTED
+        self.last_health_check = 0  # Timestamp of last successful PING
+        self.health_check_interval = 60  # PRD-001 Section 2.1: PING every 60 seconds
+        self.instance_name = "kraken-ws"  # For Prometheus labels
     
     @asynccontextmanager
     async def get_connection(self):
@@ -346,18 +365,40 @@ class RedisConnectionManager:
         
         yield self.redis_client
     
+    def _set_connection_state(self, state: RedisConnectionState):
+        """Set connection state and emit Prometheus metric (PRD-001 Section 2.1)"""
+        self.connection_state = state
+        self.logger.debug(f"Redis connection state: {state.value}")
+
+        # Emit Prometheus gauge (PRD-001 Section 2.1)
+        if PROMETHEUS_AVAILABLE and REDIS_CONNECTED:
+            status_value = 1 if state == RedisConnectionState.CONNECTED else 0
+            REDIS_CONNECTED.labels(instance=self.instance_name).set(status_value)
+
     async def initialize_pool(self):
-        """Initialize Redis connection - Redis Cloud Optimized with async fixes"""
+        """Initialize Redis connection - Redis Cloud Optimized (PRD-001 Section 2.1)"""
         if not self.config.redis_url:
             self.logger.warning("No Redis URL provided, skipping Redis initialization")
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
             return
-        
-        try:
-            # FIXED: Redis Cloud connection using environment variable for security
-            if self.config.redis_url.startswith("rediss://"):
-                self.logger.info("🔧 Using Redis Cloud optimized connection from REDIS_URL...")
 
-                # Use environment variable instead of hardcoded credentials - SECURE
+        try:
+            self._set_connection_state(RedisConnectionState.RECONNECTING)
+
+            # PRD-001 Section 2.1: Redis Cloud TLS connection
+            if self.config.redis_url.startswith("rediss://"):
+                self.logger.info("Connecting to Redis Cloud via TLS...")
+
+                # PRD-001 Section 2.1: Load TLS certificate
+                import ssl
+                ssl_context = ssl.create_default_context()
+                cert_path = "config/certs/redis_ca.pem"
+                if os.path.exists(cert_path):
+                    ssl_context.load_verify_locations(cert_path)
+                    self.logger.info(f"Loaded TLS certificate from {cert_path}")
+                else:
+                    self.logger.warning(f"TLS certificate not found at {cert_path}, using system certs")
+
                 # Note: socket_keepalive_options not supported on Windows
                 import platform
                 keepalive_opts = {}
@@ -370,6 +411,7 @@ class RedisConnectionManager:
                         }
                     }
 
+                # PRD-001 Section 2.1: Connection pooling with max 10 connections
                 self.redis_client = redis.from_url(
                     self.config.redis_url,
                     ssl_cert_reqs='required',
@@ -377,6 +419,7 @@ class RedisConnectionManager:
                     socket_timeout=self.config.redis_socket_timeout,
                     socket_keepalive=True,
                     socket_connect_timeout=5,
+                    max_connections=10,  # PRD-001 Section 2.1
                     **keepalive_opts
                 )
             elif self.config.redis_url.startswith(("redis://", "rediss://")):
@@ -409,17 +452,20 @@ class RedisConnectionManager:
                     socket_timeout=self.config.redis_socket_timeout,
                 )
             
-            # Test connection with simpler approach
+            # PRD-001 Section 2.1: Test connection with PING
             await self.redis_client.ping()
-            self.logger.info("✅ Redis Cloud connection initialized successfully")
-            
+            self.last_health_check = time.time()
+            self._set_connection_state(RedisConnectionState.CONNECTED)
+            self.logger.info("✅ Redis connection initialized successfully (max_connections=10)")
+
             # Test stream operations if configured
             if self.config.redis_cloud_optimized:
                 await self._test_redis_cloud_features()
-                    
+
         except Exception as e:
-            self.logger.error(f"❌ Redis Cloud initialization failed: {e}")
+            self.logger.error(f"❌ Redis initialization failed: {e}")
             self.redis_client = None
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
     
     async def _test_redis_cloud_features(self):
         """Test Redis Cloud specific features"""
@@ -444,11 +490,42 @@ class RedisConnectionManager:
         except Exception as e:
             self.logger.warning(f"⚠️ Redis Cloud features test failed: {e}")
     
+    async def health_check(self):
+        """Perform Redis PING health check (PRD-001 Section 2.1)
+
+        Should be called every 60 seconds to verify connection health.
+        """
+        if not self.redis_client:
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
+            return False
+
+        # Check if health check is due (every 60 seconds)
+        current_time = time.time()
+        if current_time - self.last_health_check < self.health_check_interval:
+            return self.connection_state == RedisConnectionState.CONNECTED
+
+        try:
+            # PRD-001 Section 2.1: Redis PING health check
+            await self.redis_client.ping()
+            self.last_health_check = current_time
+
+            if self.connection_state != RedisConnectionState.CONNECTED:
+                self.logger.info("Redis health check passed - connection restored")
+                self._set_connection_state(RedisConnectionState.CONNECTED)
+
+            return True
+
+        except Exception as e:
+            self.logger.warning(f"Redis health check failed: {e}")
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
+            return False
+
     async def close(self):
         """Close Redis connection"""
         if self.redis_client:
             await self.redis_client.aclose()
             self.redis_client = None
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
 
 
 class KrakenWebSocketClient:
@@ -1698,6 +1775,9 @@ class KrakenWebSocketClient:
         while self.running:
             try:
                 current_time = time.time()
+
+                # PRD-001 Section 2.1: Redis PING health check every 60 seconds
+                await self.redis_manager.health_check()
 
                 # Check overall health status (PRD-001 Section 4.1)
                 if not self.is_healthy:
