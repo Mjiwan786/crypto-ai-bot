@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 200/248 Complete (80.6%)
+**Status:** 203/248 Complete (81.9%)
 
 ---
 
@@ -294,10 +294,10 @@
 - [x] Add regression test to ensure signal schema matches API expectations (field names, types)
 - [x] Document canonical schema in PRD Section 5 (this is already done)
 
-### 5.3 Example Signal (3/3)
-- [ ] Create example_signal.json file with valid signal matching schema
-- [ ] Validate example signal passes Pydantic validation
-- [ ] Document example signal in PRD Section 5.2 (already done)
+### 5.3 Example Signal (3/3) ✅
+- [x] Create example_signal.json file with valid signal matching schema
+- [x] Validate example signal passes Pydantic validation
+- [x] Document example signal in PRD Section 5.2 (already done)
 
 ---
 
