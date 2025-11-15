@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 109/248 Complete (44.0%)
+**Status:** 119/248 Complete (48.0%)
 
 ---
 
@@ -167,17 +167,17 @@
 - [x] Emit Prometheus gauge `current_regime{pair}` (0=RANGING, 1=TRENDING_UP, -1=TRENDING_DOWN, 2=VOLATILE) - COMPLETE
 - [x] Add regime detector unit tests with synthetic TRENDING_UP, RANGING, VOLATILE data - COMPLETE (19/19 tests passing)
 
-### 3.3 Signal Analyst (10/10)
-- [ ] Implement strategy selection based on current regime (see PRD Section 8.7)
-- [ ] Configure strategy allocations: scalper=0.4, trend=0.3, mean_reversion=0.2, breakout=0.1
-- [ ] Generate signals with min confidence threshold 0.6 (reject < 60%)
-- [ ] Calculate indicators: RSI(14), MACD, ATR(14), volume_ratio
-- [ ] Populate TradingSignal.indicators section with all indicator values
-- [ ] Calculate entry_price, take_profit, stop_loss based on strategy rules
-- [ ] Calculate risk_reward_ratio: (take_profit - entry_price) / (entry_price - stop_loss)
-- [ ] Log signal generation at INFO level with pair, strategy, confidence
-- [ ] Emit Prometheus counter `signals_generated_total{pair, strategy, side}` on signal creation
-- [ ] Add signal analyst unit tests for each strategy (scalper, trend, mean_reversion, breakout)
+### 3.3 Signal Analyst (10/10) ✅
+- [x] Implement strategy selection based on current regime (see PRD Section 8.7)
+- [x] Configure strategy allocations: scalper=0.4, trend=0.3, mean_reversion=0.2, breakout=0.1
+- [x] Generate signals with min confidence threshold 0.6 (reject < 60%)
+- [x] Calculate indicators: RSI(14), MACD, ATR(14), volume_ratio
+- [x] Populate TradingSignal.indicators section with all indicator values
+- [x] Calculate entry_price, take_profit, stop_loss based on strategy rules
+- [x] Calculate risk_reward_ratio: (take_profit - entry_price) / (entry_price - stop_loss)
+- [x] Log signal generation at INFO level with pair, strategy, confidence
+- [x] Emit Prometheus counter `signals_generated_total{pair, strategy, side}` on signal creation
+- [x] Add signal analyst unit tests for each strategy (scalper, trend, mean_reversion, breakout)
 
 ### 3.4 Model Transparency (8/8)
 - [ ] Log feature importance for every prediction (top 5 features with weights)
