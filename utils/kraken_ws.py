@@ -405,6 +405,7 @@ class KrakenWebSocketClient:
         # Connection state tracking (PRD-001 Section 4.1)
         self.connection_state = ConnectionState.DISCONNECTED
         self.connection_state_changed_at = time.time()  # Track when state changed
+        self.reconnection_attempt = 0  # Current reconnection attempt (reset on success) - PRD-001 Section 4.2
 
         # Resource management
         self.redis_manager = RedisConnectionManager(config)
@@ -1211,23 +1212,26 @@ class KrakenWebSocketClient:
                 if not self.running:
                     break
 
-                # Reset backoff on successful connection
+                # Reset backoff and reconnection attempt on successful connection (PRD-001 Section 4.2)
                 backoff = self.config.reconnect_delay
+                self.reconnection_attempt = 0
+                self.logger.info("Connection successful - reconnection attempt counter reset to 0")
 
             except Exception as e:
-                self.stats["reconnects"] += 1
+                self.reconnection_attempt += 1
+                self.stats["reconnects"] += 1  # Keep historical total
 
                 # Set state to RECONNECTING (PRD-001 Section 4.1)
                 self._set_connection_state(
                     ConnectionState.RECONNECTING,
-                    f"Reconnection attempt {self.stats['reconnects']}/{self.config.max_retries}"
+                    f"Reconnection attempt {self.reconnection_attempt}/{self.config.max_retries}"
                 )
 
                 self.logger.error(
-                    f"Kraken WS connection failed (attempt {self.stats['reconnects']}): {e}"
+                    f"Kraken WS connection failed (attempt {self.reconnection_attempt}): {e}"
                 )
 
-                if self.stats["reconnects"] >= self.config.max_retries:
+                if self.reconnection_attempt >= self.config.max_retries:
                     self.logger.error("Kraken WS max reconnection attempts reached")
                     # Set state to DISCONNECTED after max retries
                     self._set_connection_state(ConnectionState.DISCONNECTED, "Max reconnection attempts reached")
@@ -1268,6 +1272,7 @@ class KrakenWebSocketClient:
             "running": self.running,
             "connection_state": self.connection_state.value,  # PRD-001 Section 4.1
             "is_healthy": self.is_healthy,  # PRD-001 Section 4.1 - Health based on connection duration
+            "reconnection_attempt": self.reconnection_attempt,  # PRD-001 Section 4.2 - Current reconnection attempt
             "redis_connected": self.redis_manager.redis_client is not None,
             "latency_stats": latency_stats,
             "circuit_breakers": cb_statuses,

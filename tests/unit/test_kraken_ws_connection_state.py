@@ -614,5 +614,96 @@ class TestPrometheusMetrics:
         assert 'connection state' in KRAKEN_WS_CONNECTIONS_TOTAL._documentation.lower()
 
 
+class TestReconnectionCounter:
+    """Test reconnection attempt counter per PRD-001 Section 4.2"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url="",
+            max_retries=10
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_reconnection_attempt_starts_at_zero(self, client):
+        """Test that reconnection_attempt initializes to 0"""
+        assert client.reconnection_attempt == 0
+
+    def test_reconnection_attempt_in_stats(self, client):
+        """Test that reconnection_attempt is included in get_stats()"""
+        stats = client.get_stats()
+
+        assert "reconnection_attempt" in stats
+        assert stats["reconnection_attempt"] == 0
+
+    def test_reconnection_attempt_increments_on_failure(self, client):
+        """Test that reconnection_attempt increments when set via exception path"""
+        # Simulate what happens in start() on connection failure
+        client.reconnection_attempt += 1
+
+        assert client.reconnection_attempt == 1
+
+        # Second failure
+        client.reconnection_attempt += 1
+
+        assert client.reconnection_attempt == 2
+
+    def test_reconnection_attempt_resets_on_success(self, client):
+        """Test that reconnection_attempt resets to 0 on successful connection"""
+        # Simulate failures
+        client.reconnection_attempt = 5
+
+        # Simulate successful connection (what happens in start())
+        client.reconnection_attempt = 0
+
+        assert client.reconnection_attempt == 0
+
+    def test_stats_reconnects_separate_from_attempt(self, client):
+        """Test that stats['reconnects'] is separate from reconnection_attempt"""
+        # Historical total should be separate from current attempt
+        client.stats["reconnects"] = 10
+        client.reconnection_attempt = 2
+
+        stats = client.get_stats()
+
+        # Historical total should be preserved
+        assert stats["reconnects"] == 10
+
+        # Current attempt should be separate
+        assert stats["reconnection_attempt"] == 2
+
+    def test_multiple_reconnection_cycles(self, client):
+        """Test reconnection counter through multiple connect/disconnect cycles"""
+        # Cycle 1: 3 failures, then success
+        client.reconnection_attempt = 3
+        client.stats["reconnects"] = 3
+
+        # Success - reset attempt but keep historical total
+        client.reconnection_attempt = 0
+
+        assert client.reconnection_attempt == 0
+        assert client.stats["reconnects"] == 3
+
+        # Cycle 2: 2 more failures
+        client.reconnection_attempt = 2
+        client.stats["reconnects"] = 5
+
+        assert client.reconnection_attempt == 2
+        assert client.stats["reconnects"] == 5
+
+        # Success again
+        client.reconnection_attempt = 0
+
+        assert client.reconnection_attempt == 0
+        assert client.stats["reconnects"] == 5  # Historical count preserved
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

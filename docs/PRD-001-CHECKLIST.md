@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 16/248 Complete (6.5%)
+**Status:** 17/248 Complete (6.9%)
 
 ---
 
@@ -35,11 +35,11 @@
 - [x] Add connection timeout detection (no PONG response in 60s → reconnect)
 - [x] Emit Prometheus counter `kraken_ws_connections_total{state}` on state changes
 
-### 1.2 Reconnection Logic (3/10)
+### 1.2 Reconnection Logic (4/10)
 - [x] Implement exponential backoff: start at 1s, double each attempt (1s, 2s, 4s, 8s, 16s, 32s, max 60s)
 - [x] Add ±20% jitter to backoff intervals to prevent thundering herd
 - [x] Set max reconnection attempts to 10 before marking unhealthy
-- [ ] Track reconnection attempt count and reset on successful connection
+- [x] Track reconnection attempt count and reset on successful connection
 - [ ] Log each reconnection attempt with attempt number and wait time
 - [ ] After 10 failed attempts, mark bot unhealthy and trigger PagerDuty alert
 - [ ] On successful reconnection, resubscribe to all channels (ticker, spread, trade, book)
