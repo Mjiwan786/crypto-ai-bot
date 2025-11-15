@@ -9,6 +9,7 @@ import json
 import logging
 import time
 import os
+import random
 from typing import Dict, List, Optional, Callable, Any
 from enum import Enum
 import websockets
@@ -17,6 +18,14 @@ import orjson
 from datetime import datetime
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, field_validator, Field
+
+
+class ConnectionState(str, Enum):
+    """WebSocket connection states per PRD-001 Section 4.1"""
+    CONNECTING = "connecting"
+    CONNECTED = "connected"
+    DISCONNECTED = "disconnected"
+    RECONNECTING = "reconnecting"
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -43,12 +52,12 @@ class KrakenWSConfig(BaseModel):
         "scalp_signals": "kraken:scalp"
     })
     
-    # UPDATED: Redis Cloud optimized connection settings
+    # UPDATED: Redis Cloud optimized connection settings (PRD-001 compliant)
     reconnect_delay: int = Field(
-        default=int(os.getenv("WEBSOCKET_RECONNECT_DELAY", "3")), ge=1, le=60
+        default=int(os.getenv("WEBSOCKET_RECONNECT_DELAY", "1")), ge=1, le=60
     )
-    max_retries: int = Field(default=int(os.getenv("WEBSOCKET_MAX_RETRIES", "5")), ge=1, le=100)
-    ping_interval: int = Field(default=int(os.getenv("WEBSOCKET_PING_INTERVAL", "20")), ge=5, le=60)
+    max_retries: int = Field(default=int(os.getenv("WEBSOCKET_MAX_RETRIES", "10")), ge=1, le=100)
+    ping_interval: int = Field(default=int(os.getenv("WEBSOCKET_PING_INTERVAL", "30")), ge=5, le=60)
     close_timeout: int = Field(default=int(os.getenv("WEBSOCKET_CLOSE_TIMEOUT", "5")), ge=1, le=30)
     book_depth: int = Field(default=10, ge=5, le=1000)
     heartbeat_interval: int = Field(default=15, ge=10, le=300)
@@ -268,32 +277,47 @@ class RedisConnectionManager:
                 self.logger.info("🔧 Using Redis Cloud optimized connection from REDIS_URL...")
 
                 # Use environment variable instead of hardcoded credentials - SECURE
+                # Note: socket_keepalive_options not supported on Windows
+                import platform
+                keepalive_opts = {}
+                if platform.system() != 'Windows':
+                    keepalive_opts = {
+                        'socket_keepalive_options': {
+                            'TCP_KEEPIDLE': 1,
+                            'TCP_KEEPINTVL': 3,
+                            'TCP_KEEPCNT': 5
+                        }
+                    }
+
                 self.redis_client = redis.from_url(
                     self.config.redis_url,
                     ssl_cert_reqs='required',
                     decode_responses=False,
                     socket_timeout=self.config.redis_socket_timeout,
                     socket_keepalive=True,
-                    socket_keepalive_options={
-                        'TCP_KEEPIDLE': 1,
-                        'TCP_KEEPINTVL': 3,
-                        'TCP_KEEPCNT': 5
-                    },
                     socket_connect_timeout=5,
+                    **keepalive_opts
                 )
             elif self.config.redis_url.startswith(("redis://", "rediss://")):
                 # Generic Redis URL with optimizations - fixed
+                import platform
+                keepalive_opts = {}
+                if platform.system() != 'Windows':
+                    keepalive_opts = {
+                        'socket_keepalive_options': {
+                            'TCP_KEEPIDLE': 1,
+                            'TCP_KEEPINTVL': 3,
+                            'TCP_KEEPCNT': 5
+                        }
+                    }
+
                 self.redis_client = redis.from_url(
                     self.config.redis_url,
                     socket_timeout=self.config.redis_socket_timeout,
                     socket_keepalive=True,
-                    socket_keepalive_options={
-                        'TCP_KEEPIDLE': 1,
-                        'TCP_KEEPINTVL': 3,
-                        'TCP_KEEPCNT': 5
-                    },
                     decode_responses=False,
-                    socket_connect_timeout=5
+                    socket_connect_timeout=5,
+                    **keepalive_opts
                 )
             else:
                 # Direct host/port configuration
@@ -359,10 +383,13 @@ class KrakenWebSocketClient:
             config = KrakenWSConfig(**config)
         elif not isinstance(config, KrakenWSConfig):
             raise ValueError("Config must be KrakenWSConfig instance or dict")
-        
+
         self.config = config
         self.logger = logging.getLogger(__name__)
-        
+
+        # Connection state tracking (PRD-001 Section 4.1)
+        self.connection_state = ConnectionState.DISCONNECTED
+
         # Resource management
         self.redis_manager = RedisConnectionManager(config)
         self.ws: Optional[websockets.WebSocketServerProtocol] = None
@@ -420,6 +447,29 @@ class KrakenWebSocketClient:
             "pair": pairs,
             "subscription": {"name": channel, **kwargs}
         }
+
+    def _set_connection_state(self, new_state: ConnectionState, reason: str = ""):
+        """
+        Set connection state and log the transition (PRD-001 Section 4.1).
+
+        Args:
+            new_state: The new connection state
+            reason: Optional reason for the state change
+        """
+        if self.connection_state != new_state:
+            old_state = self.connection_state
+            self.connection_state = new_state
+            timestamp = datetime.now().isoformat()
+
+            # Log state change at INFO level with timestamp (PRD-001 Section 8.1)
+            log_msg = f"[{timestamp}] Connection state: {old_state.value} → {new_state.value}"
+            if reason:
+                log_msg += f" ({reason})"
+            self.logger.info(log_msg)
+
+    def get_connection_state(self) -> ConnectionState:
+        """Get the current connection state"""
+        return self.connection_state
     
     async def trigger_circuit_breaker(self, breaker_name: str, reason: str):
         """Trigger a circuit breaker"""
@@ -1029,8 +1079,10 @@ class KrakenWebSocketClient:
     async def connect_once(self):
         """Single connection attempt with circuit breaker protection"""
         try:
+            # Set state to CONNECTING (PRD-001 Section 4.1)
+            self._set_connection_state(ConnectionState.CONNECTING, "Starting connection attempt")
             self.logger.info(f"Kraken WS connecting to {self.config.url}")
-            
+
             async with websockets.connect(
                 self.config.url,
                 ping_interval=self.config.ping_interval,
@@ -1038,8 +1090,11 @@ class KrakenWebSocketClient:
                 compression=None  # Kraken doesn't support compression
             ) as ws:
                 self.ws = ws
+
+                # Set state to CONNECTED (PRD-001 Section 4.1)
+                self._set_connection_state(ConnectionState.CONNECTED, "WebSocket connection established")
                 self.logger.info("Kraken WS connected")
-                
+
                 # Setup subscriptions
                 await self.setup_subscriptions()
                 
@@ -1056,6 +1111,8 @@ class KrakenWebSocketClient:
                         await self.handle_message(message)
                         
                 except websockets.exceptions.ConnectionClosed:
+                    # Set state to DISCONNECTED (PRD-001 Section 4.1)
+                    self._set_connection_state(ConnectionState.DISCONNECTED, "WebSocket connection closed")
                     self.logger.info("Kraken WS disconnected")
                 finally:
                     if health_task:
@@ -1064,65 +1121,84 @@ class KrakenWebSocketClient:
                             await health_task
                         except asyncio.CancelledError:
                             pass
-                        
+
         except Exception as e:
+            # Set state to DISCONNECTED on error (PRD-001 Section 4.1)
+            self._set_connection_state(ConnectionState.DISCONNECTED, f"Connection error: {str(e)}")
             self.logger.error(f"Kraken WS connection error: {e}")
             raise
 
     async def start(self):
-        """Start the WebSocket client with enhanced reconnection logic"""
+        """Start the WebSocket client with enhanced reconnection logic (PRD-001 Section 4.2)"""
         self.running = True
         await self.redis_manager.initialize_pool()
-        
+
         backoff = self.config.reconnect_delay
         max_backoff = 60
-        
+
         while self.running:
             try:
                 await self.circuit_breakers["connection"].call(self.connect_once)
                 # If we get here, connection closed normally
                 if not self.running:
                     break
-                    
+
                 # Reset backoff on successful connection
                 backoff = self.config.reconnect_delay
-                
+
             except Exception as e:
                 self.stats["reconnects"] += 1
+
+                # Set state to RECONNECTING (PRD-001 Section 4.1)
+                self._set_connection_state(
+                    ConnectionState.RECONNECTING,
+                    f"Reconnection attempt {self.stats['reconnects']}/{self.config.max_retries}"
+                )
+
                 self.logger.error(
                     f"Kraken WS connection failed (attempt {self.stats['reconnects']}): {e}"
                 )
-                
+
                 if self.stats["reconnects"] >= self.config.max_retries:
                     self.logger.error("Kraken WS max reconnection attempts reached")
+                    # Set state to DISCONNECTED after max retries
+                    self._set_connection_state(ConnectionState.DISCONNECTED, "Max reconnection attempts reached")
                     break
-                
-                self.logger.warning(f"Kraken WS retry in {backoff} seconds...")
-                await asyncio.sleep(backoff)
-                
-                # Exponential backoff with jitter
-                backoff = min(backoff * 1.5 + (backoff * 0.1), max_backoff)
+
+                # Calculate backoff with ±20% jitter (PRD-001 Section 4.2)
+                jitter = random.uniform(-0.2, 0.2)
+                backoff_with_jitter = backoff * (1 + jitter)
+
+                self.logger.warning(f"Kraken WS retry in {backoff_with_jitter:.1f} seconds...")
+                await asyncio.sleep(backoff_with_jitter)
+
+                # Exponential backoff: double each time (PRD-001 Section 4.2)
+                backoff = min(backoff * 2, max_backoff)
 
     async def stop(self):
-        """Stop the WebSocket client"""
+        """Stop the WebSocket client (PRD-001 Section 9.1)"""
         self.logger.info("Stopping Kraken WebSocket client...")
         self.running = False
-        
+
+        # Set state to DISCONNECTED (PRD-001 Section 4.1)
+        self._set_connection_state(ConnectionState.DISCONNECTED, "Graceful shutdown requested")
+
         if self.ws:
             await self.ws.close()
-        
+
         await self.redis_manager.close()
-        
+
         self.logger.info("Kraken WebSocket client stopped")
 
     def get_stats(self) -> dict:
-        """Get comprehensive connection statistics"""
+        """Get comprehensive connection statistics (PRD-001 Section 8.2)"""
         latency_stats = self.latency_tracker.get_stats() if self.latency_tracker else {}
         cb_statuses = {name: cb.state.value for name, cb in self.circuit_breakers.items()}
-        
+
         return {
             **self.stats,
             "running": self.running,
+            "connection_state": self.connection_state.value,  # PRD-001 Section 4.1
             "redis_connected": self.redis_manager.redis_client is not None,
             "latency_stats": latency_stats,
             "circuit_breakers": cb_statuses,
