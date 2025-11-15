@@ -11,11 +11,11 @@ pydantic-settings==2.10.1
 pyyaml==6.0.2
 orjson==3.10.12
 requests==2.32.4
-tenacity==9.1.2
+tenacity>=8.2.0,<9.0.0
 
 # --- Redis / Streams / Realtime ---
 redis==5.0.8
-websockets==11.0.3
+websockets>=13.0
 
 # --- Async stack ---
 aiohttp==3.12.15
@@ -34,9 +34,10 @@ pandas==2.3.1
 scipy==1.15.2
 
 # --- TA & Modeling ---
-ta-lib==0.6.4
+ta-lib==0.5.1  # Technical analysis library (C library installed in Dockerfile, using newer compatible version)
 ta==0.11.0
 scikit-learn==1.7.1
+scikit-optimize==0.10.2  # Bayesian optimization for parameter tuning
 xgboost==3.0.3
 joblib==1.5.1
 statsmodels==0.14.5

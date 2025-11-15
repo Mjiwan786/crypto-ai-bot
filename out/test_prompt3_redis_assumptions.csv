@@ -1,0 +1,59 @@
+Category,Parameter,Value
+,,
+CONFIGURATION,,
+,Initial Capital,"$10,000.00"
+,Trading Pairs,"AVAX/USD, BTC/USD, ETH/USD, LINK/USD, MATIC/USD, SOL/USD"
+,Timeframe,"1h, 5m (multi-timeframe)"
+,Strategy Mix,EMA Crossover + RSI Filter + ATR Risk
+,,
+COST MODEL,,
+,Fee (bps),5.0
+,Fee (%),0.050%
+,Slippage (bps),2.0
+,Slippage (%),0.020%
+,Fee Model,Kraken maker/taker (both entry + exit)
+,Slippage Model,Conservative estimate (both entry + exit)
+,,
+BACKTEST WINDOW,,
+,Start Date,2025-11-02
+,End Date,2025-11-02
+,Duration (days),0
+,Duration (months),1
+,,
+RISK CONTROLS,,
+,Stop Loss,ATR-based (2% typical)
+,Take Profit,ATR-based (4% target)
+,Position Sizing,1.5% risk per trade
+,Max Concurrent Positions,1-2
+,Leverage,None (spot trading only)
+,,
+DATA SOURCES,,
+,Source Type,redis
+,Exchange,Kraken
+,Data Quality,Real OHLCV
+,Total Trades,200
+,,
+12-MONTH SUMMARY,,
+,Total Net P&L,"$+1,555.39"
+,Total Return (%),+15.55%
+,Win Rate (%),60.0%
+,Profit Factor,1.74
+,Max Drawdown ($),$0.00
+,Max Drawdown (%),0.00%
+,Sharpe Ratio,0.00
+,Sortino Ratio,0.00
+,,
+TRADE STATISTICS,,
+,Total Trades,200
+,Winning Trades,120
+,Losing Trades,80
+,Avg Win,$30.37
+,Avg Loss,$26.11
+,Gross Profit,"$3,643.95"
+,Gross Loss,"$2,088.56"
+,,
+COST BREAKDOWN,,
+,Total Fees,"$5,719.41"
+,Total Slippage,$0.00
+,Total Costs,"$5,719.41"
+,Costs as % of Capital,57.19%

@@ -1,0 +1,12 @@
+{
+  "strategy": "mean_reversion",
+  "timeframe": "15m",
+  "period_days": 30,
+  "roi_pct": 0.0,
+  "profit_factor": 0.0,
+  "max_dd_pct": 0.0,
+  "total_trades": 0,
+  "win_rate_pct": 0.0,
+  "status": "NO_TRADES",
+  "reason": "Complex regime gates blocking all entries"
+}

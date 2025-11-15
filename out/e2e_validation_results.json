@@ -1,0 +1,380 @@
+{
+  "success": false,
+  "loops_completed": 10,
+  "best_params": null,
+  "best_metrics_180d": null,
+  "best_metrics_365d": null,
+  "gates_passed": false,
+  "history": [
+    {
+      "loop_num": 1,
+      "best_params": {
+        "target_bps": 36.48263598520495,
+        "stop_bps": 8.0,
+        "base_risk_pct": 2.5,
+        "atr_factor": 0.8
+      },
+      "metrics_180d": {
+        "profit_factor": 0.9522524353902877,
+        "sharpe_ratio": -0.07128921983695714,
+        "max_drawdown_pct": 0.28764427493941863,
+        "cagr_pct": -4.030295012443464,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.953769090243,
+        "gross_profit": 29.904612204435132,
+        "gross_loss": 31.24421947263115
+      },
+      "metrics_365d": {
+        "profit_factor": 0.9522524353902877,
+        "sharpe_ratio": -0.07128921983695714,
+        "max_drawdown_pct": 0.28764427493941863,
+        "cagr_pct": -4.030295012443464,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.953769090243,
+        "gross_profit": 29.904612204435132,
+        "gross_loss": 31.24421947263115
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 0.95 < 1.4",
+        "Sharpe -0.07 < 1.3",
+        "CAGR -4.03% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 2,
+      "best_params": {
+        "target_bps": 36.48263598520495,
+        "stop_bps": 8.0,
+        "base_risk_pct": 2.5,
+        "atr_factor": 0.8
+      },
+      "metrics_180d": {
+        "profit_factor": 0.9522524353902877,
+        "sharpe_ratio": -0.07128921983695714,
+        "max_drawdown_pct": 0.28764427493941863,
+        "cagr_pct": -4.030295012443464,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.953769090243,
+        "gross_profit": 29.904612204435132,
+        "gross_loss": 31.24421947263115
+      },
+      "metrics_365d": {
+        "profit_factor": 0.9522524353902877,
+        "sharpe_ratio": -0.07123817571094783,
+        "max_drawdown_pct": 0.28764427493941863,
+        "cagr_pct": -3.9990492899350407,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.953769090243,
+        "gross_profit": 29.904612204435132,
+        "gross_loss": 31.24421947263115
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 0.95 < 1.4",
+        "Sharpe -0.07 < 1.3",
+        "CAGR -4.00% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 3,
+      "best_params": {
+        "target_bps": 18.497257986268224,
+        "stop_bps": 8.0,
+        "base_risk_pct": 0.9611590189498859,
+        "atr_factor": 1.9900720974050683
+      },
+      "metrics_180d": {
+        "profit_factor": 1.0427605637455115,
+        "sharpe_ratio": 0.013962287211221058,
+        "max_drawdown_pct": 0.2796763598138883,
+        "cagr_pct": 21.615826988332525,
+        "win_rate_pct": 33.813364055299544,
+        "total_trades": 29.5,
+        "final_equity": 10000.227050392808,
+        "gross_profit": 32.75530398106752,
+        "gross_loss": 31.235679978070593
+      },
+      "metrics_365d": {
+        "profit_factor": 1.0428573268049255,
+        "sharpe_ratio": 0.013962287211221058,
+        "max_drawdown_pct": 0.2796763598138883,
+        "cagr_pct": 21.615826988332525,
+        "win_rate_pct": 33.813364055299544,
+        "total_trades": 29.5,
+        "final_equity": 10000.227050392808,
+        "gross_profit": 32.75824834008861,
+        "gross_loss": 31.235679978070593
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 1.04 < 1.4",
+        "Sharpe 0.01 < 1.3",
+        "CAGR 21.62% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 4,
+      "best_params": {
+        "target_bps": 18.500304956325188,
+        "stop_bps": 8.0,
+        "base_risk_pct": 0.9611588816562378,
+        "atr_factor": 1.9900720347040604
+      },
+      "metrics_180d": {
+        "profit_factor": 1.043021887024226,
+        "sharpe_ratio": 0.014132846938718302,
+        "max_drawdown_pct": 0.2796763598138972,
+        "cagr_pct": 21.669242784910328,
+        "win_rate_pct": 33.813364055299544,
+        "total_trades": 29.5,
+        "final_equity": 10000.232226901808,
+        "gross_profit": 32.76343795285959,
+        "gross_loss": 31.235692608682847
+      },
+      "metrics_365d": {
+        "profit_factor": 1.043021887024226,
+        "sharpe_ratio": 0.014132846938718302,
+        "max_drawdown_pct": 0.2796763598138972,
+        "cagr_pct": 21.669242784910328,
+        "win_rate_pct": 33.813364055299544,
+        "total_trades": 29.5,
+        "final_equity": 10000.232226901808,
+        "gross_profit": 32.76343795285959,
+        "gross_loss": 31.235692608682847
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 1.04 < 1.4",
+        "Sharpe 0.01 < 1.3",
+        "CAGR 21.67% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 5,
+      "best_params": {
+        "target_bps": 18.500304889752073,
+        "stop_bps": 8.0,
+        "base_risk_pct": 0.9611588816580858,
+        "atr_factor": 1.990072034705746
+      },
+      "metrics_180d": {
+        "profit_factor": 1.0430218834287535,
+        "sharpe_ratio": 0.014132843212340679,
+        "max_drawdown_pct": 0.27967635981392913,
+        "cagr_pct": 21.669241617467943,
+        "win_rate_pct": 33.813364055299544,
+        "total_trades": 29.5,
+        "final_equity": 10000.2322267887,
+        "gross_profit": 32.7634378394718,
+        "gross_loss": 31.23569260840688
+      },
+      "metrics_365d": {
+        "profit_factor": 1.0430218834287535,
+        "sharpe_ratio": 0.014132843212340679,
+        "max_drawdown_pct": 0.27967635981392913,
+        "cagr_pct": 21.669241617467943,
+        "win_rate_pct": 33.813364055299544,
+        "total_trades": 29.5,
+        "final_equity": 10000.2322267887,
+        "gross_profit": 32.7634378394718,
+        "gross_loss": 31.23569260840688
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 1.04 < 1.4",
+        "Sharpe 0.01 < 1.3",
+        "CAGR 21.67% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 6,
+      "best_params": {
+        "target_bps": 18.500304889752073,
+        "stop_bps": 8.0,
+        "base_risk_pct": 0.9611588816580858,
+        "atr_factor": 1.990072034705746
+      },
+      "metrics_180d": {
+        "profit_factor": 1.0430218834287535,
+        "sharpe_ratio": 0.014132843212340679,
+        "max_drawdown_pct": 0.27967635981392913,
+        "cagr_pct": 21.669241617467943,
+        "win_rate_pct": 33.813364055299544,
+        "total_trades": 29.5,
+        "final_equity": 10000.2322267887,
+        "gross_profit": 32.7634378394718,
+        "gross_loss": 31.23569260840688
+      },
+      "metrics_365d": {
+        "profit_factor": 1.0430218834287535,
+        "sharpe_ratio": 0.014132843212340679,
+        "max_drawdown_pct": 0.27967635981392913,
+        "cagr_pct": 21.669241617467943,
+        "win_rate_pct": 33.813364055299544,
+        "total_trades": 29.5,
+        "final_equity": 10000.2322267887,
+        "gross_profit": 32.7634378394718,
+        "gross_loss": 31.23569260840688
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 1.04 < 1.4",
+        "Sharpe 0.01 < 1.3",
+        "CAGR 21.67% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 7,
+      "best_params": {
+        "target_bps": 36.329039077875905,
+        "stop_bps": 8.0,
+        "base_risk_pct": 0.5,
+        "atr_factor": 0.8115751701134558
+      },
+      "metrics_180d": {
+        "profit_factor": 0.9760242725136372,
+        "sharpe_ratio": -0.04913591067901832,
+        "max_drawdown_pct": 0.28764432377470683,
+        "cagr_pct": -5.009908879660081,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.83113328284,
+        "gross_profit": 30.623663326074656,
+        "gross_loss": 31.243860803346543
+      },
+      "metrics_365d": {
+        "profit_factor": 0.9760242725136372,
+        "sharpe_ratio": -0.04908658564199334,
+        "max_drawdown_pct": 0.28764432377470683,
+        "cagr_pct": -4.9801730022836885,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.83113328284,
+        "gross_profit": 30.623663326074656,
+        "gross_loss": 31.243860803346543
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 0.98 < 1.4",
+        "Sharpe -0.05 < 1.3",
+        "CAGR -4.98% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 8,
+      "best_params": {
+        "target_bps": 35.70540308992411,
+        "stop_bps": 8.0,
+        "base_risk_pct": 0.5,
+        "atr_factor": 2.0
+      },
+      "metrics_180d": {
+        "profit_factor": 0.9684037951785456,
+        "sharpe_ratio": -0.06362015883253706,
+        "max_drawdown_pct": 0.2876445220654503,
+        "cagr_pct": -8.73753854136975,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.333211719826,
+        "gross_profit": 30.37447857711401,
+        "gross_loss": 31.2424045452348
+      },
+      "metrics_365d": {
+        "profit_factor": 0.96859732129736,
+        "sharpe_ratio": -0.06362015883253706,
+        "max_drawdown_pct": 0.2876445220654503,
+        "cagr_pct": -8.73753854136975,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.333211719826,
+        "gross_profit": 30.380366833454502,
+        "gross_loss": 31.2424045452348
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 0.97 < 1.4",
+        "Sharpe -0.06 < 1.3",
+        "CAGR -8.74% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 9,
+      "best_params": {
+        "target_bps": 36.39781939184121,
+        "stop_bps": 8.0,
+        "base_risk_pct": 2.5,
+        "atr_factor": 0.8885428779412625
+      },
+      "metrics_180d": {
+        "profit_factor": 0.9887059916379362,
+        "sharpe_ratio": -0.07336672236924625,
+        "max_drawdown_pct": 0.28764430190630075,
+        "cagr_pct": -4.556034779696759,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.886049223289,
+        "gross_profit": 31.01144652988092,
+        "gross_loss": 31.244021414379503
+      },
+      "metrics_365d": {
+        "profit_factor": 0.9887059916379362,
+        "sharpe_ratio": -0.07336672236924625,
+        "max_drawdown_pct": 0.28764430190630075,
+        "cagr_pct": -4.556034779696759,
+        "win_rate_pct": 22.0,
+        "total_trades": 25.0,
+        "final_equity": 9997.886049223289,
+        "gross_profit": 31.01144652988092,
+        "gross_loss": 31.244021414379503
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 0.99 < 1.4",
+        "Sharpe -0.07 < 1.3",
+        "CAGR -4.56% < 120.0%"
+      ]
+    },
+    {
+      "loop_num": 10,
+      "best_params": {
+        "target_bps": 37.46701409166832,
+        "stop_bps": 9.322302691827357,
+        "base_risk_pct": 1.5325537599534296,
+        "atr_factor": 0.8
+      },
+      "metrics_180d": {
+        "profit_factor": 1.0434287997029736,
+        "sharpe_ratio": -0.0990136836053718,
+        "max_drawdown_pct": 0.27934075785306683,
+        "cagr_pct": -22.6466587134033,
+        "win_rate_pct": 24.485125858123567,
+        "total_trades": 21.0,
+        "final_equity": 9996.361036579845,
+        "gross_profit": 30.056442974863067,
+        "gross_loss": 29.86869206830508
+      },
+      "metrics_365d": {
+        "profit_factor": 1.0434287997029736,
+        "sharpe_ratio": -0.0990136836053718,
+        "max_drawdown_pct": 0.27934075785306683,
+        "cagr_pct": -22.6466587134033,
+        "win_rate_pct": 24.485125858123567,
+        "total_trades": 21.0,
+        "final_equity": 9996.361036579845,
+        "gross_profit": 30.056442974863067,
+        "gross_loss": 29.86869206830508
+      },
+      "gates_passed": false,
+      "gate_failures": [
+        "PF 1.04 < 1.4",
+        "Sharpe -0.10 < 1.3",
+        "CAGR -22.65% < 120.0%"
+      ]
+    }
+  ]
+}

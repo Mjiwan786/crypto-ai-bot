@@ -1,0 +1,21 @@
+{
+  "strategy": "momentum",
+  "pairs": [
+    "BTC/USD",
+    "ETH/USD"
+  ],
+  "timeframe": "1h",
+  "lookback": "360d",
+  "capital": 10000,
+  "ml_enabled": false,
+  "total_trades": 78,
+  "win_rate_pct": 48.7,
+  "profit_factor": 1.38,
+  "max_drawdown_pct": -16.8,
+  "final_equity": 10892.0,
+  "total_return_pct": 8.92,
+  "annualized_return_pct": 8.92,
+  "monthly_roi_pct": 0.7433333333333333,
+  "sharpe_ratio": 0.68,
+  "note": "Regime fixes applied: chop trading enabled, more opportunities but lower quality"
+}

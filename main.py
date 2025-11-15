@@ -66,6 +66,71 @@ async def run_command(args) -> None:
     _logger.info(f"Config: {args.config}")
     _logger.info(f"Dry run: {args.dry_run}")
 
+    # Start health endpoint immediately for Fly.io
+    # Use shared state to allow health handler to access orchestrator
+    health_state = {"orchestrator": None, "start_time": time.time()}
+
+    from aiohttp import web
+    import json as json_lib
+
+    async def health_handler(request):
+        """Health check with degraded status detection"""
+        orchestrator = health_state.get("orchestrator")
+        current_time = time.time()
+        uptime = current_time - health_state["start_time"]
+
+        response = {
+            "status": "healthy",
+            "mode": args.mode,
+            "uptime_seconds": round(uptime, 2)
+        }
+
+        # Check publisher health if orchestrator is available
+        if orchestrator and hasattr(orchestrator, 'signal_processor'):
+            signal_processor = orchestrator.signal_processor
+            if signal_processor and hasattr(signal_processor, 'resilient_publisher'):
+                publisher = signal_processor.resilient_publisher
+                if publisher:
+                    stats = publisher.get_health_stats()
+                    response["publisher"] = stats
+
+                    # Degraded if no publish in >30s
+                    if stats["last_publish_seconds_ago"] > 30:
+                        response["status"] = "degraded"
+                        response["reason"] = f"No publish in {stats['last_publish_seconds_ago']:.1f}s (>30s threshold)"
+
+        # Add performance metrics if available
+        metrics_publisher = health_state.get("metrics_publisher")
+        if metrics_publisher:
+            try:
+                metrics_summary = metrics_publisher.get_latest_summary()
+                if metrics_summary and metrics_summary.get("available"):
+                    response["performance_metrics"] = {
+                        "aggressive_mode_score": round(metrics_summary["aggressive_mode_score"]["value"], 2),
+                        "velocity_to_target_pct": round(metrics_summary["velocity_to_target"]["percent"], 1),
+                        "days_remaining": metrics_summary["days_remaining_estimate"]["value"],
+                        "daily_rate_usd": round(metrics_summary["days_remaining_estimate"]["daily_rate"], 2),
+                        "win_rate_pct": round(metrics_summary["trading_stats"]["win_rate"] * 100, 1),
+                        "total_trades": metrics_summary["trading_stats"]["total_trades"],
+                    }
+            except Exception as e:
+                _logger.debug(f"Could not fetch performance metrics: {e}")
+
+        status_code = 200 if response["status"] == "healthy" else 503
+        return web.Response(
+            text=json_lib.dumps(response),
+            content_type='application/json',
+            status=status_code
+        )
+
+    app = web.Application()
+    app.router.add_get('/health', health_handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    _logger.info("✅ Health endpoint started on 0.0.0.0:8080 (degraded if no publish >30s)")
+
     # ===========================================
     # SECURITY & SAFETY CHECKS
     # ===========================================
@@ -103,14 +168,31 @@ async def run_command(args) -> None:
 
     # Initialize trading system
     try:
+        _logger.info("Importing MasterOrchestrator...")
         from orchestration.master_orchestrator import MasterOrchestrator
-        orchestrator = MasterOrchestrator(config_path=args.config)
+        _logger.info("✅ MasterOrchestrator imported successfully")
 
-        if not await orchestrator.initialize():
-            _logger.error("Failed to initialize orchestrator")
+        _logger.info("Creating MasterOrchestrator instance...")
+        orchestrator = MasterOrchestrator(config_path=args.config)
+        _logger.info("✅ MasterOrchestrator instance created")
+
+        _logger.info("Initializing orchestrator (timeout: 60s)...")
+        try:
+            init_result = await asyncio.wait_for(
+                orchestrator.initialize(),
+                timeout=60.0
+            )
+            if not init_result:
+                _logger.error("Failed to initialize orchestrator")
+                sys.exit(1)
+        except asyncio.TimeoutError:
+            _logger.error("⏱️ Orchestrator initialization timed out after 60s")
             sys.exit(1)
 
         _logger.info("Trading system initialized successfully")
+
+        # Store orchestrator in health state for health endpoint
+        health_state["orchestrator"] = orchestrator
 
         # 3. Connect kill switch to Redis (if available)
         try:
@@ -123,6 +205,24 @@ async def run_command(args) -> None:
         # Start the system
         await orchestrator.start()
         _logger.info("Trading system started")
+
+        # Start performance metrics publisher (feature-flagged)
+        metrics_publisher = None
+        try:
+            from metrics.metrics_publisher import create_metrics_publisher
+
+            metrics_publisher = create_metrics_publisher(
+                redis_manager=orchestrator.redis_manager if hasattr(orchestrator, 'redis_manager') else None,
+                trade_manager=orchestrator.trade_manager if hasattr(orchestrator, 'trade_manager') else None,
+                equity_tracker=orchestrator.equity_tracker if hasattr(orchestrator, 'equity_tracker') else None,
+                logger=_logger,
+                update_interval=30,
+                auto_start=True,
+            )
+            health_state["metrics_publisher"] = metrics_publisher
+            _logger.info("[OK] Performance metrics publisher started (update_interval=30s)")
+        except Exception as e:
+            _logger.warning(f"Performance metrics publisher not started: {e}")
 
         # Main trading loop with kill switch checks
         while not _shutdown_requested:
@@ -144,6 +244,13 @@ async def run_command(args) -> None:
                 await asyncio.sleep(5)  # Wait before retry
 
         # Graceful shutdown
+        if metrics_publisher:
+            try:
+                metrics_publisher.stop()
+                _logger.info("Metrics publisher stopped")
+            except Exception as e:
+                _logger.warning(f"Error stopping metrics publisher: {e}")
+
         await orchestrator.stop()
         _logger.info("Trading system stopped gracefully")
 

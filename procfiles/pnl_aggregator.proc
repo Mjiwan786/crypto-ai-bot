@@ -1,0 +1,24 @@
+# PnL Aggregator Process Configuration
+#
+# Runs the PnL aggregator service that consumes trade close events
+# from Redis stream "trades:closed" and publishes aggregated equity
+# data to "pnl:equity".
+#
+# Usage:
+#   foreman start -f procfiles/pnl_aggregator.proc
+#   goreman -f procfiles/pnl_aggregator.proc start
+#
+# Environment Variables (set in .env or export):
+#   REDIS_URL - Redis connection string (required)
+#   START_EQUITY - Initial equity in USD (default: 10000)
+#   POLL_MS - Polling interval in milliseconds (default: 500)
+#   PNL_METRICS_PORT - Prometheus metrics port (optional)
+#   USE_PANDAS - Enable pandas statistics (default: false)
+
+pnl-aggregator: python -m monitoring.pnl_aggregator
+
+# Optional: Run with Prometheus metrics
+# pnl-aggregator: PNL_METRICS_PORT=9309 python -m monitoring.pnl_aggregator
+
+# Optional: Run with pandas statistics
+# pnl-aggregator: USE_PANDAS=true STATS_WINDOW_SIZE=5000 python -m monitoring.pnl_aggregator

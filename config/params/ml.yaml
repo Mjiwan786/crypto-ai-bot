@@ -1,0 +1,13 @@
+enabled: false
+features:
+- returns
+- rsi
+- adx
+- slope
+min_alignment_confidence: 0.6
+models:
+- enabled: true
+  type: logit
+- enabled: true
+  type: tree
+seed: 42

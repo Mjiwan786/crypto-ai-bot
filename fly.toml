@@ -1,76 +1,56 @@
-# ===============================================
-# Fly.io Configuration for Crypto AI Bot
-# 24/7 Worker Deployment with Health Checks
-# ===============================================
+# fly.toml - crypto-ai-bot worker configuration
+# Background worker process (no HTTP service)
 
-app = "crypto-ai-bot"
-primary_region = "ewr"  # Newark, NJ (closest to Redis Cloud us-east-1-4)
-kill_signal = "SIGTERM"
-kill_timeout = "30s"
+app = 'crypto-ai-bot'
+primary_region = 'iad'
 
-# Build configuration
 [build]
+  dockerfile = "Dockerfile"
 
-# Deployment configuration
-[deploy]
-  strategy = "rolling"
-
-# VM configuration - adjust based on workload
-[vm]
-  cpu_kind = "shared"
-  cpus = 1
-  memory_mb = 1024
-
-# Auto-scaling configuration
-[http_service]
-  internal_port = 8080
-  force_https = false
-  auto_stop_machines = false  # ⚠️ CRITICAL: Never auto-stop worker
-  auto_start_machines = true
-  min_machines_running = 1
-  processes = ["app"]
-
-# HTTP health checks
-[[http_service.checks]]
-  interval = "30s"
-  timeout = "10s"
-  grace_period = "60s"
-  method = "GET"
-  path = "/health"
-
-# Environment variables (non-sensitive)
 [env]
   ENVIRONMENT = "prod"
+  MODE = "paper"
   LOG_LEVEL = "INFO"
-  TZ = "America/Toronto"
   PYTHONUNBUFFERED = "1"
-  HEALTH_API_PORT = "8080"
-  PAPER_TRADING_ENABLED = "true"
+  REDIS_TLS_CERT_PATH = "/app/config/certs/redis_ca.pem"
 
-# Metrics (Prometheus-compatible)
-[metrics]
-  port = 9091
-  path = "/metrics"
+# HTTP service configuration for health endpoint
+[[services]]
+  processes = ["app"]
+  protocol = "tcp"
+  internal_port = 8080
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
 
-# ===============================================
-# SECRETS CONFIGURATION (set via Fly CLI)
-# ===============================================
-# NEVER commit actual secrets to this file!
-#
-# Set secrets with:
-#   fly secrets set REDIS_URL="rediss://default:PASSWORD@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0"
-#   fly secrets set KRAKEN_API_KEY="your_kraken_api_key"
-#   fly secrets set KRAKEN_API_SECRET="your_kraken_api_secret"
-#   fly secrets set DISCORD_BOT_TOKEN="your_discord_token"
-#   fly secrets set DISCORD_CHANNEL_ID="your_channel_id"
-#
-# Optional (for live trading - use with EXTREME caution):
-#   fly secrets set PAPER_TRADING_ENABLED="false"
-#   fly secrets set LIVE_TRADING_CONFIRMATION="I-accept-the-risk"
-#
-# List secrets:
-#   fly secrets list
-#
-# Remove secret:
-#   fly secrets unset SECRET_NAME
-# ===============================================
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["http", "tls"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "30s"
+
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "60s"
+    method = "get"
+    path = "/health"
+    protocol = "http"
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1

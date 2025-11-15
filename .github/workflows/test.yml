@@ -1,0 +1,201 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          miniforge-variant: Mambaforge
+          use-mamba: true
+          channels: conda-forge,defaults
+          channel-priority: true
+          activate-environment: crypto-bot
+          auto-activate-base: false
+
+      - name: Cache Conda packages
+        uses: actions/cache@v4
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-conda-
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio pytest-timeout
+
+      - name: Lint with flake8
+        shell: bash -l {0}
+        run: |
+          pip install flake8
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 agents/ ai_engine/ strategies/ orchestration/ config/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 agents/ ai_engine/ strategies/ orchestration/ config/ --count --exit-zero --max-line-length=120 --statistics
+
+      - name: Run unit tests
+        shell: bash -l {0}
+        run: |
+          pytest -v -m "not integration" --tb=short --maxfail=5
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Run tests with coverage
+        shell: bash -l {0}
+        run: |
+          pytest \
+            --cov=agents \
+            --cov=ai_engine \
+            --cov=strategies \
+            --cov=orchestration \
+            --cov=config \
+            --cov-report=term \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=90 \
+            -v \
+            -m "not integration" \
+            --maxfail=3 \
+            --tb=short
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            .coverage
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.10"
+          miniforge-variant: Mambaforge
+          use-mamba: true
+          activate-environment: crypto-bot
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-timeout
+
+      - name: Run integration tests
+        shell: bash -l {0}
+        run: |
+          pytest -v -m "integration" --tb=short
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+        continue-on-error: true  # Integration tests may fail if Redis is unavailable
+
+  type-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install mypy
+          pip install -r requirements.txt
+
+      - name: Type check with mypy
+        run: |
+          mypy agents/ ai_engine/ strategies/ --ignore-missing-imports
+        continue-on-error: true  # Type checking failures should not block CI
+
+  e3-specific-tests:
+    # E3: CI checks for pair parsing, stream selection, and rate limiter
+    # No deploy steps - testing only
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.10"
+          miniforge-variant: Mambaforge
+          use-mamba: true
+          activate-environment: crypto-bot
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov
+
+      - name: Test E1 Rate Limiter
+        shell: bash -l {0}
+        run: |
+          pytest tests/test_infrastructure_rate_limiter.py -v \
+            --cov=agents/infrastructure/rate_limiter \
+            --cov-report=term
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Test Pair Parsing
+        shell: bash -l {0}
+        run: |
+          pytest tests/ -k "pair" -v --tb=short
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Test Stream Selection
+        shell: bash -l {0}
+        run: |
+          pytest tests/ -k "stream" -v --tb=short
+        env:
+          PYTHONPATH: ${{ github.workspace }}

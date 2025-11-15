@@ -1,0 +1,1243 @@
+2025-10-26 08:31:34 | INFO | __main__ | \U0001f527 ML override: enabled=False
+2025-10-26 08:31:34 | INFO | __main__ | \u2705 ML config updated: C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\params\ml.yaml
+2025-10-26 08:31:34 | INFO | __main__ | ======================================================================
+2025-10-26 08:31:34 | INFO | __main__ | CRYPTO AI BOT - BACKTESTING (B4 Realistic Costs)
+2025-10-26 08:31:34 | INFO | __main__ | ======================================================================
+2025-10-26 08:31:34 | INFO | __main__ | Strategy: momentum
+2025-10-26 08:31:34 | INFO | __main__ | Pairs: BTC/USD
+2025-10-26 08:31:34 | INFO | __main__ | Period: 2025-04-28 to 2025-10-25 (180d)
+2025-10-26 08:31:34 | INFO | __main__ | Timeframe: 1h
+2025-10-26 08:31:34 | INFO | __main__ | Risk: 1.0% per trade | Capital: $10,000
+2025-10-26 08:31:34 | INFO | __main__ | Costs: Maker=16bps, Taker=26bps, Slip=2bps
+2025-10-26 08:31:34 | INFO | __main__ | 
+2025-10-26 08:31:34 | INFO | __main__ | ======================================================================
+2025-10-26 08:31:34 | INFO | __main__ | BACKTEST: BTC/USD | momentum | 1h
+2025-10-26 08:31:34 | INFO | __main__ | ======================================================================
+2025-10-26 08:31:34 | INFO | __main__ | Fetching BTC/USD 1h from kraken...
+2025-10-26 08:31:36 | INFO | __main__ | \u2713 Fetched 685 candles for BTC/USD from kraken
+2025-10-26 08:31:37 | INFO | __main__ | \u2713 Cached 685 candles to: BTC_USD_1h_2025-04-28_2025-10-25.csv
+2025-10-26 08:31:37 | INFO | __main__ | Risk/Cost Config:
+2025-10-26 08:31:37 | INFO | __main__ |   Risk per trade: 1.0% \u2192 Position size: 1.00%
+2025-10-26 08:31:37 | INFO | __main__ |   SL: 25bps | TP: 35bps
+2025-10-26 08:31:37 | INFO | __main__ |   Maker: 16bps | Taker: 26bps | Slippage: 2bps
+2025-10-26 08:31:37 | INFO | __main__ |   Spread cap: 10bps | Overnight: 0bps
+2025-10-26 08:31:37 | INFO | backtesting.engine | Starting backtest: BTC/USD from 2025-04-28 to 2025-10-25
+2025-10-26 08:31:37 | INFO | backtesting.engine | Initial capital: $10,000.00
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.130, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=80ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.073, n=300) - chop|score=0.07|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.066, n=300) - chop|score=0.07|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.047, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.005, n=300) - chop|score=0.00|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.054, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.064, n=300) - chop|score=-0.06|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.115, n=300) - chop|score=-0.12|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.086, n=300) - chop|score=-0.09|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.178, n=300) - chop|score=-0.18|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=44ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.076, n=300) - chop|score=-0.08|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=40ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.018, n=300) - chop|score=-0.02|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.062, n=300) - chop|score=0.06|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.077, n=300) - chop|score=0.08|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.076, n=300) - chop|score=-0.08|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.132, n=300) - chop|score=-0.13|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.208, n=300) - chop|score=-0.21|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.336, n=300) - chop|score=-0.34|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.265, n=300) - chop|score=-0.27|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:37 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.296, n=300) - chop|score=-0.30|conf=0.80|stale
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:37 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=36ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.296, n=300) - chop|score=-0.30|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.238, n=300) - chop|score=-0.24|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.188, n=300) - chop|score=-0.19|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=40ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.086, n=300) - chop|score=-0.09|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=36ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.068, n=300) - chop|score=-0.07|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=39ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.075, n=300) - chop|score=-0.08|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=36ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.052, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=37ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.107, n=300) - chop|score=-0.11|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=38ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.087, n=300) - chop|score=-0.09|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=34ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.011, n=300) - chop|score=-0.01|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=37ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.008, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.004, n=300) - chop|score=-0.00|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.055, n=300) - chop|score=-0.06|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.020, n=300) - chop|score=0.02|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.040, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=41ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.136, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=71ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.122, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.177, n=300) - chop|score=0.18|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=35ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.108, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=39ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.042, n=300) - chop|score=-0.04|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=40ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.260, n=300) - chop|score=-0.26|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=39ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.390, n=300) - chop|score=-0.39|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=37ms)
+2025-10-26 08:31:38 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.430, n=300) - chop|score=-0.43|conf=0.80|stale
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:38 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=37ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.436, n=300) - chop|score=-0.44|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=35ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.416, n=300) - chop|score=-0.42|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=38ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.500, n=300) - chop|score=-0.50|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=40ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.483, n=300) - chop|score=-0.48|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=35ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.465, n=300) - chop|score=-0.46|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=41ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.520, n=300) - chop|score=-0.52|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.492, n=300) - chop|score=-0.49|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.545, n=300) - chop|score=-0.55|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.410, n=300) - chop|score=-0.41|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.429, n=300) - chop|score=-0.43|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.371, n=300) - chop|score=-0.37|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.367, n=300) - chop|score=-0.37|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.368, n=300) - chop|score=-0.37|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.404, n=300) - chop|score=-0.40|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.329, n=300) - chop|score=-0.33|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=64ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.322, n=300) - chop|score=-0.32|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.277, n=300) - chop|score=-0.28|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.201, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:39 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.145, n=300) - chop|score=-0.14|conf=0.80|stale
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:39 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.108, n=300) - chop|score=-0.11|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.096, n=300) - chop|score=-0.10|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.083, n=300) - chop|score=-0.08|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.008, n=300) - chop|score=-0.01|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.004, n=300) - chop|score=0.00|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.006, n=300) - chop|score=-0.01|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.009, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=41ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.001, n=300) - chop|score=-0.00|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.097, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.062, n=300) - chop|score=0.06|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.041, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.026, n=300) - chop|score=-0.03|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.012, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=38ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.072, n=300) - chop|score=0.07|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.124, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.167, n=300) - chop|score=0.17|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.223, n=300) - chop|score=0.22|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=34ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.193, n=300) - chop|score=0.19|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=70ms)
+2025-10-26 08:31:40 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.197, n=300) - chop|score=0.20|conf=0.80|stale
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:40 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.192, n=300) - chop|score=0.19|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=63ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.276, n=300) - chop|score=0.28|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.265, n=300) - chop|score=0.26|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.269, n=300) - chop|score=0.27|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.258, n=300) - chop|score=0.26|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.233, n=300) - chop|score=0.23|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.341, n=300) - chop|score=0.34|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.379, n=300) - chop|score=0.38|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.380, n=300) - chop|score=0.38|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.301, n=300) - chop|score=0.30|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=38ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.286, n=300) - chop|score=0.29|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=41ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.297, n=300) - chop|score=0.30|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.296, n=300) - chop|score=0.30|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.270, n=300) - chop|score=0.27|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=44ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.251, n=300) - chop|score=0.25|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.216, n=300) - chop|score=0.22|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=36ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.193, n=300) - chop|score=0.19|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.237, n=300) - chop|score=0.24|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.165, n=300) - chop|score=0.17|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.108, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:41 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.087, n=300) - chop|score=0.09|conf=0.80|stale
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:41 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=61ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.049, n=300) - chop|score=0.05|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.130, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.128, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.117, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=41ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.140, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.027, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.040, n=300) - chop|score=-0.04|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=64ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.035, n=300) - chop|score=-0.03|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.046, n=300) - chop|score=0.05|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.092, n=300) - chop|score=-0.09|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.052, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.028, n=300) - chop|score=-0.03|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.037, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.038, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.123, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.119, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.133, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:42 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.122, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:42 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.102, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.078, n=300) - chop|score=0.08|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.015, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.068, n=300) - chop|score=-0.07|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.102, n=300) - chop|score=-0.10|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.144, n=300) - chop|score=-0.14|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.214, n=300) - chop|score=-0.21|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.211, n=300) - chop|score=-0.21|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.204, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.198, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.280, n=300) - chop|score=-0.28|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.278, n=300) - chop|score=-0.28|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.265, n=300) - chop|score=-0.27|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.316, n=300) - chop|score=-0.32|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.272, n=300) - chop|score=-0.27|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=38ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.271, n=300) - chop|score=-0.27|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.184, n=300) - chop|score=-0.18|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.225, n=300) - chop|score=-0.23|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:43 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.124, n=300) - chop|score=-0.12|conf=0.80|stale
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:43 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.125, n=300) - chop|score=-0.12|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.078, n=300) - chop|score=-0.08|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.042, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.107, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.119, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.097, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.137, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.155, n=300) - chop|score=0.15|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=41ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.139, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.073, n=300) - chop|score=0.07|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.094, n=300) - chop|score=0.09|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.104, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.124, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.150, n=300) - chop|score=0.15|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.170, n=300) - chop|score=0.17|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.113, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.092, n=300) - chop|score=0.09|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=65ms)
+2025-10-26 08:31:44 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.034, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:44 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.057, n=300) - chop|score=0.06|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.001, n=300) - chop|score=0.00|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.075, n=300) - chop|score=-0.08|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.080, n=300) - chop|score=-0.08|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.093, n=300) - chop|score=-0.09|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.026, n=300) - chop|score=-0.03|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.027, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.020, n=300) - chop|score=-0.02|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.007, n=300) - chop|score=-0.01|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.077, n=300) - chop|score=-0.08|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.108, n=300) - chop|score=-0.11|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.066, n=300) - chop|score=-0.07|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.126, n=300) - chop|score=-0.13|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=40ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.020, n=300) - chop|score=-0.02|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.033, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.008, n=300) - chop|score=-0.01|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=44ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.024, n=300) - chop|score=-0.02|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.035, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:45 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.230, n=300) - chop|score=0.23|conf=0.80|stale
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:45 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.076, n=300) - chop|score=0.08|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=66ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.185, n=300) - chop|score=0.18|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=67ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.244, n=300) - chop|score=0.24|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.279, n=300) - chop|score=0.28|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=77ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.275, n=300) - chop|score=0.27|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.267, n=300) - chop|score=0.27|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.188, n=300) - chop|score=0.19|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.147, n=300) - chop|score=0.15|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.204, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.158, n=300) - chop|score=-0.16|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=61ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.386, n=300) - chop|score=-0.39|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.364, n=300) - chop|score=-0.36|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=61ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.422, n=300) - chop|score=-0.42|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=61ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.437, n=300) - chop|score=-0.44|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.387, n=300) - chop|score=-0.39|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.445, n=300) - chop|score=-0.45|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:46 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.384, n=300) - chop|score=-0.38|conf=0.80|stale
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:46 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.298, n=300) - chop|score=-0.30|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=67ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.283, n=300) - chop|score=-0.28|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.247, n=300) - chop|score=-0.25|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.169, n=300) - chop|score=-0.17|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.195, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=67ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.217, n=300) - chop|score=-0.22|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=75ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.360, n=300) - chop|score=-0.36|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=69ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.453, n=300) - chop|score=-0.45|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.493, n=300) - chop|score=-0.49|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.525, n=300) - chop|score=-0.52|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.456, n=300) - chop|score=-0.46|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.353, n=300) - chop|score=-0.35|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.381, n=300) - chop|score=-0.38|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.261, n=300) - chop|score=-0.26|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.302, n=300) - chop|score=-0.30|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.126, n=300) - chop|score=-0.13|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=63ms)
+2025-10-26 08:31:47 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.140, n=300) - chop|score=-0.14|conf=0.80|stale
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:47 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.095, n=300) - chop|score=-0.09|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.060, n=300) - chop|score=-0.06|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.040, n=300) - chop|score=-0.04|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.029, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.084, n=300) - chop|score=0.08|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.057, n=300) - chop|score=0.06|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.032, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.102, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.106, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.095, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=70ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.183, n=300) - chop|score=0.18|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.149, n=300) - chop|score=0.15|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.191, n=300) - chop|score=0.19|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.183, n=300) - chop|score=0.18|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.116, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.130, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.157, n=300) - chop|score=0.16|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:48 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.130, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:48 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.127, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.128, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.164, n=300) - chop|score=0.16|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.161, n=300) - chop|score=0.16|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.125, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.090, n=300) - chop|score=0.09|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.121, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.132, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.172, n=300) - chop|score=0.17|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.110, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.164, n=300) - chop|score=0.16|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.147, n=300) - chop|score=0.15|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.167, n=300) - chop|score=0.17|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.137, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.140, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.107, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.208, n=300) - chop|score=0.21|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.141, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:49 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.086, n=300) - chop|score=0.09|conf=0.80|stale
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:49 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.097, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=61ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.052, n=300) - chop|score=0.05|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.005, n=300) - chop|score=-0.01|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=69ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.201, n=300) - chop|score=0.20|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.245, n=300) - chop|score=0.24|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.189, n=300) - chop|score=0.19|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.179, n=300) - chop|score=0.18|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=64ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.233, n=300) - chop|score=0.23|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=69ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.252, n=300) - chop|score=0.25|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=65ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.216, n=300) - chop|score=0.22|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=66ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.209, n=300) - chop|score=0.21|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.224, n=300) - chop|score=0.22|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.247, n=300) - chop|score=0.25|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.135, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.136, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.108, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:50 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.138, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:50 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=35ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.007, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.033, n=300) - chop|score=-0.03|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.046, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.032, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.114, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=61ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.147, n=300) - chop|score=0.15|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.155, n=300) - chop|score=0.16|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.169, n=300) - chop|score=0.17|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.117, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.097, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.085, n=300) - chop|score=0.09|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.003, n=300) - chop|score=0.00|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=64ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.057, n=300) - chop|score=0.06|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=71ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.037, n=300) - chop|score=-0.04|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.048, n=300) - chop|score=0.05|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=67ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.063, n=300) - chop|score=0.06|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=67ms)
+2025-10-26 08:31:51 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.037, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:51 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=65ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.003, n=300) - chop|score=0.00|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.054, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.001, n=300) - chop|score=0.00|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.006, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.042, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.048, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.024, n=300) - chop|score=-0.02|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.132, n=300) - chop|score=-0.13|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.093, n=300) - chop|score=-0.09|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.199, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.213, n=300) - chop|score=-0.21|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.251, n=300) - chop|score=-0.25|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=53ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.327, n=300) - chop|score=-0.33|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.351, n=300) - chop|score=-0.35|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.296, n=300) - chop|score=-0.30|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.264, n=300) - chop|score=-0.26|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=68ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.294, n=300) - chop|score=-0.29|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=61ms)
+2025-10-26 08:31:52 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.221, n=300) - chop|score=-0.22|conf=0.80|stale
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:52 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=63ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.178, n=300) - chop|score=-0.18|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.138, n=300) - chop|score=-0.14|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.122, n=300) - chop|score=-0.12|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=69ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.114, n=300) - chop|score=-0.11|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.002, n=300) - chop|score=-0.00|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=63ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.049, n=300) - chop|score=0.05|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=67ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.002, n=300) - chop|score=-0.00|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=67ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.015, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=63ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.044, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.020, n=300) - chop|score=0.02|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.055, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.019, n=300) - chop|score=-0.02|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=63ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.145, n=300) - chop|score=-0.15|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.198, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.205, n=300) - chop|score=-0.21|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:53 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.174, n=300) - chop|score=-0.17|conf=0.80|stale
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:53 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.227, n=300) - chop|score=-0.23|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.203, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.172, n=300) - chop|score=-0.17|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=48ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.217, n=300) - chop|score=-0.22|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.271, n=300) - chop|score=-0.27|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.204, n=300) - chop|score=-0.20|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.218, n=300) - chop|score=-0.22|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.244, n=300) - chop|score=-0.24|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.325, n=300) - chop|score=-0.33|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.294, n=300) - chop|score=-0.29|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.232, n=300) - chop|score=-0.23|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=63ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.150, n=300) - chop|score=-0.15|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.108, n=300) - chop|score=-0.11|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.129, n=300) - chop|score=-0.13|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=64ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.120, n=300) - chop|score=-0.12|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=61ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.162, n=300) - chop|score=-0.16|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.100, n=300) - chop|score=-0.10|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:54 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.149, n=300) - chop|score=-0.15|conf=0.80|stale
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:54 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.014, n=300) - chop|score=-0.01|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.013, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.022, n=300) - chop|score=0.02|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.065, n=300) - chop|score=0.07|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.083, n=300) - chop|score=0.08|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=65ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.104, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.172, n=300) - chop|score=0.17|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.141, n=300) - chop|score=0.14|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.251, n=300) - chop|score=0.25|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.306, n=300) - chop|score=0.31|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.371, n=300) - chop|score=0.37|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.255, n=300) - chop|score=0.26|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.241, n=300) - chop|score=0.24|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=60ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.230, n=300) - chop|score=0.23|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=62ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.202, n=300) - chop|score=0.20|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.181, n=300) - chop|score=0.18|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.177, n=300) - chop|score=0.18|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:55 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.208, n=300) - chop|score=0.21|conf=0.80|stale
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:55 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.193, n=300) - chop|score=0.19|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.199, n=300) - chop|score=0.20|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.226, n=300) - chop|score=0.23|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=44ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.268, n=300) - chop|score=0.27|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.184, n=300) - chop|score=0.18|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.128, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=54ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.019, n=300) - chop|score=0.02|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=46ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.005, n=300) - chop|score=0.01|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.020, n=300) - chop|score=0.02|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.045, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.035, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=50ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.044, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=51ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.020, n=300) - chop|score=0.02|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=43ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.043, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.097, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.119, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=57ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.129, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:56 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.067, n=300) - chop|score=0.07|conf=0.80|stale
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:56 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.126, n=300) - chop|score=0.13|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.113, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=56ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.094, n=300) - chop|score=0.09|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=59ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.076, n=300) - chop|score=0.08|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=65ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.103, n=300) - chop|score=0.10|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.034, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=52ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.032, n=300) - chop|score=-0.03|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=-0.045, n=300) - chop|score=-0.05|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.034, n=300) - chop|score=0.03|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=55ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.002, n=300) - chop|score=0.00|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=49ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.049, n=300) - chop|score=0.05|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.036, n=300) - chop|score=0.04|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=58ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.075, n=300) - chop|score=0.07|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=44ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.115, n=300) - chop|score=0.12|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=47ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.074, n=300) - chop|score=0.07|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=42ms)
+2025-10-26 08:31:57 | INFO | ai_engine.regime_detector.deep_ta_analyzer | TA regime: chop (conf=0.800, score=0.114, n=300) - chop|score=0.11|conf=0.80|stale
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | TA regime: chop, confidence=0.800, latency=0ms
+2025-10-26 08:31:57 | INFO | ai_engine.strategy_selector | Strategy decision for BTC/USD: hold none alloc=0.00 conf=0.800 (score=0.000, latency=45ms)
+2025-10-26 08:31:57 | INFO | backtesting.engine | Backtest complete: 0 trades executed
+2025-10-26 08:31:57 | INFO | backtesting.engine | Final equity: $10,000.00 (+0.00%)
+2025-10-26 08:31:57 | INFO | __main__ | 
+Saving standardized outputs...
+2025-10-26 08:31:57 | INFO | __main__ | \u2713 Appended to backtest_summary.csv
+2025-10-26 08:31:57 | WARNING | __main__ | No closed trades to save for BTC/USD
+2025-10-26 08:31:57 | INFO | __main__ | \u2713 Saved equity curve to equity_momentum_BTC_USD_1h.json
+2025-10-26 08:31:57 | INFO | __main__ | \u2713 Saved config to config_momentum_BTC_USD_1h.json
+2025-10-26 08:31:57 | ERROR | __main__ | \u274c Backtest failed for BTC/USD: 'charmap' codec can't encode character '\u274c' in position 12: character maps to <undefined>
+
+======================================================================
+RESULTS: BTC/USD
+======================================================================
+
+======================================================================
+BACKTEST RESULTS SUMMARY
+======================================================================
+
+Configuration:
+  Symbol: BTC/USD
+  Period: 2025-04-28 to 2025-10-25
+  Initial Capital: $10,000.00
+  Final Equity: $10,000.00
+  Timeframe: 1h
+
+Returns:
+  Total Return: $0.00 (+0.00%)
+  Annualized Return: +0.00%
+
+Risk Metrics:
+  Sharpe Ratio: 0.00
+  Sortino Ratio: 0.00
+  Max Drawdown: $0.00 (0.00%)
+  Max DD Duration: 0 days
+  Volatility (Annual): 0.00%
+
+Trade Statistics:
+  Total Trades: 0
+  Winning Trades: 0 (0.0%)
+  Losing Trades: 0
+  Avg Win: $0.00
+  Avg Loss: $0.00
+  Profit Factor: 0.00
+  Expectancy: $0.00
+
+Risk-Adjusted Metrics:
+  Calmar Ratio: 0.00
+  Recovery Factor: inf
+
+======================================================================
+
+
+======================================================================
+SUMMARY
+======================================================================
+Traceback (most recent call last):
+  File "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\scripts\run_backtest.py", line 1038, in <module>
+    main()
+  File "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\scripts\run_backtest.py", line 1027, in main
+    print(f"{symbol:12} | Return: {results.total_return_pct:+7.2f}% | "
+  File "C:\Users\Maith\.conda\envs\crypto-bot\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2717' in position 66: character maps to <undefined>

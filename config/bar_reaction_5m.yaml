@@ -1,0 +1,67 @@
+# Bar Reaction 5m Strategy Configuration - OPTIMIZED
+# Balanced parameters between baseline (conservative) and current (aggressive)
+
+strategy:
+  name: "bar_reaction_5m"
+  description: "5-minute bar-close reaction strategy - OPTIMIZED"
+  timeframe: "5m"
+
+  mode: "trend"
+
+  # Trigger settings (BALANCED: Middle ground)
+  trigger_mode: "open_to_close"
+  trigger_bps_up: 13.0    # Slightly more aggressive to get more trades
+  trigger_bps_down: 13.0
+
+  # ATR volatility gates (BALANCED)
+  min_atr_pct: 0.10  # Between 0.05 (current) and 0.15 (baseline)
+  max_atr_pct: 2.75   # Between 3.0 (current) and 2.5 (baseline)
+  atr_window: 14
+
+  # ATR-based risk management (BALANCED: Better R:R)
+  sl_atr: 0.8   # Between 0.6 (current) and 1.0 (baseline)
+  tp1_atr: 1.25  # Between 1.0 (current) and 1.5 (baseline)
+  tp2_atr: 2.0  # Between 1.8 (current) and 2.5 (baseline)
+
+  # Position sizing (BALANCED: Conservative)
+  risk_per_trade_pct: 0.8  # Between 0.6 (current) and 1.0 (baseline)
+
+  # Execution constraints
+  maker_only: true
+  spread_bps_cap: 10.0    # Between 12 (current) and 8 (baseline)
+
+  # Optional: Extreme fade logic
+  enable_extreme_fade: false
+  extreme_bps_threshold: 35.0
+  mean_revert_size_factor: 0.5
+
+# Backtesting configuration
+backtest:
+  lookback_days: 180
+  warmup_bars: 50
+
+  # Cost model
+  maker_fee_bps: 16
+  taker_fee_bps: 26
+  slippage_bps: 1
+
+  # Fill simulation
+  fill_model: "maker"
+  queue_bars: 1
+  partial_fills: false
+
+  # Quality gates
+  min_profit_factor: 1.35
+  min_sharpe_ratio: 1.0
+  max_drawdown_pct: 20.0
+
+# Trading pairs
+pairs:
+  - "BTC/USD"
+
+# Risk limits
+risk:
+  max_concurrent_positions: 1
+  max_daily_trades: 50
+  max_daily_loss_pct: 3.0
+  max_total_exposure_pct: 100.0

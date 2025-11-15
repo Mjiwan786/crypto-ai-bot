@@ -435,6 +435,10 @@ class RedisConnectionManager:
         # Publish queue tracking (PRD-001 Section 2.4)
         self.publish_queue_depth: Dict[str, int] = {}  # Track in-progress publishes per stream
         self.publish_backpressure_threshold = 1000  # PRD-001 Section 2.4: reject when depth > 1000
+
+        # Data integrity tracking (PRD-001 Section 2.5)
+        self.last_timestamp: Dict[str, float] = {}  # Last published timestamp per stream
+        self.sequence_counter: Dict[str, int] = {}  # Sequence number per stream
     
     @asynccontextmanager
     async def get_connection(self):
@@ -720,6 +724,33 @@ class RedisConnectionManager:
             REDIS_PUBLISH_QUEUE_DEPTH.labels(stream=stream_name).set(self.publish_queue_depth[stream_name])
 
         try:
+            # PRD-001 Section 2.5: Generate server-side timestamp
+            server_timestamp = datetime.now(timezone.utc).timestamp()
+
+            # PRD-001 Section 2.5: Enforce monotonically increasing timestamps
+            last_ts = self.last_timestamp.get(stream_name, 0.0)
+            if server_timestamp <= last_ts:
+                timestamp_delta = server_timestamp - last_ts
+                self.logger.warning(
+                    f"Timestamp validation failed: non-monotonic timestamp detected. "
+                    f"Current: {server_timestamp}, Last: {last_ts}, Delta: {timestamp_delta:.6f}s"
+                )
+                return False
+
+            # PRD-001 Section 2.5: Reject timestamps > 5s in future (clock skew protection)
+            now = datetime.now(timezone.utc).timestamp()
+            if server_timestamp > now + 5.0:
+                clock_skew = server_timestamp - now
+                self.logger.warning(
+                    f"Timestamp validation failed: timestamp too far in future. "
+                    f"Server: {server_timestamp}, Now: {now}, Skew: {clock_skew:.6f}s"
+                )
+                return False
+
+            # PRD-001 Section 2.5: Increment sequence number per stream
+            sequence_num = self.sequence_counter.get(stream_name, 0) + 1
+            self.sequence_counter[stream_name] = sequence_num
+
             # PRD-001 Section 2.3: Generate UUID v4 for idempotency
             signal_id = str(uuid.uuid4())
 
@@ -744,6 +775,13 @@ class RedisConnectionManager:
 
             # Add signal_id AFTER validation
             signal_data_copy['signal_id'] = signal_id
+
+            # PRD-001 Section 2.5: Add server timestamp and sequence number
+            signal_data_copy['server_timestamp'] = server_timestamp
+            signal_data_copy['server_timestamp_iso'] = datetime.fromtimestamp(
+                server_timestamp, tz=timezone.utc
+            ).isoformat()
+            signal_data_copy['sequence_number'] = sequence_num
 
             # PRD-001 Section 2.3: Serialize to JSON with UTF-8 encoding
             try:
@@ -773,8 +811,12 @@ class RedisConnectionManager:
                     )
 
                     self.logger.debug(
-                        f"Published signal to {stream_name} with signal_id={signal_id}"
+                        f"Published signal to {stream_name} with signal_id={signal_id}, "
+                        f"sequence={sequence_num}"
                     )
+
+                    # PRD-001 Section 2.5: Update last timestamp after successful publish
+                    self.last_timestamp[stream_name] = server_timestamp
 
                     # PRD-001 Section 2.4: Emit latency histogram
                     latency_ms = (time.time() - start_time) * 1000

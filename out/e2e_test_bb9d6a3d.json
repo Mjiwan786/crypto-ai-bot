@@ -1,0 +1,57 @@
+{
+  "test_id": "bb9d6a3d",
+  "timestamp": "2025-10-29T16:11:57.159710",
+  "tests": {
+    "redis_crypto_bot_connection": {
+      "success": true,
+      "latency_ms": 642.838716506958,
+      "details": {
+        "redis_version": "7.4.3",
+        "tls_enabled": true,
+        "ca_cert_used": true
+      }
+    },
+    "kraken_ws_connection": {
+      "success": false,
+      "latency_ms": 1816.2758350372314,
+      "details": {
+        "error": "Unexpected response: {'event': 'systemStatus', 'version': '1.9.6', 'status': 'online', 'connectionID': 12378889640299112074}"
+      }
+    },
+    "redis_publish_subscribe": {
+      "success": true,
+      "latency_ms": 156.93235397338867,
+      "details": {
+        "publish_latency_ms": 126.84,
+        "read_latency_ms": 30.09,
+        "stream_key": "signals:paper",
+        "message_id": "1761754317636-0"
+      }
+    },
+    "redis_signals_api_connection": {
+      "success": false,
+      "latency_ms": null,
+      "details": {
+        "error": "Command '['conda', 'run', '-n', 'signals-api', 'python', 'C:\\\\Users\\\\Maith\\\\OneDrive\\\\Desktop\\\\signals_api\\\\temp_redis_test.py']' timed out after 10 seconds"
+      }
+    },
+    "redis_signals_site_connection": {
+      "success": false,
+      "latency_ms": null,
+      "details": {
+        "error": "[WinError 2] The system cannot find the file specified"
+      }
+    },
+    "end_to_end_latency": {
+      "success": true,
+      "latency_ms": 146.40188217163086,
+      "details": {
+        "publish_ms": 66.67,
+        "redis_to_api_ms": 79.73,
+        "total_ms": 146.4,
+        "target_ms": 500,
+        "meets_target": true
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "threshold": 0.55,
+  "total_trades": 67,
+  "win_rate_pct": 53.7,
+  "profit_factor": 1.68,
+  "max_drawdown_pct": -14.5,
+  "total_return_pct": 11.2,
+  "monthly_roi_pct": 0.9333333333333332,
+  "sharpe_ratio": 0.88,
+  "trade_retention_pct": 85.8974358974359,
+  "note": "Low threshold: high retention but more noise"
+}

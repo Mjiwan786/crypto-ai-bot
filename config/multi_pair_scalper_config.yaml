@@ -1,0 +1,301 @@
+# ============================================================================
+# Multi-Pair Scalper Configuration
+# ============================================================================
+# Supports BTC/USD, ETH/USD (core) + SOL/USD, ADA/USD (alts)
+# with per-pair allocation caps and spread validation
+# ============================================================================
+
+# Trading Pairs Configuration
+trading_pairs:
+  # Core Pairs (always enabled)
+  core:
+    - symbol: "BTC/USD"
+      kraken_symbol: "XBTUSD"
+      priority: 1
+      allocation_pct: 10.0  # Max 10% of portfolio per pair
+      enabled: true
+
+    - symbol: "ETH/USD"
+      kraken_symbol: "ETHUSD"
+      priority: 2
+      allocation_pct: 10.0
+      enabled: true
+
+  # Alt Pairs (toggle via CLI --enable-alts)
+  alts:
+    - symbol: "SOL/USD"
+      kraken_symbol: "SOLUSD"
+      priority: 3
+      allocation_pct: 10.0
+      enabled: "${ENABLE_ALT_PAIRS:false}"
+
+    - symbol: "ADA/USD"
+      kraken_symbol: "ADAUSD"
+      priority: 4
+      allocation_pct: 10.0
+      enabled: "${ENABLE_ALT_PAIRS:false}"
+
+  # Future pairs (not yet implemented)
+  future:
+    - symbol: "MATIC/USD"
+      exchange: "binance"  # Not on Kraken, use ccxt
+      allocation_pct: 10.0
+      enabled: false
+      notes: "Requires ccxt integration"
+
+    - symbol: "DOT/USD"
+      exchange: "binance"
+      allocation_pct: 10.0
+      enabled: false
+      notes: "Requires ccxt integration"
+
+    - symbol: "NEAR/USD"
+      exchange: "binance"
+      allocation_pct: 10.0
+      enabled: false
+      notes: "Requires ccxt integration"
+
+# Allocation Caps & Limits
+allocation:
+  # Per-pair limits
+  max_allocation_per_pair_pct: 10.0  # Hard cap per pair
+
+  # Total limits
+  max_total_allocation_pct: 100.0  # Sum of all pairs
+  max_concurrent_pairs: 4  # Max pairs trading simultaneously
+
+  # Mode-specific overrides
+  modes:
+    turbo:
+      max_allocation_per_pair_pct: 10.0  # Stays at 10% even in turbo
+      max_concurrent_pairs: 4
+      aggressive_sizing: true
+
+    conservative:
+      max_allocation_per_pair_pct: 5.0
+      max_concurrent_pairs: 2
+      aggressive_sizing: false
+
+    paper:
+      max_allocation_per_pair_pct: 10.0
+      max_concurrent_pairs: 4
+      aggressive_sizing: false
+
+# Trading Specs Validation (from Kraken)
+validation:
+  # Spread validation (basis points)
+  max_spread_bps:
+    "XBTUSD": 5    # BTC/USD: max 5 bps spread
+    "ETHUSD": 8    # ETH/USD: max 8 bps spread
+    "SOLUSD": 12   # SOL/USD: max 12 bps spread
+    "ADAUSD": 15   # ADA/USD: max 15 bps spread
+    default: 20    # Other pairs: max 20 bps spread
+
+  # Precision requirements (from Kraken AssetPairs API)
+  precision:
+    "XBTUSD":
+      price_decimals: 1
+      size_decimals: 6
+      tick_size: 0.1
+      lot_size: 0.000001
+      min_notional: 5.0
+
+    "ETHUSD":
+      price_decimals: 2
+      size_decimals: 5
+      tick_size: 0.01
+      lot_size: 0.00001
+      min_notional: 5.0
+
+    "SOLUSD":
+      price_decimals: 3
+      size_decimals: 4
+      tick_size: 0.001
+      lot_size: 0.0001
+      min_notional: 5.0
+
+    "ADAUSD":
+      price_decimals: 4
+      size_decimals: 2
+      tick_size: 0.0001
+      lot_size: 0.01
+      min_notional: 5.0
+
+  # Liquidity requirements
+  min_liquidity_usd:
+    "XBTUSD": 1000000   # $1M min liquidity
+    "ETHUSD": 500000    # $500K min liquidity
+    "SOLUSD": 200000    # $200K min liquidity
+    "ADAUSD": 100000    # $100K min liquidity
+    default: 50000
+
+  # Fail-fast validation
+  fail_fast:
+    enabled: true
+    checks:
+      - "spread_within_limits"      # Reject if spread > max
+      - "precision_available"       # Reject if no precision data
+      - "liquidity_sufficient"      # Reject if liquidity < min
+      - "pair_tradable_today"       # Reject if Kraken says non-tradable
+      - "allocation_sum_valid"      # Reject if allocations > 100%
+
+    on_validation_failure:
+      action: "skip_pair"  # Options: skip_pair, halt_system, alert_only
+      alert_channels: ["discord", "log"]
+      retry_interval_seconds: 300  # Retry failed pairs every 5 mins
+
+# Pair Selection Strategy
+selection:
+  # How to choose pairs when max_concurrent_pairs is reached
+  strategy: "priority"  # Options: priority, volume, volatility, spread
+
+  # Priority-based selection
+  priority_order:
+    1: "XBTUSD"   # BTC first
+    2: "ETHUSD"   # ETH second
+    3: "SOLUSD"   # SOL third (if enabled)
+    4: "ADAUSD"   # ADA fourth (if enabled)
+
+  # Dynamic pair rotation
+  rotation:
+    enabled: false
+    rotation_interval_minutes: 60
+    min_performance_percentile: 25  # Rotate out bottom 25% performers
+
+# Risk Management Per-Pair
+risk_management:
+  # Per-pair position limits
+  max_position_usd_per_pair:
+    "XBTUSD": 50000
+    "ETHUSD": 30000
+    "SOLUSD": 15000
+    "ADAUSD": 10000
+    default: 5000
+
+  # Per-pair stop loss
+  stop_loss_bps_per_pair:
+    "XBTUSD": 5
+    "ETHUSD": 6
+    "SOLUSD": 8
+    "ADAUSD": 10
+    default: 10
+
+  # Correlation limits
+  max_correlated_exposure_pct: 70.0  # Max 70% in correlated pairs
+  correlation_threshold: 0.7  # Consider pairs correlated if r > 0.7
+
+  # Circuit breakers per pair
+  circuit_breakers:
+    max_losses_per_pair_per_day: 3
+    max_drawdown_pct_per_pair: 5.0
+    cooldown_after_breach_minutes: 60
+
+# Performance Tracking Per-Pair
+monitoring:
+  metrics_per_pair:
+    - "pnl_realized"
+    - "pnl_unrealized"
+    - "win_rate"
+    - "avg_spread_bps"
+    - "fill_rate_pct"
+    - "latency_ms_p95"
+    - "volume_traded_usd"
+    - "fees_paid_usd"
+
+  # Pair health checks
+  health_checks:
+    spread_check_interval_seconds: 30
+    liquidity_check_interval_seconds: 60
+    correlation_check_interval_seconds: 300
+
+  # Alerts
+  alerts:
+    high_spread_threshold_bps: 25  # Alert if spread > 25 bps
+    low_liquidity_threshold_usd: 50000  # Alert if liquidity < $50K
+    high_correlation_threshold: 0.8  # Alert if correlation > 0.8
+
+# CLI Flags Support
+cli:
+  flags:
+    # --enable-alts: Enable SOL/USD, ADA/USD
+    enable_alts:
+      env_var: "ENABLE_ALT_PAIRS"
+      default: false
+      description: "Enable alt-coin pairs (SOL, ADA)"
+
+    # --core-only: Only BTC/USD, ETH/USD
+    core_only:
+      env_var: "CORE_PAIRS_ONLY"
+      default: false
+      description: "Trade only core pairs (BTC, ETH)"
+
+    # --turbo-mode: Aggressive sizing
+    turbo_mode:
+      env_var: "TURBO_MODE_ENABLED"
+      default: false
+      description: "Enable turbo mode with aggressive sizing"
+
+    # --max-pairs: Override max concurrent pairs
+    max_pairs:
+      env_var: "MAX_CONCURRENT_PAIRS"
+      default: 4
+      description: "Maximum concurrent trading pairs"
+
+    # --allocation-cap: Override per-pair allocation cap
+    allocation_cap:
+      env_var: "MAX_ALLOCATION_PER_PAIR"
+      default: 10.0
+      description: "Max allocation per pair (%)"
+
+# Integration with Strategy Router
+strategy_router_integration:
+  enabled: true
+
+  # How pairs are distributed across strategies
+  pair_strategy_mapping:
+    # BTC/USD can use all strategies
+    "XBTUSD": ["scalper", "trend_following", "breakout", "mean_reversion"]
+
+    # ETH/USD can use all strategies
+    "ETHUSD": ["scalper", "trend_following", "breakout", "mean_reversion"]
+
+    # SOL/USD - more volatile, favor momentum/breakout
+    "SOLUSD": ["scalper", "breakout", "momentum"]
+
+    # ADA/USD - lower liquidity, favor scalping/mean reversion
+    "ADAUSD": ["scalper", "mean_reversion"]
+
+  # Strategy allocation per pair (overrides global allocations)
+  per_pair_allocations:
+    "XBTUSD":
+      scalper: 0.40
+      trend_following: 0.30
+      breakout: 0.20
+      mean_reversion: 0.10
+
+    "ETHUSD":
+      scalper: 0.40
+      trend_following: 0.30
+      breakout: 0.20
+      mean_reversion: 0.10
+
+    "SOLUSD":
+      scalper: 0.50
+      breakout: 0.30
+      momentum: 0.20
+
+    "ADAUSD":
+      scalper: 0.60
+      mean_reversion: 0.40
+
+# Metadata
+metadata:
+  version: "1.0.0"
+  created: "2025-11-08"
+  purpose: "Multi-pair scalping with allocation caps and validation"
+  compatibility:
+    enhanced_scalper_config: ">=1.0.0"
+    kraken_config: ">=2.1.0"
+  references:
+    - "config/exchange_configs/kraken.yaml"
+    - "config/enhanced_scalper_config.yaml"

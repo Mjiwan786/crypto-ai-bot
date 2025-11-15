@@ -1,0 +1,321 @@
+/* Print-ready CSS for PDF generation */
+/* Optimized for A4 paper size */
+
+@page {
+  size: A4;
+  margin: 20mm 15mm;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  color: #1a1a1a;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Headings */
+h1 {
+  font-size: 24pt;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 12pt;
+  color: #000;
+  page-break-after: avoid;
+}
+
+h2 {
+  font-size: 18pt;
+  font-weight: 600;
+  margin-top: 20pt;
+  margin-bottom: 10pt;
+  color: #1a1a1a;
+  page-break-after: avoid;
+  border-bottom: 1pt solid #e0e0e0;
+  padding-bottom: 6pt;
+}
+
+h3 {
+  font-size: 14pt;
+  font-weight: 600;
+  margin-top: 16pt;
+  margin-bottom: 8pt;
+  color: #2a2a2a;
+  page-break-after: avoid;
+}
+
+h4 {
+  font-size: 12pt;
+  font-weight: 600;
+  margin-top: 12pt;
+  margin-bottom: 6pt;
+  color: #3a3a3a;
+  page-break-after: avoid;
+}
+
+/* Paragraphs */
+p {
+  margin: 0 0 10pt 0;
+  text-align: justify;
+}
+
+/* Links */
+a {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+a:visited {
+  color: #551a8b;
+}
+
+/* Code blocks */
+pre {
+  background-color: #f5f5f5;
+  border: 1pt solid #d0d0d0;
+  border-radius: 3pt;
+  padding: 10pt;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 9pt;
+  line-height: 1.4;
+  overflow-x: auto;
+  page-break-inside: avoid;
+  margin: 10pt 0;
+}
+
+code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 9pt;
+  background-color: #f5f5f5;
+  padding: 2pt 4pt;
+  border-radius: 2pt;
+}
+
+pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+/* Lists */
+ul, ol {
+  margin: 10pt 0;
+  padding-left: 20pt;
+}
+
+li {
+  margin-bottom: 5pt;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12pt 0;
+  font-size: 10pt;
+  page-break-inside: avoid;
+}
+
+thead {
+  display: table-header-group;
+}
+
+th {
+  background-color: #2c3e50;
+  color: white;
+  font-weight: 600;
+  text-align: left;
+  padding: 8pt 10pt;
+  border: 1pt solid #34495e;
+}
+
+td {
+  padding: 8pt 10pt;
+  border: 1pt solid #d0d0d0;
+  vertical-align: top;
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* Blockquotes */
+blockquote {
+  margin: 12pt 0;
+  padding: 10pt 15pt;
+  background-color: #f9f9f9;
+  border-left: 4pt solid #2c3e50;
+  font-style: italic;
+  color: #4a4a4a;
+  page-break-inside: avoid;
+}
+
+/* Horizontal rules */
+hr {
+  border: none;
+  border-top: 1pt solid #e0e0e0;
+  margin: 20pt 0;
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 12pt auto;
+  page-break-inside: avoid;
+  border: 1pt solid #e0e0e0;
+  padding: 4pt;
+}
+
+/* Image captions (if using markdown image syntax) */
+img + em {
+  display: block;
+  text-align: center;
+  font-size: 9pt;
+  color: #666;
+  margin-top: -8pt;
+  margin-bottom: 12pt;
+}
+
+/* Page breaks */
+.page-break {
+  page-break-after: always;
+}
+
+h1, h2, h3, h4 {
+  page-break-after: avoid;
+}
+
+/* Prevent orphans and widows */
+p, li {
+  orphans: 3;
+  widows: 3;
+}
+
+/* Strong and emphasis */
+strong, b {
+  font-weight: 700;
+  color: #000;
+}
+
+em, i {
+  font-style: italic;
+}
+
+/* Header (first page) */
+body > h1:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Date and metadata (typically below title) */
+body > h1:first-child + p strong {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+/* Summary sections */
+h2:first-of-type + p {
+  background-color: #f0f7ff;
+  padding: 10pt;
+  border-left: 4pt solid #0066cc;
+  margin-bottom: 16pt;
+  font-size: 10pt;
+  page-break-inside: avoid;
+}
+
+/* Appendix styling */
+h2:contains("Appendix") {
+  margin-top: 30pt;
+  border-top: 2pt solid #2c3e50;
+  padding-top: 12pt;
+}
+
+/* Footer (page numbers) */
+@page {
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 9pt;
+    color: #666;
+  }
+}
+
+/* Print optimizations */
+@media print {
+  body {
+    background: white;
+  }
+
+  a {
+    text-decoration: underline;
+  }
+
+  /* Show URLs for links */
+  a[href^="http"]:after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #666;
+  }
+
+  /* Avoid breaking inside key elements */
+  pre, blockquote, table, img {
+    page-break-inside: avoid;
+  }
+}
+
+/* Placeholder for images */
+img[src*="_assets"] {
+  border: 2pt dashed #ccc;
+  background-color: #fafafa;
+  padding: 40pt 20pt;
+  text-align: center;
+}
+
+/* Code syntax highlighting (basic) */
+.hljs {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.hljs-comment {
+  color: #998;
+  font-style: italic;
+}
+
+.hljs-keyword {
+  color: #333;
+  font-weight: bold;
+}
+
+.hljs-string {
+  color: #d14;
+}
+
+.hljs-number {
+  color: #099;
+}
+
+/* Responsive adjustments for smaller pages */
+@media (max-width: 600pt) {
+  body {
+    font-size: 10pt;
+  }
+
+  h1 {
+    font-size: 20pt;
+  }
+
+  h2 {
+    font-size: 16pt;
+  }
+
+  table {
+    font-size: 9pt;
+  }
+}

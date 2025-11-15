@@ -1,0 +1,60 @@
+# Bar Reaction 5m Strategy Configuration - DEBUG MODE
+# Ultra-relaxed filters for debugging no-trade issue
+
+strategy:
+  name: "bar_reaction_5m_debug"
+  description: "Debug configuration with relaxed filters"
+  timeframe: "5m"
+  mode: "trend"
+
+  # VERY RELAXED trigger settings
+  trigger_mode: "open_to_close"
+  trigger_bps_up: 5.0     # Very low to catch any movement
+  trigger_bps_down: 5.0
+
+  # VERY WIDE ATR gates
+  min_atr_pct: 0.001     # Almost no minimum
+  max_atr_pct: 100.0     # Almost no maximum
+  atr_window: 14
+
+  # Standard risk management
+  sl_atr: 1.5
+  tp1_atr: 2.5
+  tp2_atr: 4.0
+
+  # Position sizing
+  risk_per_trade_pct: 1.2
+  min_position_usd: 50.0
+  max_position_usd: 2000.0
+
+  # Execution constraints
+  maker_only: true
+  spread_bps_cap: 50.0    # Very high to not reject
+
+  enable_extreme_fade: false
+
+# NO regime filtering for debug
+regime:
+  enable_regime_filter: false
+
+# Backtesting configuration
+backtest:
+  lookback_days: 180
+  warmup_bars: 50
+  maker_fee_bps: 16
+  taker_fee_bps: 26
+  slippage_bps: 2
+  fill_model: "maker"
+  queue_bars: 1
+  partial_fills: false
+
+# Trading pairs
+pairs:
+  - "BTC/USD"
+
+# Risk limits
+risk:
+  max_concurrent_positions: 5
+  max_daily_trades: 1000
+  max_daily_loss_pct: 50.0
+  max_total_exposure_pct: 500.0

@@ -190,7 +190,7 @@ class EnhancedTradingAgent(ABC):
         try:
             # Initialize Redis
             redis_url = self.config.get('redis', {}).get('url', 'redis://localhost:6379')
-            self.redis_manager = RedisManager(redis_url=redis_url)
+            self.redis_manager = RedisManager(url=redis_url)
             await self.redis_manager.initialize()
             
             # Initialize MCP context

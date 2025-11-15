@@ -1,0 +1,14 @@
+{
+  "total_trades": 8,
+  "winning_trades": 5,
+  "losing_trades": 3,
+  "win_rate": 62.5,
+  "profit_factor": 2.7311007158103586,
+  "total_return": 249.4310675677897,
+  "total_return_pct": 2.494310675677897,
+  "max_drawdown_pct": 1.0047943336240304,
+  "sharpe_ratio": 7.760406773995382,
+  "avg_win": 78.70383981221343,
+  "avg_loss": 48.02937716442582,
+  "final_equity": 10221.016131146745
+}

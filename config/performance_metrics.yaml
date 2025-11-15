@@ -1,0 +1,30 @@
+# Performance Metrics Configuration
+# Real-time progress tracking for P&L optimization
+
+# Enable/disable performance metrics
+enabled: true
+
+# Update interval (seconds)
+update_interval: 30
+
+# Target configuration
+starting_equity_usd: 10000.0
+target_equity_usd: 20000.0  # $10k profit target (+100%)
+
+# Redis stream keys
+redis_streams:
+  performance_metrics: "metrics:performance"
+  aggressive_mode_score: "metrics:aggressive_mode_score"
+  velocity_to_target: "metrics:velocity_to_target"
+  days_remaining: "metrics:days_remaining"
+
+# Prometheus metrics enabled
+prometheus_enabled: true
+
+# Feature flags
+features:
+  publish_to_redis: true
+  publish_to_prometheus: true
+  log_summary: true
+  cache_metrics: true
+  cache_ttl_seconds: 10

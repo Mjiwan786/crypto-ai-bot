@@ -1,0 +1,57 @@
+{
+  "test_id": "1c19a4b0",
+  "timestamp": "2025-10-29T16:09:27.197986",
+  "tests": {
+    "redis_crypto_bot_connection": {
+      "success": true,
+      "latency_ms": 749.7010231018066,
+      "details": {
+        "redis_version": "7.4.3",
+        "tls_enabled": true,
+        "ca_cert_used": true
+      }
+    },
+    "kraken_ws_connection": {
+      "success": false,
+      "latency_ms": 1813.5673999786377,
+      "details": {
+        "error": "Unexpected response: {'event': 'systemStatus', 'version': '1.9.6', 'status': 'online', 'connectionID': 14601272639375942682}"
+      }
+    },
+    "redis_publish_subscribe": {
+      "success": true,
+      "latency_ms": 191.55168533325195,
+      "details": {
+        "publish_latency_ms": 134.64,
+        "read_latency_ms": 56.91,
+        "stream_key": "signals:paper",
+        "message_id": "1761754167816-0"
+      }
+    },
+    "redis_signals_api_connection": {
+      "success": false,
+      "latency_ms": null,
+      "details": {
+        "error": "[WinError 2] The system cannot find the file specified"
+      }
+    },
+    "redis_signals_site_connection": {
+      "success": false,
+      "latency_ms": null,
+      "details": {
+        "error": "[WinError 2] The system cannot find the file specified"
+      }
+    },
+    "end_to_end_latency": {
+      "success": true,
+      "latency_ms": 320.1770782470703,
+      "details": {
+        "publish_ms": 115.09,
+        "redis_to_api_ms": 205.08,
+        "total_ms": 320.18,
+        "target_ms": 500,
+        "meets_target": true
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "config": "BASELINE (Conservative)",
+  "total_return_pct": -93.71,
+  "total_trades": 12,
+  "winning_trades": 5,
+  "losing_trades": 7,
+  "win_rate_pct": 41.7,
+  "profit_factor": 2.3,
+  "max_drawdown_pct": -99.95,
+  "sharpe_ratio": 2.27,
+  "avg_win": 10.17,
+  "avg_loss": -3.16,
+  "expectancy": 2.4
+}

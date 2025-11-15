@@ -1,0 +1,48 @@
+{
+  "baseline": {
+    "threshold": null,
+    "total_trades": 48,
+    "winning_trades": 24,
+    "losing_trades": 24,
+    "win_rate_pct": 50.0,
+    "profit_factor": 1.42,
+    "max_drawdown_pct": -15.2,
+    "annualized_return_pct": 104.0,
+    "monthly_roi_pct": 8.67
+  },
+  "sweep_results": [
+    {
+      "threshold": 0.55,
+      "total_trades": 41,
+      "winning_trades": 22,
+      "losing_trades": 19,
+      "win_rate_pct": 53.66,
+      "profit_factor": 1.58,
+      "max_drawdown_pct": -13.8,
+      "annualized_return_pct": 112.0,
+      "monthly_roi_pct": 9.33
+    },
+    {
+      "threshold": 0.65,
+      "total_trades": 34,
+      "winning_trades": 20,
+      "losing_trades": 14,
+      "win_rate_pct": 58.82,
+      "profit_factor": 1.89,
+      "max_drawdown_pct": -11.8,
+      "annualized_return_pct": 123.0,
+      "monthly_roi_pct": 10.25
+    },
+    {
+      "threshold": 0.75,
+      "total_trades": 26,
+      "winning_trades": 17,
+      "losing_trades": 9,
+      "win_rate_pct": 65.38,
+      "profit_factor": 2.12,
+      "max_drawdown_pct": -9.5,
+      "annualized_return_pct": 115.0,
+      "monthly_roi_pct": 9.58
+    }
+  ]
+}

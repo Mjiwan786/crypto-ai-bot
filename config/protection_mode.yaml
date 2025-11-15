@@ -1,0 +1,28 @@
+# Protection Mode Configuration
+# Auto-switches when equity >= $18k or win streak >= threshold
+# Reduces risk by halving sizes, tightening stops, reducing max trades/min
+
+# Mode control
+enabled: false  # Current state (auto-managed)
+auto_enable: true  # Auto-enable based on triggers
+manual_override: false  # Manual override (ignores triggers)
+
+# Triggers
+triggers:
+  equity_threshold_usd: 18000.0  # Protect profits at $18k
+  win_streak_threshold: 5  # Reduce risk after 5 consecutive wins
+
+# Protection parameters (applied when enabled)
+parameters:
+  position_size_multiplier: 0.5  # Halve all position sizes
+  stop_loss_tightening_pct: 0.3  # Tighten stops by 30%
+  max_trades_per_minute_reduction_pct: 0.5  # Reduce by 50%
+
+# Hysteresis (prevent oscillation)
+hysteresis:
+  equity_exit_pct: 0.95  # Exit protection at 95% of threshold ($17,100)
+  win_streak_exit: 0  # Exit when streak breaks
+
+# Runtime override commands (via Redis stream: protection:commands)
+# Commands: enable, disable, enable_manual_override, disable_manual_override
+# Example: redis-cli -u $REDIS_URL XADD protection:commands * command enable

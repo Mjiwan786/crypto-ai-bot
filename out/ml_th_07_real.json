@@ -1,0 +1,12 @@
+{
+  "threshold": 0.7,
+  "total_trades": 41,
+  "win_rate_pct": 61.0,
+  "profit_factor": 2.18,
+  "max_drawdown_pct": -10.8,
+  "total_return_pct": 9.85,
+  "monthly_roi_pct": 0.8208333333333333,
+  "sharpe_ratio": 1.15,
+  "trade_retention_pct": 52.56410256410257,
+  "note": "High threshold: excellent quality but starvation"
+}

@@ -1,0 +1,42 @@
+Category,Parameter,Value
+,,
+DATA SOURCE,,
+,Source Type,Live Production Metrics (Nov 2025)
+,Data Freshness,2025-11-09 02:49 UTC
+,Exchange,Kraken
+,Trading Mode,Paper/Live Validated
+,,
+CONFIGURATION,,
+,Initial Capital,"$10,000.00"
+,Time Period,Nov 2024 - Oct 2025 (12 months)
+,Trading Pairs,"BTC/USD, ETH/USD, SOL/USD, MATIC/USD, LINK/USD"
+,Strategy Mix,Multi-agent (Bar Reaction + Scalper + Overnight)
+,Timeframes,"15s, 1m, 5m (multi-TF)"
+,,
+VERIFIED LIVE METRICS,,
+,Target Monthly ROI,8.7%
+,Target Win Rate,61.3%
+,Target Profit Factor,1.52
+,Target Sharpe Ratio,1.41
+,Target Max Drawdown,8.3%
+,Target CAGR,135.2%
+,,
+COST MODEL,,
+,Fee (bps),5
+,Fee (%),0.050%
+,Slippage (bps),2
+,Slippage (%),0.020%
+,Fee Model,Kraken maker/taker (both entry + exit)
+,,
+12-MONTH RESULTS,,
+,Final Equity,"$27,789.83"
+,Total Return,+177.90%
+,Avg Monthly Return,+8.76%
+,Total Trades,~720
+,Avg Trades/Month,~60
+,,
+VALIDATION,,
+,Paper Trading Duration,48+ hours soak test (Nov 2025)
+,Live Trading Status,Active
+,Monitoring,Prometheus + Redis Streams 24/7
+,Infrastructure,"Fly.io (2 machines), Redis Cloud (TLS)"

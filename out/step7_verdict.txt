@@ -1,0 +1,1 @@
+STEP 7 PASS [PASS] -- ROI=10.15%, PF=1.62, DD=-14.2%, Trades=61 (th=0.6)

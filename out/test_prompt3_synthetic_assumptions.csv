@@ -1,0 +1,59 @@
+Category,Parameter,Value
+,,
+CONFIGURATION,,
+,Initial Capital,"$10,000.00"
+,Trading Pairs,"BTC/USD, ETH/USD"
+,Timeframe,"1h, 5m (multi-timeframe)"
+,Strategy Mix,EMA Crossover + RSI Filter + ATR Risk
+,,
+COST MODEL,,
+,Fee (bps),5.0
+,Fee (%),0.050%
+,Slippage (bps),2.0
+,Slippage (%),0.020%
+,Fee Model,Kraken maker/taker (both entry + exit)
+,Slippage Model,Conservative estimate (both entry + exit)
+,,
+BACKTEST WINDOW,,
+,Start Date,2024-12-01
+,End Date,2025-11-27
+,Duration (days),361
+,Duration (months),12
+,,
+RISK CONTROLS,,
+,Stop Loss,ATR-based (2% typical)
+,Take Profit,ATR-based (4% target)
+,Position Sizing,1.5% risk per trade
+,Max Concurrent Positions,1-2
+,Leverage,None (spot trading only)
+,,
+DATA SOURCES,,
+,Source Type,synthetic
+,Exchange,Kraken
+,Data Quality,Synthetic
+,Total Trades,330
+,,
+12-MONTH SUMMARY,,
+,Total Net P&L,$+36.18
+,Total Return (%),+0.36%
+,Win Rate (%),51.8%
+,Profit Factor,1.08
+,Max Drawdown ($),$48.01
+,Max Drawdown (%),0.48%
+,Sharpe Ratio,0.59
+,Sortino Ratio,1.49
+,,
+TRADE STATISTICS,,
+,Total Trades,330
+,Winning Trades,171
+,Losing Trades,159
+,Avg Win,$2.90
+,Avg Loss,$2.89
+,Gross Profit,$495.75
+,Gross Loss,$459.57
+,,
+COST BREAKDOWN,,
+,Total Fees,$49.85
+,Total Slippage,$19.94
+,Total Costs,$69.80
+,Costs as % of Capital,0.70%

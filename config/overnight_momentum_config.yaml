@@ -1,0 +1,158 @@
+# Overnight Momentum Strategy Configuration
+#
+# Asian session momentum trading with low volume filtering.
+# Uses larger notional on spot (leverage proxy) for 1-3% swing targets.
+#
+# Status: BACKTEST ONLY (requires promotion gates to go live)
+
+# Feature Flags
+enabled: false  # Set to true to enable strategy
+backtest_only: true  # Only run in backtest mode (safety)
+
+# Session Configuration
+session:
+  asian_start_utc: 0   # 00:00 UTC (8:00 AM Hong Kong/Singapore)
+  asian_end_utc: 8     # 08:00 UTC (4:00 PM Hong Kong/Singapore)
+
+# Entry Criteria
+entry:
+  # Volume filter (must be in low volume environment)
+  volume_percentile_max: 50.0  # Max 50th percentile of 24h volume
+
+  # Momentum detection
+  momentum_threshold: 0.6  # 0.0 to 1.0 (higher = stronger momentum required)
+
+  # Minimum criteria
+  min_price_change_pct: 0.5  # Minimum price movement to consider
+  min_volatility_expansion: 1.2  # Recent vol / baseline vol ratio
+
+# Target & Risk
+targets:
+  # Swing targets
+  target_min_pct: 1.0  # Minimum target (conservative)
+  target_max_pct: 3.0  # Maximum target (aggressive)
+  default_target_pct: 1.5  # Default target
+
+  # Trailing stops
+  trailing_stop_pct: 0.7  # 0.7% trailing stop (tight)
+  trailing_stop_min_pct: 0.5  # Minimum trailing stop
+  trailing_stop_max_pct: 1.0  # Maximum trailing stop
+
+# Position Limits
+limits:
+  max_concurrent_positions: 1  # Hard cap: 1 position at a time
+  max_position_size_usd: 5000  # Maximum position size
+  min_position_size_usd: 100   # Minimum position size
+
+# Leverage Proxy (Spot Only)
+leverage:
+  use_margin: false  # NEVER use margin for overnight positions
+  spot_notional_multiplier: 2.0  # Use 2x notional on spot (leverage proxy)
+  max_notional_multiplier: 3.0   # Maximum multiplier
+
+# Exit Conditions
+exit:
+  # Automatic exits
+  session_end_exit: true  # Exit at end of Asian session
+  max_hold_hours: 8  # Maximum hold time (hours)
+
+  # Risk-off triggers
+  volatility_spike_threshold: 2.0  # Exit if vol spikes > 2x
+  drawdown_exit_pct: 2.0  # Exit if position down > 2%
+
+# Promotion Gates (Backtest -> Live)
+promotion_gates:
+  # Minimum backtest performance required
+  min_trades: 50  # Minimum trades in backtest
+  min_win_rate: 0.55  # Minimum 55% win rate
+  min_sharpe: 1.5  # Minimum Sharpe ratio
+  max_drawdown: 0.10  # Maximum 10% drawdown
+  min_profit_factor: 1.5  # Minimum profit factor
+
+  # Consistency requirements
+  min_consecutive_days: 30  # Minimum days of positive results
+  max_losing_streak: 5  # Maximum consecutive losses
+
+# Symbols
+symbols:
+  # Allowed symbols for overnight trading
+  whitelist:
+    - BTC/USD
+    - ETH/USD
+    # Add more as needed
+
+  # Blocked symbols (too volatile for overnight)
+  blacklist:
+    - SOL/USD  # Too volatile
+    # Add more as needed
+
+# Monitoring & Alerts
+monitoring:
+  alert_on_entry: true
+  alert_on_exit: true
+  alert_on_trailing_stop_update: false  # Too frequent
+  log_level: INFO
+
+# Backtest Configuration
+backtest:
+  # Data requirements
+  min_history_days: 90  # Minimum historical data
+  lookback_bars: 20  # Bars to look back for signals
+
+  # Execution simulation
+  slippage_bps: 10  # 10 bps slippage
+  commission_bps: 26  # 0.26% total fees (Binance + Kraken)
+
+  # Reporting
+  report_interval_days: 7  # Generate report every 7 days
+  save_trades: true  # Save all trades to file
+
+# Risk Management Integration
+risk:
+  # Position sizing
+  risk_per_trade_pct: 1.0  # 1% risk per trade
+  use_atr_sizing: false  # Don't use ATR (use fixed %)
+
+  # Correlation limits
+  max_correlation: 0.7  # Don't open if correlated > 0.7 with existing
+
+  # Portfolio heat limit
+  max_portfolio_heat_pct: 10.0  # Maximum 10% portfolio heat
+
+# Validation Bounds (fail-fast limits)
+validation_bounds:
+  risk_per_trade_pct:
+    min: 0.1
+    max: 5.0
+  trailing_stop_pct:
+    min: 0.3
+    max: 2.0
+  target_pct:
+    min: 0.5
+    max: 5.0
+  notional_multiplier:
+    min: 1.0
+    max: 3.0
+  portfolio_heat_pct:
+    min: 1.0
+    max: 20.0
+  volume_percentile_max:
+    min: 10.0
+    max: 90.0
+  momentum_threshold:
+    min: 0.1
+    max: 1.0
+
+# Redis Streams
+redis:
+  publish_signals: true
+  publish_exits: true
+  signal_stream: "overnight:signals"
+  exit_stream: "overnight:exits"
+  position_stream: "overnight:positions"
+
+# Audit & Compliance
+audit:
+  log_all_decisions: true
+  log_file: "logs/overnight_momentum_audit.log"
+  redis_audit_stream: "overnight:audit"

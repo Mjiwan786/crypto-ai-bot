@@ -1,0 +1,60 @@
+{
+  "test_id": "39275ca1",
+  "timestamp": "2025-10-29T16:13:02.090787",
+  "tests": {
+    "redis_crypto_bot_connection": {
+      "success": true,
+      "latency_ms": 640.6102180480957,
+      "details": {
+        "redis_version": "7.4.3",
+        "tls_enabled": true,
+        "ca_cert_used": true
+      }
+    },
+    "kraken_ws_connection": {
+      "success": true,
+      "latency_ms": 1782.0172309875488,
+      "details": {
+        "pair": "XBT/USD",
+        "channel": "ticker",
+        "subscription_id": 119930888,
+        "system_status": "online"
+      }
+    },
+    "redis_publish_subscribe": {
+      "success": true,
+      "latency_ms": 101.84025764465332,
+      "details": {
+        "publish_latency_ms": 31.58,
+        "read_latency_ms": 70.26,
+        "stream_key": "signals:paper",
+        "message_id": "1761754382694-0"
+      }
+    },
+    "redis_signals_api_connection": {
+      "success": true,
+      "latency_ms": 658.07,
+      "details": {
+        "conda_env": "signals-api"
+      }
+    },
+    "redis_signals_site_connection": {
+      "success": false,
+      "latency_ms": null,
+      "details": {
+        "error": "[WinError 2] The system cannot find the file specified"
+      }
+    },
+    "end_to_end_latency": {
+      "success": true,
+      "latency_ms": 196.06828689575195,
+      "details": {
+        "publish_ms": 102.78,
+        "redis_to_api_ms": 93.29,
+        "total_ms": 196.07,
+        "target_ms": 500,
+        "meets_target": true
+      }
+    }
+  }
+}

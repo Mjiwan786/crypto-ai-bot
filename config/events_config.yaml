@@ -1,0 +1,200 @@
+# Event Guard Configuration
+#
+# Defines major macro events and exchange listings that affect trading.
+#
+# Event Types:
+#   - fed_announcement: Federal Reserve announcements
+#   - fomc: FOMC meetings
+#   - nfp: Non-Farm Payroll
+#   - cpi_report: Consumer Price Index
+#   - gdp_release: GDP reports
+#   - retail_sales: Retail sales data
+#   - exchange_listing: New exchange listings
+#   - halving: Bitcoin halving events
+#   - fork: Blockchain forks
+#   - custom: Custom events
+#
+# Impact Levels:
+#   - high: Major market movers (60s blackout)
+#   - medium: Secondary indicators (30s blackout)
+#   - low: Minor events (monitoring only)
+#   - symbol_specific: Affects specific symbols only
+#
+# Timestamp Format:
+#   - ISO 8601: "2025-01-28T14:00:00Z" (UTC)
+#   - Unix timestamp: 1706457600
+#
+# Allowlist:
+#   - Symbols allowed to trade during blackout periods
+#   - Useful for exchange listings, halvings, etc.
+
+# Feature Flag
+enabled: false  # Set to true to enable event guard
+
+# Blackout Configuration
+pre_event_blackout_seconds: 60    # Disable entries 60s before event
+post_event_momentum_seconds: 10   # Momentum window after event
+momentum_multiplier: 1.3          # Size multiplier for momentum trades (max 1.3x)
+
+# Events
+events:
+  # ========================================
+  # FOMC Meetings 2025
+  # ========================================
+  - type: fomc
+    impact: high
+    timestamp: "2025-01-28T19:00:00Z"  # 2:00 PM ET
+    description: "FOMC Meeting - January 2025"
+
+  - type: fomc
+    impact: high
+    timestamp: "2025-03-18T18:00:00Z"  # 2:00 PM ET (DST)
+    description: "FOMC Meeting - March 2025"
+
+  - type: fomc
+    impact: high
+    timestamp: "2025-05-06T18:00:00Z"
+    description: "FOMC Meeting - May 2025"
+
+  - type: fomc
+    impact: high
+    timestamp: "2025-06-17T18:00:00Z"
+    description: "FOMC Meeting - June 2025"
+
+  - type: fomc
+    impact: high
+    timestamp: "2025-07-29T18:00:00Z"
+    description: "FOMC Meeting - July 2025"
+
+  - type: fomc
+    impact: high
+    timestamp: "2025-09-16T18:00:00Z"
+    description: "FOMC Meeting - September 2025"
+
+  - type: fomc
+    impact: high
+    timestamp: "2025-11-04T19:00:00Z"  # Back to EST
+    description: "FOMC Meeting - November 2025"
+
+  - type: fomc
+    impact: high
+    timestamp: "2025-12-16T19:00:00Z"
+    description: "FOMC Meeting - December 2025"
+
+  # ========================================
+  # Non-Farm Payroll 2025 (First Friday, 8:30 AM ET)
+  # ========================================
+  - type: nfp
+    impact: high
+    timestamp: "2025-01-10T13:30:00Z"
+    description: "Non-Farm Payroll - January 2025"
+
+  - type: nfp
+    impact: high
+    timestamp: "2025-02-07T13:30:00Z"
+    description: "Non-Farm Payroll - February 2025"
+
+  - type: nfp
+    impact: high
+    timestamp: "2025-03-07T13:30:00Z"
+    description: "Non-Farm Payroll - March 2025"
+
+  - type: nfp
+    impact: high
+    timestamp: "2025-04-04T12:30:00Z"  # DST
+    description: "Non-Farm Payroll - April 2025"
+
+  # ========================================
+  # CPI Reports 2025 (Mid-month, 8:30 AM ET)
+  # ========================================
+  - type: cpi_report
+    impact: high
+    timestamp: "2025-01-15T13:30:00Z"
+    description: "CPI Report - January 2025"
+
+  - type: cpi_report
+    impact: high
+    timestamp: "2025-02-12T13:30:00Z"
+    description: "CPI Report - February 2025"
+
+  - type: cpi_report
+    impact: high
+    timestamp: "2025-03-12T12:30:00Z"  # DST
+    description: "CPI Report - March 2025"
+
+  # ========================================
+  # GDP Releases (Quarterly)
+  # ========================================
+  - type: gdp_release
+    impact: high
+    timestamp: "2025-01-30T13:30:00Z"
+    description: "Q4 2024 GDP Release"
+
+  - type: gdp_release
+    impact: high
+    timestamp: "2025-04-30T12:30:00Z"
+    description: "Q1 2025 GDP Release"
+
+  # ========================================
+  # Exchange Listings (Examples)
+  # ========================================
+  # Uncomment and update with actual listings
+
+  # - type: exchange_listing
+  #   impact: symbol_specific
+  #   timestamp: "2025-02-01T14:00:00Z"
+  #   description: "XYZ/USD listing on Coinbase"
+  #   symbols:
+  #     - XYZ/USD
+  #   allowlist:
+  #     - XYZ/USD  # Allow trading this symbol during listing
+
+  # ========================================
+  # Bitcoin Events
+  # ========================================
+  # Bitcoin Halving (April 2028 - estimated)
+  # - type: halving
+  #   impact: high
+  #   timestamp: "2028-04-20T00:00:00Z"
+  #   description: "Bitcoin Halving Event"
+  #   allowlist:
+  #     - BTC/USD  # Allow BTC trading during halving
+
+  # ========================================
+  # Custom Events (Examples)
+  # ========================================
+  # Add your own events here
+
+  # - type: custom
+  #   impact: high
+  #   timestamp: "2025-06-15T14:00:00Z"
+  #   description: "Major Partnership Announcement"
+
+# ========================================
+# Symbol-Specific Allowlists
+# ========================================
+# Additional allowlist rules (merged with event allowlists)
+allowlists:
+  # Example: Always allow certain symbols during specific event types
+  # fomc:
+  #   - BTC/USD
+  #   - ETH/USD
+
+  # exchange_listing:
+  #   - (defined per-event above)
+
+# ========================================
+# Audit Logging
+# ========================================
+audit_log:
+  enabled: true
+  log_file: "logs/event_guard_audit.log"
+  redis_stream: "events:audit_log"
+
+# ========================================
+# Monitoring
+# ========================================
+monitoring:
+  alert_on_blackout: true
+  alert_on_momentum_window: true
+  notify_upcoming_events_hours: 24  # Alert for events in next 24h

@@ -601,3 +601,14 @@ async def check_redis_cloud_health(config: RedisCloudConfig | None = None) -> Re
 
     checker = RedisHealthChecker(health_config)
     return await checker.check_health()
+
+
+# ==============================================================================
+# Backward Compatibility Aliases
+# ==============================================================================
+
+# Legacy alias for backward compatibility with existing code
+RedisClient = RedisCloudClient
+RedisClientWithBackoff = RedisCloudClient  # Tests expect this name
+
+logger.debug("RedisClient and RedisClientWithBackoff are aliases for RedisCloudClient")

@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 from aiohttp import web
+import aiohttp
 
 # Fix Windows console encoding
 if sys.platform == "win32":
@@ -57,6 +58,113 @@ total_errors = 0
 # PnL tracking
 pnl_equity = 10000.0  # Starting equity
 pnl_daily_start = 10000.0
+
+# Price caching
+last_price_fetch = 0
+cached_prices = {}
+PRICE_CACHE_SECONDS = 30  # Refresh prices every 30 seconds
+
+# Kraken pair mapping (Kraken uses different symbols)
+KRAKEN_PAIRS = {
+    "BTC/USD": "XXBTZUSD",
+    "ETH/USD": "XETHZUSD",
+    "SOL/USD": "SOLUSD",
+    "MATIC/USD": "MATICUSD",
+    "LINK/USD": "LINKUSD",
+}
+
+
+async def fetch_kraken_prices():
+    """Fetch current prices from Kraken public API with caching"""
+    global last_price_fetch, cached_prices
+
+    current_time = time.time()
+
+    # Return cached prices if fresh
+    if current_time - last_price_fetch < PRICE_CACHE_SECONDS and cached_prices:
+        return cached_prices
+
+    try:
+        # Build comma-separated pair list for Kraken
+        pairs_param = ",".join(KRAKEN_PAIRS.values())
+        url = f"https://api.kraken.com/0/public/Ticker?pair={pairs_param}"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                if response.status == 200:
+                    data = await response.json()
+
+                    if data.get("error") and len(data["error"]) > 0:
+                        print(f"Kraken API error: {data['error']}")
+                        return cached_prices or get_fallback_prices()
+
+                    # Parse prices from Kraken response
+                    result = data.get("result", {})
+                    new_prices = {}
+
+                    for our_pair, kraken_pair in KRAKEN_PAIRS.items():
+                        if kraken_pair in result:
+                            # Kraken returns 'c' (last trade closed) as [price, volume]
+                            last_price = float(result[kraken_pair]["c"][0])
+                            new_prices[our_pair] = last_price
+
+                    if new_prices:
+                        cached_prices = new_prices
+                        last_price_fetch = current_time
+                        return cached_prices
+
+    except Exception as e:
+        print(f"Error fetching Kraken prices: {e}")
+
+    # Return cached or fallback
+    return cached_prices or get_fallback_prices()
+
+
+def get_fallback_prices():
+    """Fallback prices if Kraken API fails"""
+    return {
+        "BTC/USD": 45000.0,
+        "ETH/USD": 3000.0,
+        "SOL/USD": 150.0,
+        "MATIC/USD": 0.85,
+        "LINK/USD": 15.0,
+    }
+
+
+def calculate_signal_levels(pair, current_price, side):
+    """Calculate entry, SL, and TP based on current price and side"""
+    # Use ATR-based distances (simplified)
+    # Different pairs have different volatility
+    volatility_factors = {
+        "BTC/USD": 0.015,   # 1.5%
+        "ETH/USD": 0.020,   # 2.0%
+        "SOL/USD": 0.025,   # 2.5%
+        "MATIC/USD": 0.030, # 3.0%
+        "LINK/USD": 0.025,  # 2.5%
+    }
+
+    vol_factor = volatility_factors.get(pair, 0.02)
+
+    # Add some randomness to entry (simulate slippage/spread)
+    entry_offset = random.uniform(-0.002, 0.002)  # ±0.2%
+
+    if side == "buy":
+        entry = current_price * (1 + entry_offset)
+        sl = entry * (1 - vol_factor * 1.5)  # 1.5x ATR for SL
+        tp = entry * (1 + vol_factor * 2.0)  # 2x ATR for TP (1.33 R:R)
+    else:  # sell
+        entry = current_price * (1 + entry_offset)
+        sl = entry * (1 + vol_factor * 1.5)
+        tp = entry * (1 - vol_factor * 2.0)
+
+    # Round to appropriate precision
+    precision = 2 if pair in ["BTC/USD", "ETH/USD"] else 4
+
+    return {
+        "entry": round(entry, precision),
+        "sl": round(sl, precision),
+        "tp": round(tp, precision),
+    }
 
 
 async def health_handler(request):
@@ -150,17 +258,43 @@ async def publish_continuously():
 
                 timestamp = int(time.time() * 1000)
 
+                # Fetch current market prices from Kraken
+                current_prices = await fetch_kraken_prices()
+
+                # Cycle through all 5 trading pairs
+                pairs = ["BTC/USD", "ETH/USD", "SOL/USD", "MATIC/USD", "LINK/USD"]
+                pair = pairs[counter % len(pairs)]
+
+                # Get current price for this pair
+                current_price = current_prices.get(pair, 0)
+
+                if current_price == 0:
+                    print(f"⚠️  No price available for {pair}, skipping...")
+                    counter += 1
+                    await asyncio.sleep(MIN_PUBLISH_INTERVAL)
+                    continue
+
+                # Determine side (randomize with slight buy bias)
+                side = "buy" if random.random() > 0.48 else "sell"
+
+                # Calculate realistic entry, SL, TP based on current price
+                levels = calculate_signal_levels(pair, current_price, side)
+
+                # Generate realistic varying confidence score (0.65-0.95)
+                # Simulates AI model confidence varying by market conditions
+                confidence = round(random.uniform(0.65, 0.95), 2)
+
                 # Publish paper signal
                 signal = {
                     "id": f"continuous-{timestamp}-{counter}",
                     "ts": timestamp,
-                    "pair": "BTC-USD" if counter % 2 == 0 else "ETH-USD",
-                    "side": "buy" if counter % 2 == 0 else "sell",
-                    "entry": 45000.0 if counter % 2 == 0 else 3000.0,
-                    "sl": 44500.0 if counter % 2 == 0 else 2950.0,
-                    "tp": 46000.0 if counter % 2 == 0 else 3100.0,
+                    "pair": pair,
+                    "side": side,
+                    "entry": levels["entry"],
+                    "sl": levels["sl"],
+                    "tp": levels["tp"],
                     "strategy": "continuous_publisher",
-                    "confidence": 0.85,
+                    "confidence": confidence,
                     "mode": "paper"
                 }
 
@@ -174,7 +308,7 @@ async def publish_continuously():
 
                 last_publish_time = time.time()
                 total_published += 1
-                print(f"[{counter}] {signal['pair']} {signal['side']} (ID: {msg_id})")
+                print(f"[{counter}] {signal['pair']} {signal['side']} @ ${levels['entry']} (market: ${current_price:.2f}, conf: {confidence}) (ID: {msg_id})")
 
                 # Publish PnL point every signal (simulate equity growth)
                 pnl_equity += random.uniform(-10, 15)  # Random walk

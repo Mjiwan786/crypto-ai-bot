@@ -1,0 +1,12 @@
+{
+  "strategy": "scalper",
+  "timeframe": "1m",
+  "period_days": 30,
+  "roi_pct": null,
+  "profit_factor": null,
+  "max_dd_pct": null,
+  "total_trades": null,
+  "win_rate_pct": null,
+  "status": "NO_DATA",
+  "reason": "Kraken does not provide 1m candle data"
+}

@@ -413,6 +413,32 @@ def analyze_batch(
 
 
 # ==============================================================================
+# Legacy Compatibility (Deprecated)
+# ==============================================================================
+
+class SignalAnalyst:
+    """Deprecated: Legacy class for backward compatibility.
+
+    Use the pure functions `analyze()` and `analyze_batch()` instead.
+    This class exists only to prevent import errors during migration.
+    """
+    def __init__(self, *args, **kwargs):
+        logger.warning("SignalAnalyst class is deprecated. Use analyze() function instead.")
+        pass
+
+
+class SignalAnalystManager:
+    """Deprecated: Legacy class for backward compatibility.
+
+    Use the pure functions `analyze()` and `analyze_batch()` instead.
+    This class exists only to prevent import errors during migration.
+    """
+    def __init__(self, *args, **kwargs):
+        logger.warning("SignalAnalystManager class is deprecated. Use analyze() function instead.")
+        pass
+
+
+# ==============================================================================
 # Exports
 # ==============================================================================
 
@@ -421,4 +447,6 @@ __all__ = [
     "analyze_batch",
     "AnalysisContext",
     "AnalystConfig",
+    "SignalAnalyst",  # Deprecated
+    "SignalAnalystManager",  # Deprecated
 ]

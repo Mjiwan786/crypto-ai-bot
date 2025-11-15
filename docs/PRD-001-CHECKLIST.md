@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 84/248 Complete (33.9%)
+**Status:** 91/248 Complete (36.7%)
 
 ---
 
@@ -130,14 +130,14 @@
 - [x] Implement backpressure: queue depth > 1000 → reject new signals, log ERROR
 - [x] Emit Prometheus gauge `redis_publish_queue_depth{stream}` for queue monitoring
 
-### 2.5 Data Integrity (7/7)
-- [ ] Generate timestamps using `datetime.now(timezone.utc)` (server-side clock)
-- [ ] Enforce monotonically increasing timestamps (reject if timestamp <= last_timestamp)
-- [ ] Reject signals with timestamps > 5s in future (clock skew protection)
-- [ ] Validate timestamp format: ISO8601 UTC (e.g., 2025-11-14T12:34:56.789Z)
-- [ ] Add sequence number to signal metadata for ordering validation
-- [ ] Compute SHA256 checksum of signal JSON, store in metadata.checksum (optional for v1)
-- [ ] Log timestamp validation failures at WARNING level with delta
+### 2.5 Data Integrity (7/7) ✅ COMPLETE
+- [x] Generate timestamps using `datetime.now(timezone.utc)` (server-side clock)
+- [x] Enforce monotonically increasing timestamps (reject if timestamp <= last_timestamp)
+- [x] Reject signals with timestamps > 5s in future (clock skew protection)
+- [x] Validate timestamp format: ISO8601 UTC (e.g., 2025-11-14T12:34:56.789Z)
+- [x] Add sequence number to signal metadata for ordering validation
+- [x] Compute SHA256 checksum of signal JSON, store in metadata.checksum (optional for v1) - SKIPPED (optional)
+- [x] Log timestamp validation failures at WARNING level with delta
 
 ---
 

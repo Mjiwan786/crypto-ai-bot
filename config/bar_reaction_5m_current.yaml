@@ -1,0 +1,71 @@
+# Bar Reaction 5m Strategy Configuration
+# 5-minute bar-close momentum strategy with ATR-based risk management
+
+strategy:
+  name: "bar_reaction_5m"
+  description: "5-minute bar-close reaction strategy with dual profit targets"
+  timeframe: "5m"
+
+  # Trading mode
+  mode: "trend"  # "trend" = follow momentum, "revert" = fade extremes
+
+  # Trigger settings
+  trigger_mode: "open_to_close"  # "open_to_close" or "prev_close_to_close"
+  trigger_bps_up: 12.0    # Minimum upward move in bps to trigger long
+  trigger_bps_down: 12.0  # Minimum downward move in bps to trigger short
+
+  # ATR volatility gates
+  min_atr_pct: 0.05  # Minimum ATR as % of close (volatility floor) - lowered for current market
+  max_atr_pct: 3.0   # Maximum ATR as % of close (volatility ceiling)
+  atr_window: 14     # ATR calculation period
+
+  # ATR-based risk management
+  sl_atr: 0.6   # Stop loss as multiple of ATR (e.g., 0.6x ATR)
+  tp1_atr: 1.0  # First take profit as multiple of ATR (e.g., 1.0x ATR)
+  tp2_atr: 1.8  # Second take profit as multiple of ATR (e.g., 1.8x ATR)
+
+  # Position sizing
+  risk_per_trade_pct: 0.6  # Risk per trade as % of account equity
+
+  # Execution constraints
+  maker_only: true       # Enforce maker-only (post-only) orders
+  spread_bps_cap: 12.0    # Maximum spread in bps (reject if wider) - widened for backtest
+
+  # Optional: Extreme fade logic (contrarian trades on big moves)
+  enable_extreme_fade: false        # Enable contrarian trades
+  extreme_bps_threshold: 35.0       # Move threshold for extreme fade
+  mean_revert_size_factor: 0.5      # Size multiplier for fade trades
+
+# Backtesting configuration
+backtest:
+  # Data settings
+  lookback_days: 180      # Historical data period
+  warmup_bars: 50         # Bars needed for indicator warmup
+
+  # Cost model (realistic maker-only)
+  maker_fee_bps: 16       # Maker fee (Kraken: 0.16%)
+  taker_fee_bps: 26       # Taker fee (Kraken: 0.26%) - not used if maker_only=true
+  slippage_bps: 1         # Slippage (optimistic for maker orders)
+
+  # Fill simulation
+  fill_model: "maker"     # "maker" = realistic limit order fills
+  queue_bars: 1           # Bars to wait for fill (0 = fill immediately, 1 = next bar)
+  partial_fills: false    # Allow partial fills (not implemented yet)
+
+  # Quality gates
+  min_profit_factor: 1.35
+  min_sharpe_ratio: 1.0
+  max_drawdown_pct: 20.0
+
+# Trading pairs
+pairs:
+  - "BTC/USD"
+  - "ETH/USD"
+  - "SOL/USD"
+
+# Risk limits (global)
+risk:
+  max_concurrent_positions: 1
+  max_daily_trades: 50
+  max_daily_loss_pct: 3.0
+  max_total_exposure_pct: 100.0

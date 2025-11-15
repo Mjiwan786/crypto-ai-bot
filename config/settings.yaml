@@ -1,19 +1,44 @@
-# Global configuration settings (no secrets)
-mode: PAPER  # PAPER | LIVE
+# Minimal production configuration matching Pydantic schema exactly
+
+mode:
+  bot_mode: PAPER
+  enable_trading: false
+  live_trading_confirmation: ""
+
 logging:
   level: INFO
   dir: logs/
-  max_size_mb: 100
-  backup_count: 5
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+redis:
+  url: "${REDIS_URL}"
+  db: 0
+  client_name: "crypto-ai-bot"
+  decode_responses: true
+  streams:
+    md_trades: "md:trades"
+    md_spread: "md:spread"
+    md_book: "md:orderbook"
+    md_candles: "md:candles"
+    signals_paper: "signals:paper"
+    signals_live: "signals:live"
+    active_signals: "signals:paper"
+    events: "events:bus"
+
+exchange:
+  primary: "kraken"
 
 risk:
-  max_position_pct: 0.05
-  stop_loss_pct: 0.02
-  take_profit_pct: 0.04
-  max_daily_loss_pct: 0.10
-  max_concurrent_positions: 3
-  position_sizing_method: "fixed_percentage"  # fixed_percentage | kelly | volatility_adjusted
+  portfolio:
+    max_drawdown_pct: 25.0
+    max_single_position_notional_usd: 2000
+  notional_limits:
+    min_usd: 10.0
+    max_usd: 10000.0
+  compliance:
+    kill_switch: false
+    allowed_symbols: ["BTC/USD", "ETH/USD"]
+    banned_symbols: []
+    quote_currencies_allowed: ["USD"]
 
 strategies:
   allocations:
@@ -21,50 +46,14 @@ strategies:
     trend: 0.3
     mean_reversion: 0.2
     breakout: 0.1
-  rebalance_frequency: "daily"  # daily | weekly | monthly
-  min_allocation_pct: 0.05
-
-redis:
-  host: localhost
-  port: 6379
-  db: 0
-  password: null  # Will be loaded from .env
-  streams:
-    trades: "md:trades"
-    orderbook: "md:orderbook"
-    signals_paper: "signals:paper"
-    signals_live: "signals:live"
-    positions: "positions"
-    orders: "orders"
-  connection_pool_size: 10
-  socket_timeout: 5
-  socket_connect_timeout: 5
-
-kraken:
-  rest_url: "https://api.kraken.com"
-  ws_url: "wss://ws.kraken.com"
-  api_version: "0"
-  timeout: 30
-  retry_attempts: 3
-  retry_delay: 1.0
 
 monitoring:
-  metrics_enabled: true
-  prometheus_port: 9090
-  health_check_interval: 30
-  alert_thresholds:
-    max_drawdown_pct: 0.15
-    max_position_risk_pct: 0.08
-    min_balance_threshold: 1000
+  prometheus:
+    enabled: true
+    port: 9108
+  alerts:
+    level: "ERROR"
 
-data:
-  historical_data_dir: "data/historical"
-  real_time_data_dir: "data/realtime"
-  backup_enabled: true
-  backup_retention_days: 30
-
-performance:
-  enable_profiling: false
-  memory_limit_mb: 2048
-  cpu_limit_percent: 80
-  gc_threshold: 1000
+discord:
+  enabled: false
+  webhook_url: "https://discord.com/api/webhooks/disabled"

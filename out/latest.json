@@ -1,0 +1,14 @@
+{
+  "config": "LATEST (Current)",
+  "total_return_pct": -99.91,
+  "total_trades": 43,
+  "winning_trades": 12,
+  "losing_trades": 31,
+  "win_rate_pct": 27.9,
+  "profit_factor": 0.47,
+  "max_drawdown_pct": -100.0,
+  "sharpe_ratio": 4.41,
+  "avg_win": 1.77,
+  "avg_loss": -1.45,
+  "expectancy": -0.55
+}

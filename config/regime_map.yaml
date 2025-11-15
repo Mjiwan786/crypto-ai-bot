@@ -1,0 +1,277 @@
+# Regime Map Configuration
+# Defines strategy preferences and parameters per market regime
+
+version: "2.0"
+last_updated: "2025-11-08"
+
+# Regime Detection Thresholds
+detection:
+  # Volatility-based (Crypto VIX equivalent)
+  volatility:
+    low_threshold: 20      # VIX < 20 = low vol
+    normal_max: 40         # VIX 20-40 = normal
+    elevated_max: 60       # VIX 40-60 = elevated
+    high_max: 80           # VIX 60-80 = high
+    # VIX > 80 = extreme
+
+  # Trend Strength (0-1 scale)
+  trend:
+    strong_bull: 0.7       # Trend strength > 0.7 = strong bull
+    moderate_bull: 0.4     # 0.4-0.7 = moderate bull
+    moderate_bear: 0.3     # 0.3-0.4 = sideways
+    strong_bear: 0.0       # < 0.3 = bear
+
+  # Funding Rate (perp futures)
+  funding:
+    very_bullish: 0.0001   # > 0.01% per 8h
+    bullish: 0.00005       # 0.005% - 0.01%
+    neutral_min: -0.00005  # -0.005% to +0.005%
+    bearish: -0.0001       # -0.01% to -0.005%
+    # < -0.01% = very bearish
+
+# Regime Definitions
+regimes:
+  hyper_bull:
+    description: "Strong uptrend with high volatility and bullish funding"
+    conditions:
+      trend_strength: ">= 0.7"
+      volatility: ">= 40"
+      funding_rate: ">= 0.00005"
+
+    strategies:
+      primary:
+        - name: "trend_following"
+          weight: 0.6
+          config:
+            timeframe: "15s"
+            trigger_bps: 8.0      # Lower trigger for faster entries
+            sl_atr: 1.2           # Wider stops (let winners run)
+            tp_atr: 2.5           # Large targets
+
+        - name: "scalper_turbo"
+          weight: 0.4
+          config:
+            timeframe: "1m"
+            trigger_bps: 10.0
+            sl_atr: 0.8
+            tp_atr: 1.5
+
+      fallback:
+        - name: "momentum_strategy"
+          weight: 1.0
+
+  bull:
+    description: "Moderate uptrend with normal volatility"
+    conditions:
+      trend_strength: "0.4 - 0.7"
+      volatility: "20 - 60"
+      funding_rate: ">= 0"
+
+    strategies:
+      primary:
+        - name: "momentum_strategy"
+          weight: 0.5
+          config:
+            trigger_bps: 12.0
+            sl_atr: 1.0
+            tp_atr: 2.0
+
+        - name: "trend_following"
+          weight: 0.3
+          config:
+            trigger_bps: 15.0
+            sl_atr: 1.0
+            tp_atr: 2.2
+
+        - name: "bar_reaction_5m"
+          weight: 0.2
+          config:
+            mode: "trend"
+            trigger_bps: 12.0
+
+      fallback:
+        - name: "bar_reaction_5m"
+          weight: 1.0
+
+  bear:
+    description: "Downtrend - focus on mean reversion and shorts"
+    conditions:
+      trend_strength: "< 0.3"
+      funding_rate: "< 0"
+
+    strategies:
+      primary:
+        - name: "mean_reversion"
+          weight: 0.6
+          config:
+            rsi_oversold: 25      # Aggressive oversold level
+            rsi_overbought: 75
+            bb_deviation: 2.0
+            funding_skew_threshold: -0.00005  # Use funding as confirmation
+
+        - name: "breakout"
+          weight: 0.3
+          config:
+            breakout_threshold: 1.5  # Require strong breakout
+            volume_multiplier: 1.3
+
+        - name: "bar_reaction_5m"
+          weight: 0.1
+          config:
+            mode: "revert"        # Fade moves in bear market
+            trigger_bps: 15.0      # Higher threshold (less noise)
+
+      fallback:
+        - name: "mean_reversion"
+          weight: 1.0
+
+  sideways:
+    description: "Range-bound - focus on breakouts and grid"
+    conditions:
+      trend_strength: "0.3 - 0.4"
+      volatility: "< 40"
+
+    strategies:
+      primary:
+        - name: "breakout"
+          weight: 0.4
+          config:
+            breakout_threshold: 2.0  # Strong breakout required
+            volume_multiplier: 1.5
+
+        - name: "mean_reversion"
+          weight: 0.3
+          config:
+            rsi_oversold: 30
+            rsi_overbought: 70
+            bb_deviation: 2.5      # Wider bands for ranging
+
+        - name: "grid_hybrid"
+          weight: 0.3
+          config:
+            grid_levels: 5
+            grid_spacing_pct: 0.5   # 0.5% spacing between levels
+            range_detection_periods: 50
+
+      fallback:
+        - name: "bar_reaction_5m"
+          weight: 1.0
+          config:
+            mode: "trend"
+            trigger_bps: 8.0       # Lower for micro moves
+
+  extreme_volatility:
+    description: "Extreme volatility - reduce risk, tight stops"
+    conditions:
+      volatility: ">= 80"
+
+    strategies:
+      primary:
+        - name: "bar_reaction_5m"
+          weight: 0.7
+          config:
+            mode: "revert"
+            trigger_bps: 20.0      # Higher threshold (avoid whipsaws)
+            sl_atr: 0.6            # Tighter stops
+            tp_atr: 1.2            # Quick profits
+            risk_per_trade_pct: 0.3  # HALF normal risk
+
+        - name: "mean_reversion"
+          weight: 0.3
+          config:
+            rsi_oversold: 20       # Extreme levels only
+            rsi_overbought: 80
+
+      fallback: []  # In extreme vol, prefer to stand aside if primaries fail
+
+# Adaptive Blending Configuration
+adaptive_blending:
+  enabled: true
+  lookback_days: 90          # Use 90 days of performance data
+
+  # Performance metrics for weighting
+  metrics:
+    sharpe_weight: 0.4       # 40% weight to Sharpe ratio
+    profit_factor_weight: 0.4  # 40% weight to Profit Factor
+    win_rate_weight: 0.2     # 20% weight to Win Rate
+
+  # Performance thresholds
+  thresholds:
+    min_sharpe: 0.5          # Disable strategy if Sharpe < 0.5
+    min_profit_factor: 1.0   # Disable if PF < 1.0
+    min_trades: 10           # Need at least 10 trades to evaluate
+
+  # Adjustment factors
+  performance_multiplier:
+    excellent: 1.5           # Sharpe > 1.5, PF > 2.0
+    good: 1.2                # Sharpe > 1.0, PF > 1.5
+    average: 1.0             # Sharpe > 0.5, PF > 1.0
+    poor: 0.5                # Below average
+    disabled: 0.0            # Below thresholds
+
+# Regime Transition Handling
+transitions:
+  smoothing_enabled: true
+  smoothing_periods: 3       # Use 3 periods (15 min) to smooth regime changes
+
+  # During transitions, blend regimes
+  blend_mode: "weighted_average"  # Options: weighted_average, hard_switch
+
+  # Probability thresholds for regime classification
+  min_probability: 0.4       # Need 40% probability to activate regime
+  dominant_probability: 0.6  # Above 60% = dominant regime (full weight)
+
+# Performance Tracking
+performance_tracking:
+  enabled: true
+  update_frequency_minutes: 60  # Recalculate weights every hour
+  history_retention_days: 180   # Keep 180 days of performance history
+
+  # Redis keys for performance data
+  redis_keys:
+    performance_history: "regime:performance:history"
+    current_weights: "regime:weights:current"
+    regime_state: "regime:state:current"
+
+# Risk Management per Regime
+risk_management:
+  hyper_bull:
+    max_position_pct: 30      # Max 30% of capital per trade
+    max_concurrent_signals: 5
+    position_size_multiplier: 1.2  # 20% larger positions
+
+  bull:
+    max_position_pct: 25
+    max_concurrent_signals: 4
+    position_size_multiplier: 1.0  # Standard
+
+  bear:
+    max_position_pct: 15      # Smaller positions in bear
+    max_concurrent_signals: 3
+    position_size_multiplier: 0.7  # 30% smaller
+
+  sideways:
+    max_position_pct: 20
+    max_concurrent_signals: 4
+    position_size_multiplier: 1.0
+
+  extreme_volatility:
+    max_position_pct: 10      # Very small in extreme vol
+    max_concurrent_signals: 2
+    position_size_multiplier: 0.5  # 50% smaller
+
+# Logging and Monitoring
+logging:
+  log_regime_changes: true
+  log_weight_updates: true
+  log_performance_updates: true
+  log_strategy_selection: true
+
+# Feature Flags
+features:
+  enable_adaptive_blending: true
+  enable_performance_feedback: true
+  enable_regime_transitions: true
+  enable_risk_scaling: true
+  enable_whale_flow_detection: false  # TODO: Implement in Prompt 2
+  enable_sentiment_boost: false       # TODO: Implement in Prompt 2

@@ -1,0 +1,27 @@
+{
+  "name": "crypto-bot-data-room",
+  "version": "1.0.0",
+  "description": "Data room documentation for Crypto-AI-Bot SaaS platform",
+  "main": "scripts/build.mjs",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "clean": "rimraf out",
+    "preview": "live-server out"
+  },
+  "keywords": [
+    "crypto",
+    "trading",
+    "saas",
+    "data-room",
+    "documentation"
+  ],
+  "author": "Maith",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "md-to-pdf": "^5.2.4",
+    "rimraf": "^5.0.5",
+    "live-server": "^1.2.2"
+  }
+}

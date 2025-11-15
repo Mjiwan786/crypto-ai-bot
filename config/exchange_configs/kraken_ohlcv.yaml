@@ -41,6 +41,19 @@ timeframes:
 
   synthetic:
     # Sub-minute bars MUST derive from trades/ticks using time bucketing (no downsampling of 1m)
+    # 5s: ULTRA-LOW-LATENCY (feature flag gated for stability)
+    "5s":
+      derive_from: "trades"          # trades/ticks source
+      method: "time_bucket"
+      seconds: 5
+      redis_stream: "kraken:ohlc:5s"
+      buffer_size: 8000              # 40 seconds of data at 5s intervals
+      ml_features: false             # Too noisy for ML features
+      scalper_optimized: true
+      feature_flag: "${ENABLE_5S_BARS:false}"  # GATE: Enable only when infra is stable
+      latency_budget_ms: 50          # Ultra-strict latency requirement
+      min_trades_per_bucket: 3       # Quality filter: need at least 3 trades per 5s
+
     "15s":
       derive_from: "trades"          # trades/ticks source
       method: "time_bucket"
@@ -49,6 +62,9 @@ timeframes:
       buffer_size: 4000
       ml_features: true
       scalper_optimized: true
+      latency_budget_ms: 100         # Strict latency requirement
+      min_trades_per_bucket: 1       # At least 1 trade per 15s required
+
     "30s":
       derive_from: "trades"
       method: "time_bucket"
@@ -56,6 +72,7 @@ timeframes:
       redis_stream: "kraken:ohlc:30s"
       buffer_size: 3000
       ml_features: true
+      latency_budget_ms: 150
 
     # Coarser multi-minute bars are rollups of 1m
     "2m":
@@ -182,8 +199,9 @@ streams:
 
     consumer_groups:
       - name: "scalper_agents"
-        timeframes: ["15s", "30s", "1m"]
+        timeframes: ["5s", "15s", "30s", "1m"]  # 5s only consumed if ENABLE_5S_BARS=true
         lag_threshold_msgs: 5
+        max_latency_ms: 150  # E2E latency budget for scalpers
       - name: "trend_agents"
         timeframes: ["5m", "15m", "30m", "1h"]
         lag_threshold_msgs: 30
@@ -331,9 +349,11 @@ performance:
 # =============================================================================
 agent_integration:
   scalper_agent:
-    timeframes: ["15s", "30s", "1m"]
+    timeframes: ["5s", "15s", "30s", "1m"]  # 5s gated by ENABLE_5S_BARS env
     features: ["price_returns", "volume_ratio", "rsi_14", "macd"]
-    latency_target_ms: 50
+    latency_target_ms: 50           # Tick-to-signal latency
+    e2e_latency_target_ms: 150      # Full end-to-end budget (tick → signal → order)
+    max_trades_per_minute: "${SCALPER_MAX_TRADES_PER_MINUTE:4}"  # Tunable via env
 
   trend_agent:
     timeframes: ["5m", "15m", "30m", "1h"]

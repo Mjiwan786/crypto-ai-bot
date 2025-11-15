@@ -1,3 +1,5 @@
+from ai_engine.regime_detector.detector import RegimeTick
+
 def infer_regime(trend_strength: float, bb_width: float, sentiment: float) -> str:
     # tweak these thresholds later
     if trend_strength > 0.6 and sentiment >= 0:
@@ -5,3 +7,5 @@ def infer_regime(trend_strength: float, bb_width: float, sentiment: float) -> st
     if trend_strength < 0.35 and sentiment <= 0:
         return "bear"
     return "sideways"
+
+__all__ = ['infer_regime', 'RegimeTick']

@@ -1,0 +1,298 @@
+{
+  "dashboard": {
+    "title": "Maker-Only Execution Monitoring",
+    "description": "Monitor maker/taker ratio, spreads, rebates, and execution quality for maker-only trading strategy",
+    "tags": ["execution", "maker", "rebates", "spreads"],
+    "timezone": "utc",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Maker % (Real-time)",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "TS.MRANGE - - AGGREGATION avg 60000 FILTER type=fill",
+            "legendFormat": "Maker %",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 70, "color": "yellow" },
+                { "value": 90, "color": "green" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Total Rebates Earned (USD)",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "kraken:fills:*",
+            "legendFormat": "Rebates Earned",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "blue" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Spread Rejections",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "kraken:circuit_breaker:*",
+            "legendFormat": "Spread Rejections",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 10, "color": "yellow" },
+                { "value": 50, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Avg Queue Time (ms)",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "kraken:fills:*",
+            "legendFormat": "Avg Queue Time",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 5000, "color": "yellow" },
+                { "value": 10000, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Maker vs Taker Fills (Time Series)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "XRANGE kraken:fills:* - + COUNT 1000",
+            "legendFormat": "{{maker}}",
+            "refId": "E"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "maker=true" },
+              "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" }}]
+            },
+            {
+              "matcher": { "id": "byName", "options": "maker=false" },
+              "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" }}]
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Spread BPS Distribution",
+        "type": "histogram",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "XRANGE kraken:spread:* - + COUNT 1000",
+            "legendFormat": "Spread BPS",
+            "refId": "F"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Fill Rate by Symbol",
+        "type": "bargauge",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "XRANGE kraken:fills:* - + COUNT 1000",
+            "legendFormat": "{{symbol}}",
+            "refId": "G"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Execution Time Distribution",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "XRANGE kraken:fills:* - + COUNT 1000",
+            "legendFormat": "Execution Time",
+            "refId": "H"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Circuit Breaker Events",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "XREVRANGE kraken:circuit_breaker:* + - COUNT 100",
+            "refId": "I"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "ts": 0,
+                "pair": 1,
+                "event": 2,
+                "spread_bps": 3,
+                "threshold_bps": 4,
+                "action": 5
+              },
+              "renameByName": {
+                "ts": "Timestamp",
+                "pair": "Pair",
+                "event": "Event",
+                "spread_bps": "Spread (bps)",
+                "threshold_bps": "Threshold (bps)",
+                "action": "Action"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Rebates vs Fees (Cumulative)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 30 },
+        "targets": [
+          {
+            "datasource": "Redis",
+            "query": "XRANGE kraken:fills:* - + COUNT 10000",
+            "legendFormat": "{{maker}}",
+            "refId": "J"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10,
+              "stacking": {
+                "mode": "normal"
+              }
+            }
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "Rebates (maker=true)" },
+              "properties": [
+                { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" }},
+                { "id": "custom.transform", "value": "negative-Y" }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "Fees (maker=false)" },
+              "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" }}]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

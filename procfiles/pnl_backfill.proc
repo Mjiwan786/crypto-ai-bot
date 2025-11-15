@@ -1,0 +1,19 @@
+# PnL Backfill Process Configuration
+#
+# One-time process to backfill historical PnL data from fill files.
+# This should be run once before starting the aggregator for the first time.
+#
+# Usage:
+#   foreman run -f procfiles/pnl_backfill.proc pnl-backfill
+#   python scripts/backfill_pnl_from_fills.py --file data/fills/sample.csv
+#
+# Environment Variables (set in .env or export):
+#   REDIS_URL - Redis connection string (required)
+
+pnl-backfill: python scripts/backfill_pnl_from_fills.py --file data/fills/sample.csv --start-equity 10000
+
+# Optional: Force re-run (override marker)
+# pnl-backfill: python scripts/backfill_pnl_from_fills.py --file data/fills/sample.csv --start-equity 10000 --force
+
+# Optional: Dry run (preview only)
+# pnl-backfill: python scripts/backfill_pnl_from_fills.py --file data/fills/sample.csv --dry-run

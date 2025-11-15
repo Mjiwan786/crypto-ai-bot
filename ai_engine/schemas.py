@@ -699,6 +699,12 @@ def from_event_policy(e: Any) -> PolicyProposal:
 # PUBLIC API
 # =============================================================================
 
+# Import MarketSnapshot from events module and re-export for backward compatibility
+try:
+    from ai_engine.events import MarketSnapshotEvent as MarketSnapshot
+except ImportError:
+    MarketSnapshot = None  # Fallback if events module not available
+
 __all__ = [
     # Enums
     'Env', 'RegimeLabel', 'Side', 'DecisionAction',
@@ -727,7 +733,10 @@ __all__ = [
     'to_event', 'from_event_regime', 'to_event_decision', 'from_event_policy',
 
     # Exceptions
-    'SchemaValidationError'
+    'SchemaValidationError',
+
+    # Backward compatibility
+    'MarketSnapshot'
 ]
 
 # =============================================================================

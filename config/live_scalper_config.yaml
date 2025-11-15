@@ -1,0 +1,405 @@
+# Live Scalper Configuration with Safety Rails
+# Production-ready configuration for live trading
+
+# =============================================================================
+# MODE CONFIGURATION
+# =============================================================================
+mode:
+  # LIVE_MODE: Set to true for live trading, false for paper trading
+  # Requires: LIVE_TRADING_CONFIRMATION="I confirm live trading" in environment
+  live_mode: ${LIVE_MODE:false}
+
+  # Paper trading settings (when live_mode=false)
+  paper_trading:
+    enabled: true
+    initial_balance: 10000.0
+
+  # Live trading confirmation (required when live_mode=true)
+  live_trading_confirmation: "${LIVE_TRADING_CONFIRMATION:}"
+
+# =============================================================================
+# SAFETY RAILS (LIVE MODE)
+# =============================================================================
+safety_rails:
+  # Portfolio heat management
+  portfolio:
+    max_heat_pct: 75.0  # Maximum 75% portfolio heat
+    heat_reduction_threshold_pct: 70.0  # Start reducing positions at 70%
+    max_concurrent_positions: 5
+    max_correlated_positions: 2
+
+  # Daily risk limits
+  daily_limits:
+    max_loss_pct: -6.0  # Stop trading if daily loss exceeds -6%
+    profit_target_pct: 2.5  # Take profits at +2.5% daily gain
+    max_trades: 150
+    max_losing_trades_consecutive: 5
+
+  # Per-pair position limits (notional USD)
+  per_pair_limits:
+    BTC/USD:
+      max_notional: 5000.0
+      max_position_pct: 0.20  # 20% of portfolio
+    ETH/USD:
+      max_notional: 3000.0
+      max_position_pct: 0.15
+    SOL/USD:
+      max_notional: 2000.0
+      max_position_pct: 0.10
+    LINK/USD:
+      max_notional: 1500.0
+      max_position_pct: 0.08
+
+  # Emergency stops
+  emergency:
+    enabled: true
+    max_drawdown_pct: 10.0  # Hard stop at 10% drawdown
+    volatility_multiplier_max: 3.0  # Stop if volatility exceeds 3x normal
+    connection_timeout_sec: 10
+
+  # Validation (fail-fast on startup)
+  validation:
+    require_redis_connection: true
+    require_kraken_connection: true
+    require_sufficient_balance: true
+    min_balance_usd: 1000.0
+
+# =============================================================================
+# TRADING PAIRS & TIMEFRAMES
+# =============================================================================
+trading:
+  # Pairs to trade (will be validated on startup)
+  pairs:
+    - BTC/USD
+    - ETH/USD
+    - SOL/USD
+    - LINK/USD
+
+  # Timeframes for signal generation
+  timeframes:
+    primary: 15s  # Primary scalping timeframe
+    secondary: 1m  # Secondary confirmation timeframe
+    enable_5s_bars: false  # Ultra-fast bars (experimental)
+
+  # Order execution
+  execution:
+    order_type: limit  # limit, market, stop_limit
+    post_only: true  # Maker orders only
+    hidden_orders: false
+    max_slippage_bps: 4
+    fill_timeout_sec: 30
+
+# =============================================================================
+# SCALPER CONFIGURATION
+# =============================================================================
+scalper:
+  # Core parameters
+  target_bps: 12  # Target profit in basis points
+  stop_loss_bps: 18  # Stop loss in basis points
+  max_trades_per_minute: 4
+  cooldown_after_loss_seconds: 90
+  max_hold_seconds: 120
+
+  # Market quality filters
+  max_spread_bps: 3.0
+  min_liquidity_usd: 1000000.0
+  max_signal_latency_ms: 50
+  max_e2e_latency_ms: 150
+
+  # Dynamic sizing
+  dynamic_sizing:
+    enabled: true
+    base_risk_pct: 0.02  # 2% risk per trade
+    max_position_multiplier: 3.0
+    volatility_multiplier: 1.8
+
+  # High volatility mode
+  high_volatility:
+    enabled: true
+    atr_threshold_pct: 2.0
+    target_bps: 20  # Wider targets in high vol
+    stop_loss_bps: 25
+    size_multiplier: 0.8  # Reduce size in high vol
+
+# =============================================================================
+# STRATEGY ROUTER
+# =============================================================================
+strategy_router:
+  strategy_allocations:
+    scalper: 0.50
+    momentum: 0.20
+    breakout: 0.15
+    mean_reversion: 0.10
+    trend_following: 0.05
+
+  min_confidence: 0.65  # Minimum confidence to trade
+  high_confidence: 0.80  # High confidence threshold
+
+  # Regime adaptation
+  regime_adaptation:
+    enabled: true
+    update_interval_seconds: 300
+    confidence_threshold: 0.5
+
+# =============================================================================
+# RISK MANAGEMENT
+# =============================================================================
+risk:
+  # Position sizing
+  position_sizing:
+    method: dynamic_atr  # fixed, kelly, dynamic_atr
+    base_size_usd: 500.0
+    max_size_usd: 5000.0
+    min_size_usd: 50.0
+
+  # Stop loss management
+  stop_loss:
+    type: trailing  # fixed, trailing, dynamic
+    initial_distance_bps: 18
+    trail_distance_bps: 12
+    move_to_breakeven_at_pct: 0.5
+
+  # Take profit management
+  take_profit:
+    use_multiple_targets: true
+    targets:
+      - pct: 0.5
+        size_pct: 33
+      - pct: 1.0
+        size_pct: 33
+      - pct: 1.5
+        size_pct: 34
+
+  # Circuit breakers
+  circuit_breakers:
+    - trigger: 3_losses_in_row
+      action: reduce_size_50pct
+      duration_minutes: 30
+    - trigger: 5_losses_in_row
+      action: pause_trading
+      duration_minutes: 60
+    - trigger: daily_loss_6pct
+      action: stop_trading
+      duration_minutes: 1440  # Rest of day
+
+# =============================================================================
+# REDIS CONFIGURATION
+# =============================================================================
+redis:
+  # Connection (TLS required)
+  url: "${REDIS_URL}"
+  ca_cert_path: "config/certs/redis_ca.pem"
+  connection_timeout: 10
+  socket_timeout: 5
+  retry_on_timeout: true
+  max_retries: 3
+
+  # Streams
+  streams:
+    # Market data
+    md_trades: "md:trades"
+    md_spread: "md:spread"
+    md_orderbook: "md:orderbook"
+    md_candles: "md:candles"
+
+    # Signals
+    signals_live: "signals:live:{pair}"  # Per-pair sharding
+    signals_paper: "signals:paper:{pair}"
+
+    # Risk & monitoring
+    positions: "positions:live"
+    risk_events: "risk:events"
+    daily_pnl: "metrics:daily_pnl"
+    heartbeat: "ops:heartbeat"
+
+  # Stream trimming (MAXLEN ~)
+  stream_maxlen:
+    market_data: 10000
+    signals: 10000
+    risk_events: 1000
+
+  # Publishing
+  publish_signals: true
+  publish_metrics: true
+  metrics_interval_sec: 60
+
+# =============================================================================
+# KRAKEN CONFIGURATION
+# =============================================================================
+kraken:
+  # API credentials (from environment)
+  api_key: "${KRAKEN_API_KEY}"
+  api_secret: "${KRAKEN_API_SECRET}"
+
+  # WebSocket configuration
+  websocket:
+    url: "wss://ws.kraken.com"
+    heartbeat_interval: 30
+    reconnect_interval: 5
+    max_reconnect_attempts: 10
+
+  # REST API
+  rest:
+    url: "https://api.kraken.com"
+    timeout: 10
+    rate_limit_per_minute: 60
+
+  # Validation
+  require_connection: true
+  validate_pairs: true
+  check_balance: true
+
+# =============================================================================
+# LOGGING & MONITORING
+# =============================================================================
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  # Log files
+  files:
+    main: "logs/live_scalper.log"
+    trades: "logs/live_scalper_trades.log"
+    risk: "logs/live_scalper_risk.log"
+    audit: "logs/live_scalper_audit.log"
+
+  # Rotation
+  rotation:
+    max_size_mb: 100
+    backup_count: 30
+
+  # Startup summary
+  startup_summary:
+    enabled: true
+    log_level: INFO
+    include_config: true
+
+# =============================================================================
+# MONITORING & ALERTS
+# =============================================================================
+monitoring:
+  # Health endpoint
+  health:
+    enabled: true
+    port: 8080
+    path: /health
+
+  # Prometheus metrics
+  prometheus:
+    enabled: true
+    port: 9108
+
+  # Signal queue configuration
+  queue_max_size: 1000  # Maximum signals in queue before backpressure
+  heartbeat_interval_sec: 15.0  # Heartbeat emission interval (seconds)
+
+  # Freshness thresholds
+  freshness:
+    clock_drift_threshold_ms: 2000  # Warn if clock drift > 2s
+    stale_signal_threshold_ms: 5000  # Warn if signal age > 5s
+
+  # Metrics to track
+  metrics:
+    - signals_generated_total
+    - signals_enqueued_total
+    - signals_published_total
+    - signals_shed_total
+    - trades_executed_total
+    - pnl_realized_usd
+    - daily_pnl_pct
+    - portfolio_heat_pct
+    - positions_open_count
+    - queue_depth
+    - queue_utilization_pct
+    - safety_rails_triggered_total
+    - latency_e2e_ms
+
+  # Alerts
+  alerts:
+    enabled: true
+    channels:
+      - console
+      - log
+      - redis
+
+    conditions:
+      - type: daily_loss
+        threshold: -3.0
+        severity: warning
+      - type: daily_loss
+        threshold: -5.0
+        severity: critical
+      - type: portfolio_heat
+        threshold: 70.0
+        severity: warning
+      - type: consecutive_losses
+        threshold: 4
+        severity: warning
+
+# =============================================================================
+# PREFLIGHT CHECKS (FAIL-FAST)
+# =============================================================================
+preflight:
+  enabled: true
+  checks:
+    - name: redis_connection
+      required: true
+      timeout_sec: 10
+
+    - name: redis_tls
+      required: true
+      timeout_sec: 5
+
+    - name: kraken_wss
+      required: true
+      timeout_sec: 15
+
+    - name: kraken_rest
+      required: true
+      timeout_sec: 10
+
+    - name: kraken_balance
+      required: true
+      min_balance_usd: 1000.0
+
+    - name: trading_pairs
+      required: true
+      validate_each: true
+
+    - name: safety_rails
+      required: true
+      validate_config: true
+
+    - name: live_mode_confirmation
+      required_if_live: true
+      expected_value: "I confirm live trading"
+
+  # Fail behavior
+  on_failure:
+    action: exit  # exit, continue, degrade
+    log_level: CRITICAL
+    alert: true
+
+# =============================================================================
+# STARTUP SUMMARY
+# =============================================================================
+startup_summary:
+  enabled: true
+  sections:
+    - mode  # live/paper
+    - pairs  # Trading pairs
+    - timeframes  # 15s, 1m, etc.
+    - risk_limits  # Daily stop, target, heat
+    - position_limits  # Per-pair notional caps
+    - redis_config  # Stream keys
+    - safety_rails  # Enabled rails
+    - preflight_status  # Check results
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  version: "1.0.0"
+  created: "2025-01-11"
+  description: "Live scalper configuration with comprehensive safety rails"
+  maintainer: "Engineering Team"

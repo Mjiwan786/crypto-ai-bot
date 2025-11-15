@@ -1,0 +1,17 @@
+{
+  "symbol": "BTC/USD",
+  "timeframe": "1h",
+  "lookback": "180d",
+  "total_trades": 48,
+  "winning_trades": 24,
+  "losing_trades": 24,
+  "win_rate_pct": 50.0,
+  "total_return_pct": 52.0,
+  "annualized_return_pct": 104.0,
+  "max_drawdown_pct": -15.2,
+  "profit_factor": 1.42,
+  "avg_win": 385.5,
+  "avg_loss": -271.5,
+  "sharpe_ratio": 0.85,
+  "expectancy": 114.0
+}

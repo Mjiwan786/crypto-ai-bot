@@ -1,0 +1,16 @@
+{
+  "lookback": "540d",
+  "assets": [
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD"
+  ],
+  "threshold": 0.65,
+  "total_trades": 68,
+  "win_rate_pct": 52.9,
+  "profit_factor": 1.68,
+  "max_drawdown_pct": -15.4,
+  "monthly_roi_pct": 0.78,
+  "sharpe_ratio": 0.85,
+  "note": "Initial run shows degradation, ROI below threshold"
+}

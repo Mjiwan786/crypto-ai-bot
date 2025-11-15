@@ -1,0 +1,50 @@
+# Dynamic Position Sizing Configuration
+# Production-safe adaptive position sizing with controlled aggression
+
+dynamic_sizing:
+  # Enable/disable dynamic sizing (set false to use fixed sizing)
+  enabled: true
+
+  # Base risk levels (% of equity)
+  base_risk_pct_small: 1.5  # When equity < $15k (more aggressive to grow)
+  base_risk_pct_large: 1.0  # When equity >= $15k (more conservative)
+  equity_threshold_usd: 15000.0  # Threshold for risk tier
+
+  # Win streak boost (confidence building)
+  streak_boost_pct: 0.2  # +0.2% per consecutive win
+  max_streak_boost_pct: 1.0  # Cap at +1.0% (NOT 2.5%, safety first!)
+  max_streak_count: 5  # Stop counting after 5 consecutive wins
+
+  # Volatility adjustment (market conditions)
+  high_vol_multiplier: 0.8  # Reduce to 80% size in high volatility
+  normal_vol_multiplier: 1.0  # Normal size in calm markets
+  high_vol_threshold_atr_pct: 2.0  # ATR% threshold (2.0% = high vol)
+
+  # Portfolio heat limiter (emergency brake)
+  portfolio_heat_threshold_pct: 80.0  # Emergency threshold (% of equity at risk)
+  portfolio_heat_cut_multiplier: 0.5  # Force 50% size reduction when breached
+
+  # Absolute safety limits (circuit breakers)
+  min_position_size_multiplier: 0.1  # Never go below 10% of base size
+  max_position_size_multiplier: 3.0  # Never exceed 3x base size (hard cap)
+
+  # Runtime override support (for live tuning via Redis/MCP)
+  allow_runtime_overrides: true  # Enable hot config changes
+  override_expiry_seconds: 3600  # Overrides expire after 1 hour (safety)
+
+# Integration settings
+integration:
+  # Apply to these strategies
+  apply_to_strategies:
+    - "scalper"
+    - "bar_reaction_5m"
+    - "momentum"
+
+  # Skip dynamic sizing for these (use fixed)
+  skip_strategies:
+    - "mean_reversion"  # Example: conservative strategy
+
+  # Monitoring
+  log_sizing_decisions: true  # Log every size calculation
+  publish_metrics_to_redis: true  # Publish sizing metrics to Redis streams
+  metrics_publish_interval_seconds: 60  # Publish every 60 seconds

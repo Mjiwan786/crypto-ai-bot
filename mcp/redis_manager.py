@@ -126,7 +126,23 @@ class RedisConfig:
         self.url = url or os.getenv("REDIS_URL", "")
         self.ssl = ssl
         self.ssl_verify = ssl_verify
-        self.ca_cert = ca_cert
+        # Auto-detect CA cert for Redis Cloud
+        if ca_cert:
+            self.ca_cert = ca_cert
+        else:
+            # Try environment variable first
+            env_cert = os.getenv("REDIS_CA_CERT")
+            if env_cert and os.path.exists(env_cert):
+                self.ca_cert = env_cert
+            # Fall back to default location if URL is Redis Cloud
+            elif self.url and "redis-cloud.com" in self.url:
+                default_cert = "config/certs/redis_ca.pem"
+                if os.path.exists(default_cert):
+                    self.ca_cert = default_cert
+                else:
+                    self.ca_cert = None
+            else:
+                self.ca_cert = None
         self.health_check_interval = health_check_interval
         self.client_name = client_name
         self.connection_pool_size = connection_pool_size
@@ -369,10 +385,23 @@ class RedisManager(BaseRedisManager):
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
-    def connect(self) -> None:
-        """Establish Redis connection with production settings."""
+    def connect(self) -> bool:
+        """
+        Establish Redis connection with production settings.
+
+        IMPORTANT: This method NEVER raises exceptions. It always returns a success boolean.
+        If Redis is unavailable, logs warnings and returns False.
+
+        Returns:
+            True if connected successfully, False otherwise
+        """
         if not self.config.url:
-            raise RedisConnectionError("Redis URL not configured")
+            self.logger.warning("⚠️ Redis URL not configured - app will start anyway")
+            return False
+
+        max_retries = self.config.reconnect_retries
+        delay = self.config.reconnect_initial_delay
+        last_error = None
 
         redis_kwargs = {
             "decode_responses": False,
@@ -385,47 +414,64 @@ class RedisManager(BaseRedisManager):
             "max_connections": self.config.connection_pool_size,
         }
 
-        # Redis Cloud direct host form
-        if "redis-cloud.com" in self.config.url:
-            parsed = urlparse(self.config.url)
-            redis_kwargs.update({
-                "host": parsed.hostname,
-                "port": parsed.port or 6379,
-                "username": parsed.username or "default",
-                "password": parsed.password,
-                "ssl": self.config.ssl,
-                "ssl_cert_reqs": ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE,
-            })
-            if self.config.ca_cert:
-                redis_kwargs["ssl_ca_certs"] = self.config.ca_cert
-            self.client = redis.Redis(**redis_kwargs)
-        else:
-            # Standard URL; normalize to rediss if SSL requested
-            url = self.config.url
-            if self.config.ssl and url.startswith("redis://"):
-                url = url.replace("redis://", "rediss://", 1)
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Redis Cloud direct host form
+                if "redis-cloud.com" in self.config.url:
+                    parsed = urlparse(self.config.url)
+                    redis_kwargs.update({
+                        "host": parsed.hostname,
+                        "port": parsed.port or 6379,
+                        "username": parsed.username or "default",
+                        "password": parsed.password,
+                        "ssl": self.config.ssl,
+                        "ssl_cert_reqs": ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE,
+                    })
+                    if self.config.ca_cert:
+                        redis_kwargs["ssl_ca_certs"] = self.config.ca_cert
+                    self.client = redis.Redis(**redis_kwargs)
+                else:
+                    # Standard URL; normalize to rediss if SSL requested
+                    url = self.config.url
+                    if self.config.ssl and url.startswith("redis://"):
+                        url = url.replace("redis://", "rediss://", 1)
 
-            extra_ssl = {}
-            if self.config.ssl:
-                extra_ssl["ssl_cert_reqs"] = ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE
-                if self.config.ca_cert:
-                    extra_ssl["ssl_ca_certs"] = self.config.ca_cert
+                    extra_ssl = {}
+                    if self.config.ssl:
+                        extra_ssl["ssl_cert_reqs"] = ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE
+                        if self.config.ca_cert:
+                            extra_ssl["ssl_ca_certs"] = self.config.ca_cert
 
-            self.client = redis.from_url(url, **redis_kwargs, **extra_ssl)
+                    self.client = redis.from_url(url, **redis_kwargs, **extra_ssl)
 
-        # Test connection
-        try:
-            self.client.ping()
-            safe_url = (
-                f"{parsed.scheme}://{parsed.hostname}:{parsed.port or 6379}"
-                if "redis-cloud.com" in self.config.url
-                else (self.config.url.split("@")[-1] if "@" in self.config.url else self.config.url)
-            )
-            self.logger.info(f"✅ Connected to Redis: {safe_url}")
-        except Exception as e:
-            self.circuit_breaker.on_failure(e)
-            raise RedisConnectionError(f"Failed to connect to Redis: {e}")
-        self.circuit_breaker.on_success()
+                # Test connection
+                self.client.ping()
+                safe_url = (
+                    f"{parsed.scheme}://{parsed.hostname}:{parsed.port or 6379}"
+                    if "redis-cloud.com" in self.config.url
+                    else (self.config.url.split("@")[-1] if "@" in self.config.url else self.config.url)
+                )
+                self.logger.info(f"✅ Connected to Redis on attempt {attempt}/{max_retries}: {safe_url}")
+                self.circuit_breaker.on_success()
+                return True
+
+            except Exception as e:
+                last_error = str(e)
+                self.logger.warning(f"Redis connection failed on attempt {attempt}/{max_retries}: {e}")
+                self.circuit_breaker.on_failure(e)
+
+            # Exponential backoff with cap at max_delay
+            if attempt < max_retries:
+                backoff = min(delay * (2 ** (attempt - 1)), self.config.reconnect_max_delay)
+                self.logger.debug(f"Retrying in {backoff:.1f}s...")
+                time.sleep(backoff)
+
+        # All retries exhausted
+        self.logger.warning(
+            f"⚠️ Redis unavailable after {max_retries} attempts. Last error: {last_error}\n"
+            f"   App will start anyway. Routes/components will degrade gracefully."
+        )
+        return False
 
     def close(self) -> None:
         """Close Redis connection."""
@@ -712,10 +758,22 @@ class AsyncRedisManager(BaseRedisManager):
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.aclose()
 
-    async def aconnect(self) -> None:
-        """Establish async Redis connection."""
+    async def aconnect(self) -> bool:
+        """
+        Establish async Redis connection with retry and exponential backoff.
+
+        IMPORTANT: This method NEVER raises exceptions. It always returns a success boolean.
+        If Redis is unavailable, logs warnings and returns False.
+
+        Returns:
+            True if connected successfully, False otherwise
+        """
         if not self.config.url:
-            raise RedisConnectionError("Redis URL not configured")
+            self.logger.warning("⚠️ Redis URL not configured - app will start anyway")
+            return False
+
+        max_retries = self.config.reconnect_retries
+        delay = self.config.reconnect_initial_delay
 
         redis_kwargs = {
             "decode_responses": False,
@@ -728,49 +786,86 @@ class AsyncRedisManager(BaseRedisManager):
             "max_connections": self.config.connection_pool_size,
         }
 
-        if "redis-cloud.com" in self.config.url:
-            parsed = urlparse(self.config.url)
-            redis_kwargs.update({
-                "host": parsed.hostname,
-                "port": parsed.port or 6379,
-                "username": parsed.username or "default",
-                "password": parsed.password,
-                "ssl": self.config.ssl,
-                "ssl_cert_reqs": ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE,
-            })
-            if self.config.ca_cert:
-                redis_kwargs["ssl_ca_certs"] = self.config.ca_cert
-            self.client = redis.asyncio.Redis(**redis_kwargs)
-        else:
-            # Normalize to rediss if SSL requested
-            url = self.config.url
-            if self.config.ssl and url.startswith("redis://"):
-                url = url.replace("redis://", "rediss://", 1)
+        last_error = None
 
-            extra_ssl = {}
-            if self.config.ssl:
-                extra_ssl["ssl_cert_reqs"] = ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE
-                if self.config.ca_cert:
-                    extra_ssl["ssl_ca_certs"] = self.config.ca_cert
+        for attempt in range(1, max_retries + 1):
+            try:
+                if "redis-cloud.com" in self.config.url or self.config.url.startswith("rediss://"):
+                    # Use from_url with SSL parameters (avoid RedisSSLContext)
+                    extra_kwargs = {}
+                    if self.config.ssl:
+                        extra_kwargs["ssl_cert_reqs"] = "required" if self.config.ssl_verify else "none"
+                        if self.config.ca_cert and os.path.exists(self.config.ca_cert):
+                            extra_kwargs["ssl_ca_certs"] = self.config.ca_cert
+                            self.logger.debug(f"Using CA certificate from {self.config.ca_cert}")
 
-            self.client = redis.asyncio.from_url(url, **redis_kwargs, **extra_ssl)
+                    self.client = redis.asyncio.from_url(
+                        self.config.url,
+                        decode_responses=redis_kwargs["decode_responses"],
+                        socket_timeout=redis_kwargs["socket_timeout"],
+                        socket_connect_timeout=redis_kwargs["socket_connect_timeout"],
+                        socket_keepalive=redis_kwargs["socket_keepalive"],
+                        health_check_interval=redis_kwargs["health_check_interval"],
+                        client_name=redis_kwargs["client_name"],
+                        retry_on_timeout=redis_kwargs["retry_on_timeout"],
+                        max_connections=redis_kwargs["max_connections"],
+                        **extra_kwargs,
+                    )
+                else:
+                    # Normalize to rediss if SSL requested
+                    url = self.config.url
+                    if self.config.ssl and url.startswith("redis://"):
+                        url = url.replace("redis://", "rediss://", 1)
 
-        # Test connection
-        try:
-            await self.client.ping()
-            safe_url = (
-                f"{parsed.scheme}://{parsed.hostname}:{parsed.port or 6379}"
-                if "redis-cloud.com" in self.config.url
-                else (self.config.url.split("@")[-1] if "@" in self.config.url else self.config.url)
-            )
-            self.logger.info(f"✅ Connected to Redis (async): {safe_url}")
-            self._running = True
-            if self.config.health_check_interval > 0:
-                self._health_task = asyncio.create_task(self._health_monitor())
-        except Exception as e:
-            self.circuit_breaker.on_failure(e)
-            raise RedisConnectionError(f"Failed to connect to Redis: {e}")
-        self.circuit_breaker.on_success()
+                    extra_ssl = {}
+                    if self.config.ssl:
+                        extra_ssl["ssl_cert_reqs"] = ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE
+                        if self.config.ca_cert:
+                            extra_ssl["ssl_ca_certs"] = self.config.ca_cert
+
+                    self.client = redis.asyncio.from_url(url, **redis_kwargs, **extra_ssl)
+
+                # Test connection with timeout
+                await asyncio.wait_for(self.client.ping(), timeout=3.0)
+
+                # Create safe URL for logging (hide password)
+                parsed = urlparse(self.config.url)
+                if parsed.password:
+                    safe_url = f"{parsed.scheme}://{parsed.username or 'default'}:***@{parsed.hostname}:{parsed.port or 6379}"
+                else:
+                    safe_url = self.config.url.split("@")[-1] if "@" in self.config.url else self.config.url
+                self.logger.info(f"✅ Connected to Redis (async) on attempt {attempt}/{max_retries}: {safe_url}")
+
+                self._running = True
+                if self.config.health_check_interval > 0:
+                    self._health_task = asyncio.create_task(self._health_monitor())
+
+                self.circuit_breaker.on_success()
+                return True
+
+            except asyncio.TimeoutError:
+                last_error = "Connection timeout (3s)"
+                self.logger.warning(f"Redis connection timeout on attempt {attempt}/{max_retries}")
+                self.circuit_breaker.on_failure(Exception(last_error))
+
+            except Exception as e:
+                last_error = str(e)
+                self.logger.warning(f"Redis connection failed on attempt {attempt}/{max_retries}: {e}")
+                self.circuit_breaker.on_failure(e)
+
+            # Exponential backoff with cap at max_delay
+            if attempt < max_retries:
+                backoff = min(delay * (2 ** (attempt - 1)), self.config.reconnect_max_delay)
+                self.logger.debug(f"Retrying in {backoff:.1f}s...")
+                await asyncio.sleep(backoff)
+
+        # All retries exhausted
+        self._running = False
+        self.logger.warning(
+            f"⚠️ Redis unavailable after {max_retries} attempts. Last error: {last_error}\n"
+            f"   App will start anyway. Routes/components will degrade gracefully."
+        )
+        return False
 
     async def aclose(self) -> None:
         """Close async Redis connection."""

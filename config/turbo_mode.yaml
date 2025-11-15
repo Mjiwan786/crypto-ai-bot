@@ -1,0 +1,351 @@
+# TURBO MODE CONFIGURATION - Aggressive Growth Strategy
+# WARNING: Higher risk, higher reward. Use with caution.
+
+mode: PAPER  # PAPER | LIVE
+
+# ===================================================================
+# 1. AGGRESSIVE POSITION SIZING (1.5-2.5% risk)
+# ===================================================================
+risk:
+  # Progressive position sizing with win streak bonuses
+  max_position_pct: 0.08  # Up from 0.05 (8% max position size)
+  stop_loss_pct: 0.015    # 1.5% stop loss (tighter for faster exits)
+  take_profit_pct: 0.06   # 6% take profit (doubled from 4%)
+  max_concurrent_positions: 5  # Up from 3 (more opportunities)
+  position_sizing_method: "volatility_adjusted"
+  risk_per_trade_pct: 1.5  # Base: 1.5% (up from 0.8%)
+
+  # Win streak bonus scaling
+  win_streak_bonus_pct: 0.2  # Add 0.2% per win (max 5 wins = +1%)
+  max_win_streak_bonus: 1.0  # Cap at +1% (total 2.5% max risk)
+
+  # Volatility adjustments
+  high_vol_multiplier: 0.8   # Reduce 20% in high volatility
+  low_vol_multiplier: 1.2    # Increase 20% in low volatility
+
+  # ===================================================================
+  # 9. AGGRESSIVE RISK MANAGEMENT
+  # ===================================================================
+  # Daily limits (expanded)
+  day_max_drawdown_pct: 7.0        # Up from 4% (give more room)
+  daily_profit_target_pct: 4.0     # Target: +4% per day
+  rolling_max_drawdown_pct: 15.0   # 30-day max DD (up from 12%)
+  max_consecutive_losses: 4         # Up from 3 (more tolerance)
+  cooldown_after_losses_s: 1800    # 30 min (down from 1 hour)
+
+  # Risk scaling bands (more aggressive)
+  scale_bands:
+    - threshold_pct: -2.0   # At -2% DD, scale to 85%
+      multiplier: 0.85
+    - threshold_pct: -4.0   # At -4% DD, scale to 65%
+      multiplier: 0.65
+    - threshold_pct: -6.0   # At -6% DD, scale to 40%
+      multiplier: 0.40
+
+  # Rolling window monitoring (more lenient)
+  rolling_windows:
+    - window_s: 3600       # 1 hour window, -2% limit
+      limit_pct: -2.0
+    - window_s: 14400      # 4 hour window, -3% limit
+      limit_pct: -3.0
+    - window_s: 2592000    # 30 day window, -15% limit
+      limit_pct: -15.0
+
+  # Cooldown periods (shorter recovery times)
+  cooldown_after_soft_s: 300   # 5 min (down from 10 min)
+  cooldown_after_hard_s: 900   # 15 min (down from 30 min)
+
+  # 10. Portfolio Heat Management
+  max_portfolio_heat_pct: 80.0  # Max total exposure
+  sharpe_threshold_1h: 0.5      # Revert to conservative if below
+  auto_reduce_enabled: true
+
+# ===================================================================
+# 2. SCALPER TURBO MODE (5s timeframe, 15-20bps targets)
+# ===================================================================
+scalper:
+  enabled: true
+  timeframe_seconds: 5        # Down from 15s (faster execution)
+
+  # Target gains (basis points)
+  target_bps_low_vol: 15      # 0.15% in low volatility
+  target_bps_high_vol: 20     # 0.20% in high volatility
+  target_bps_extreme_vol: 25  # 0.25% during spikes
+
+  # Max trades per minute
+  max_trades_per_minute: 8    # Up from default (during momentum)
+  max_trades_per_minute_base: 4  # Normal conditions
+
+  # Pairs allocation
+  primary_pairs:  # 60% allocation
+    - BTC/USD
+    - ETH/USD
+
+  momentum_pairs:  # 30% allocation (high-momentum altcoins)
+    - SOL/USD
+    - MATIC/USD
+    - LINK/USD
+    - AVAX/USD
+
+  opportunistic_pairs:  # 10% allocation (add if available)
+    - DOT/USD
+    - NEAR/USD
+    - ATOM/USD
+
+  # Entry/exit speed
+  maker_only: false  # Allow taker orders for speed
+  max_slippage_bps: 3  # Accept up to 3bps slippage
+  spread_bps_cap: 15.0  # Wider spread tolerance
+
+# ===================================================================
+# 3 & 4. AI MODEL ENHANCEMENTS & REGIME DETECTION
+# ===================================================================
+ai_models:
+  # Enhanced feature set
+  turbo_features_enabled: true
+
+  features:
+    # Core features
+    - price_momentum
+    - volume_profile
+    - orderbook_imbalance
+
+    # Turbo features
+    - liquidations_imbalance      # Binance futures liquidations
+    - perp_funding_rate_arb       # Funding rate momentum
+    - whale_flow_detection        # Large block trades (>$100k)
+    - social_sentiment_spike      # Twitter/Reddit momentum (5min lag)
+    - exchange_flow_imbalance     # Net exchange deposits/withdrawals
+    - volatility_regime_shift     # Detect volatility breakouts
+
+  # Model confidence thresholds
+  min_confidence: 0.55     # Down from 0.65 (take more signals)
+  high_confidence: 0.75    # Boost size at this level
+  confidence_size_multiplier: 1.3  # 30% larger positions
+
+# Regime detection with turbo modes
+regime:
+  detection_interval_seconds: 60  # Check every minute
+
+  # 4. Enhanced regime types
+  regimes:
+    hyper_bull:
+      detection_criteria:
+        - momentum_score > 0.85
+        - volume_surge > 2.0x
+        - breakout_confirmed: true
+      position_size_multiplier: 1.20  # +20% size
+      target_bps: 18
+      allowed_strategies: ["trend", "momentum", "breakout"]
+      max_holding_time_s: 300
+
+    bull_momentum:
+      detection_criteria:
+        - momentum_score > 0.65
+        - trend_strength > 0.6
+      position_size_multiplier: 1.15  # +15% size
+      target_bps: 15
+      allowed_strategies: ["trend", "momentum", "scalper"]
+      max_holding_time_s: 600
+
+    sideways_compression:
+      detection_criteria:
+        - volatility < 0.4
+        - range_bound: true
+      position_size_multiplier: 0.90  # -10% size
+      target_bps: 12
+      allowed_strategies: ["range_grid", "mean_reversion", "breakout_prep"]
+      max_holding_time_s: 900
+
+    bear_momentum:
+      detection_criteria:
+        - momentum_score < -0.6
+        - selling_pressure > 0.7
+      position_size_multiplier: 0.90  # -10% size
+      target_bps: 12
+      allowed_strategies: ["mean_reversion", "scalper"]
+      short_bias: true
+      max_holding_time_s: 300
+
+    panic_sell:
+      detection_criteria:
+        - momentum_score < -0.85
+        - liquidation_cascade: true
+      position_size_multiplier: 0.50  # -50% size
+      target_bps: 8
+      allowed_strategies: ["scalper_btc_only"]
+      disable_trend: true
+      max_holding_time_s: 120
+
+# ===================================================================
+# 5. MULTI-EXCHANGE SUPPORT (Future: Binance integration)
+# ===================================================================
+exchanges:
+  primary: "kraken"
+  secondary: "binance"  # Coming soon
+
+  arbitrage:
+    enabled: false  # Enable when Binance is configured
+    min_edge_bps: 30   # 0.3% minimum arbitrage opportunity
+    max_edge_bps: 80   # 0.8% max expected edge
+    include_funding_rate: true
+
+  failover:
+    enabled: true
+    switch_on_downtime: true
+    max_downtime_seconds: 30
+
+# ===================================================================
+# 6. NEWS CATALYST OVERRIDE
+# ===================================================================
+news_catalyst:
+  enabled: true  # Enable news-based overrides
+
+  api_sources:
+    - cryptopanic
+    - coindesk
+    - twitter_crypto_alerts
+
+  sentiment_threshold: 0.7  # Require 70% positive sentiment
+
+  major_news_override:
+    disable_stop_losses: true    # Remove stops during major news
+    position_size_multiplier: 2.0  # Double position size
+    extend_hold_time_s: 300      # Hold for 5 minutes
+
+  news_types:
+    major_upgrade: { weight: 1.5, hold_time_s: 600 }
+    exchange_listing: { weight: 1.8, hold_time_s: 300 }
+    partnership: { weight: 1.3, hold_time_s: 300 }
+    regulation: { weight: 1.2, hold_time_s: 180 }
+
+# ===================================================================
+# 7. PRE-SCHEDULED EVENT TRADING
+# ===================================================================
+scheduled_events:
+  enabled: true
+
+  fed_announcements:
+    pre_event_seconds: 60        # Stop trading 60s before
+    post_event_delay_seconds: 10  # Resume 10s after
+    post_event_size_multiplier: 1.5  # Max size on momentum
+    duration_seconds: 300
+
+  coinbase_listings:
+    front_run_enabled: true  # Position before listing
+    allocation_pct: 5.0      # 5% of portfolio
+    hold_time_s: 3600        # Hold for 1 hour
+    exit_on_news: true       # Sell the news
+
+  major_upgrades:
+    pre_position_hours: 24   # Enter 24h before
+    allocation_pct: 3.0      # 3% of portfolio
+    exit_strategy: "trailing_stop"  # Trail the move
+    trail_distance_pct: 2.0
+
+# ===================================================================
+# 8. OVERNIGHT GAP STRATEGY (00:00-04:00 UTC)
+# ===================================================================
+overnight:
+  enabled: true
+  asian_session_hours: [0, 4]  # UTC hours
+
+  conditions:
+    low_volume_threshold: 0.3    # 30% of normal volume
+    momentum_threshold: 0.6      # Moderate momentum required
+
+  parameters:
+    leverage_multiplier: 1.5     # Simulate 1.5x leverage via sizing
+    target_pct: 3.0              # Aim for 3% moves
+    stop_loss_pct: 1.5           # Tighter stop
+    max_holding_time_s: 14400    # 4 hours max
+
+# ===================================================================
+# MICROSTRUCTURE (Updated for turbo mode)
+# ===================================================================
+microstructure:
+  default_min_notional_1m_usd: 30000.0   # More lenient (was 50k)
+  default_max_spread_bps: 15.0           # Wider spreads OK (was 10)
+  default_max_depth_imbalance: 0.75      # More imbalance OK (was 0.7)
+  notional_window_seconds: 60
+
+  pair_configs:
+    BTC/USD:
+      min_notional_1m_usd: 80000.0   # Slightly lower (was 100k)
+      max_spread_bps: 6.0
+      max_depth_imbalance: 0.70
+    ETH/USD:
+      min_notional_1m_usd: 50000.0   # Lower (was 75k)
+      max_spread_bps: 10.0
+      max_depth_imbalance: 0.75
+    SOL/USD:
+      min_notional_1m_usd: 25000.0
+      max_spread_bps: 12.0
+      max_depth_imbalance: 0.75
+    MATIC/USD:
+      min_notional_1m_usd: 15000.0
+      max_spread_bps: 15.0
+      max_depth_imbalance: 0.80
+
+# ===================================================================
+# STRATEGIES ALLOCATION
+# ===================================================================
+strategies:
+  allocations:
+    scalper: 0.50      # Increased from 0.4 (main driver)
+    trend: 0.25        # Reduced from 0.3
+    momentum: 0.15     # New strategy
+    mean_reversion: 0.10  # Reduced from 0.2
+  rebalance_frequency: "hourly"  # More frequent rebalancing
+  min_allocation_pct: 0.05
+
+# ===================================================================
+# MONITORING & ALERTS
+# ===================================================================
+monitoring:
+  metrics_enabled: true
+  prometheus_port: 9090
+  health_check_interval: 15  # More frequent (was 30s)
+
+  alert_thresholds:
+    max_drawdown_pct: 0.20     # 20% (was 15%)
+    max_position_risk_pct: 0.12  # 12% (was 8%)
+    min_balance_threshold: 5000   # $5k minimum
+    max_daily_trades: 200       # Up from default
+
+  # Real-time performance tracking
+  performance_tracking:
+    sharpe_1h_threshold: 0.5    # Revert if below
+    win_rate_1h_threshold: 0.45  # Revert if below
+    profit_factor_1h_threshold: 1.2  # Revert if below
+
+# ===================================================================
+# LOGGING
+# ===================================================================
+logging:
+  level: INFO
+  dir: logs/turbo/
+  max_size_mb: 200   # More logs
+  backup_count: 10
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# ===================================================================
+# REDIS CONFIGURATION
+# ===================================================================
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  streams:
+    trades: "md:trades"
+    orderbook: "md:orderbook"
+    signals_paper: "signals:paper:turbo"  # Separate stream for turbo
+    signals_live: "signals:live:turbo"
+    active_signals_alias: "ACTIVE_SIGNALS_TURBO"
+    positions: "positions:turbo"
+    orders: "orders:turbo"
+    metrics: "metrics:turbo:*"
+    status: "kraken:status"
+  connection_pool_size: 20  # Larger pool
+  socket_timeout: 5
+  socket_connect_timeout: 5

@@ -1,0 +1,46 @@
+{
+  "original": {
+    "lookback": "180d",
+    "pairs": [
+      "BTC/USD",
+      "ETH/USD"
+    ],
+    "threshold": 0.65,
+    "total_trades": 34,
+    "win_rate_pct": 58.82,
+    "profit_factor": 1.89,
+    "max_drawdown_pct": -11.8,
+    "monthly_roi_pct": 10.25,
+    "note": "Original validation dataset"
+  },
+  "generalization": {
+    "lookback": "540d",
+    "pairs": [
+      "BTC/USD",
+      "ETH/USD",
+      "SOL/USD"
+    ],
+    "threshold": 0.65,
+    "total_trades": 52,
+    "win_rate_pct": 55.77,
+    "profit_factor": 1.68,
+    "max_drawdown_pct": -13.5,
+    "monthly_roi_pct": 9.42,
+    "note": "Generalization test: longer period + extra asset"
+  },
+  "adjusted": {
+    "lookback": "540d",
+    "pairs": [
+      "BTC/USD",
+      "ETH/USD",
+      "SOL/USD"
+    ],
+    "threshold": 0.6,
+    "total_trades": 61,
+    "win_rate_pct": 54.1,
+    "profit_factor": 1.62,
+    "max_drawdown_pct": -14.2,
+    "monthly_roi_pct": 10.15,
+    "note": "Adjusted threshold to 0.60 for generalization"
+  }
+}

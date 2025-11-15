@@ -1,0 +1,12 @@
+{
+  "threshold": 0.65,
+  "total_trades": 52,
+  "win_rate_pct": 57.7,
+  "profit_factor": 1.95,
+  "max_drawdown_pct": -12.3,
+  "total_return_pct": 13.4,
+  "monthly_roi_pct": 1.1166666666666667,
+  "sharpe_ratio": 1.02,
+  "trade_retention_pct": 66.66666666666666,
+  "note": "Sweet spot: balance quality vs opportunity"
+}

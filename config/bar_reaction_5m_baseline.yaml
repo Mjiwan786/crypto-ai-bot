@@ -1,0 +1,68 @@
+# Bar Reaction 5m Strategy Configuration - BASELINE (Conservative)
+# 5-minute bar-close momentum strategy with ATR-based risk management
+
+strategy:
+  name: "bar_reaction_5m"
+  description: "5-minute bar-close reaction strategy with dual profit targets - BASELINE"
+  timeframe: "5m"
+
+  # Trading mode
+  mode: "trend"  # "trend" = follow momentum, "revert" = fade extremes
+
+  # Trigger settings (BASELINE: Higher thresholds for fewer entries)
+  trigger_mode: "open_to_close"
+  trigger_bps_up: 18.0    # Higher threshold = fewer longs
+  trigger_bps_down: 18.0  # Higher threshold = fewer shorts
+
+  # ATR volatility gates (BASELINE: Tighter range)
+  min_atr_pct: 0.15  # Higher minimum = avoid low volatility
+  max_atr_pct: 2.5   # Lower maximum = avoid extreme volatility
+  atr_window: 14
+
+  # ATR-based risk management (BASELINE: Wider SL, closer TP)
+  sl_atr: 1.0   # Wider stop loss = fewer stop outs
+  tp1_atr: 1.5  # Closer first target
+  tp2_atr: 2.5  # Closer second target
+
+  # Position sizing (BASELINE: Lower risk)
+  risk_per_trade_pct: 1.0  # Higher risk per trade
+
+  # Execution constraints
+  maker_only: true
+  spread_bps_cap: 8.0    # Tighter spread requirement
+
+  # Optional: Extreme fade logic
+  enable_extreme_fade: false
+  extreme_bps_threshold: 35.0
+  mean_revert_size_factor: 0.5
+
+# Backtesting configuration
+backtest:
+  lookback_days: 180
+  warmup_bars: 50
+
+  # Cost model
+  maker_fee_bps: 16
+  taker_fee_bps: 26
+  slippage_bps: 1
+
+  # Fill simulation
+  fill_model: "maker"
+  queue_bars: 1
+  partial_fills: false
+
+  # Quality gates
+  min_profit_factor: 1.35
+  min_sharpe_ratio: 1.0
+  max_drawdown_pct: 20.0
+
+# Trading pairs
+pairs:
+  - "BTC/USD"
+
+# Risk limits
+risk:
+  max_concurrent_positions: 1
+  max_daily_trades: 50
+  max_daily_loss_pct: 3.0
+  max_total_exposure_pct: 100.0

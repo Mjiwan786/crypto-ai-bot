@@ -1,0 +1,131 @@
+# Bar Reaction 5m Strategy Configuration - AGGRESSIVE (Controlled)
+# Goal: Hit success gates while managing risk
+# Target: PF ≥ 1.35, Sharpe ≥ 1.2, DD ≤ 12%, Return ≥ 25%/year
+
+strategy:
+  name: "bar_reaction_5m_aggressive"
+  description: "5-minute bar-close reaction with controlled aggression"
+  timeframe: "5m"
+  mode: "trend"  # Follow momentum, not fade
+
+  # Trigger settings - OPTIMIZED to reduce noise trades
+  trigger_mode: "open_to_close"
+  trigger_bps_up: 20.0    # Was 18.0, increased to 20 for better signal quality
+  trigger_bps_down: 20.0  # Higher threshold = fewer but higher quality signals
+
+  # ATR volatility gates - WIDENED for more opportunities
+  min_atr_pct: 0.05   # Was 0.15, widened to allow more trades in current market
+  max_atr_pct: 5.0    # Was 2.5, widened to capture more regimes
+  atr_window: 14
+
+  # ATR-based risk management - OPTIMIZED R:R (2.0:1 to 2.7:1)
+  sl_atr: 1.5   # Was 1.2, widened to 1.5 to reduce whipsaw
+  tp1_atr: 2.5  # Was 2.0, increased to 2.5 for better reward
+  tp2_atr: 4.0  # Was 3.5, increased to 4.0 for stretch target
+
+  # Position sizing - OPTIMIZED for growth with death spiral protection
+  risk_per_trade_pct: 1.2  # Was 1.0, increased to 1.2 for faster compounding
+  min_position_usd: 50.0   # CRITICAL: prevent death spiral (enforced floor)
+  max_position_usd: 2000.0 # Cap max exposure per trade
+
+  # Execution constraints
+  maker_only: true
+  spread_bps_cap: 8.0  # Was 10.0, tighter to avoid bad fills
+
+  # Extreme fade logic - DISABLED for now
+  enable_extreme_fade: false
+  extreme_bps_threshold: 40.0
+  mean_revert_size_factor: 0.5
+
+# Regime Filtering - NEW: Only trade in favorable regimes
+regime:
+  enable_regime_filter: true
+  allowed_regimes: ["bull", "bear"]  # Skip chop/sideways
+  min_regime_confidence: 0.55
+  regime_lookback_bars: 20
+
+# Safety Gates - NEW: Circuit breakers
+safety:
+  max_daily_loss_pct: 8.0     # Kill switch at -8% daily
+  max_drawdown_pct: 12.0       # Hard stop at -12% DD
+  max_consecutive_losses: 5    # Pause after 5 losses in a row
+  cooldown_after_stop_bars: 10 # Wait 50min after stop hit
+
+# Backtesting configuration
+backtest:
+  lookback_days: 180
+  warmup_bars: 50
+
+  # Cost model - REALISTIC
+  maker_fee_bps: 16   # Kraken maker fee
+  taker_fee_bps: 26   # Kraken taker fee
+  slippage_bps: 2     # Conservative slippage
+
+  # Fill simulation
+  fill_model: "maker"
+  queue_bars: 1
+  partial_fills: false
+
+  # Quality gates - SUCCESS CRITERIA
+  min_profit_factor: 1.35
+  min_sharpe_ratio: 1.2
+  max_drawdown_pct: 12.0
+  min_win_rate_pct: 45.0
+
+# Trading pairs
+pairs:
+  - "BTC/USD"
+  - "ETH/USD"
+
+# Risk limits
+risk:
+  max_concurrent_positions: 2  # Was 1, allow 2 for diversification
+  max_daily_trades: 30          # Was 50, reduce overtrading
+  max_daily_loss_pct: 8.0
+  max_total_exposure_pct: 150.0 # Allow some leverage
+
+  # Position management
+  scale_out_enabled: true
+  tp1_size_pct: 50.0   # Close 50% at TP1
+  tp2_size_pct: 50.0   # Close remaining 50% at TP2
+  trailing_stop_enabled: false  # Keep it simple for now
+
+# Protection Mode - Automatic capital preservation when nearing target
+protection_mode:
+  enabled: true
+  force_enabled: null  # Manual override: true/false/null (null = automatic)
+
+  # Activation triggers
+  equity_threshold_usd: 18000.0  # Activate when equity ≥ $18k (80% to target)
+  win_streak_threshold: 5  # Activate after 5 consecutive wins
+
+  # Protection adjustments (multipliers applied to base params)
+  risk_multiplier: 0.5  # Halve position sizes (1.2% → 0.6%)
+  sl_multiplier: 0.7    # Tighten stops (1.5 ATR → 1.05 ATR)
+  tp_multiplier: 1.0    # Keep targets same (or 0.8 to tighten)
+  rate_multiplier: 0.5  # Reduce max trades/min to 50%
+
+  # Deactivation criteria
+  deactivate_on_loss: false  # Stay in protection mode even after a loss
+  deactivate_below_equity: 17000.0  # Re-enable aggression if equity drops below $17k
+
+  # Alerts
+  alert_on_activation: true
+  alert_on_deactivation: true
+
+# Tuning knobs for iteration (if gates fail, adjust these first)
+tuning:
+  # Reduce aggression if DD > 12%
+  conservative_mode:
+    trigger_bps_up: 22.0
+    trigger_bps_down: 22.0
+    sl_atr: 1.5
+    risk_per_trade_pct: 0.6
+
+  # Increase aggression if PF looks good but returns low
+  turbo_mode:
+    trigger_bps_up: 15.0
+    trigger_bps_down: 15.0
+    sl_atr: 1.0
+    risk_per_trade_pct: 1.5
+    max_concurrent_positions: 3

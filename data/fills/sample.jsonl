@@ -1,0 +1,10 @@
+{"ts":1704067200000,"pair":"BTC/USD","side":"long","entry":45000.0,"exit":46000.0,"qty":0.1,"pnl":100.0}
+{"ts":1704070800000,"pair":"BTC/USD","side":"short","entry":46000.0,"exit":45500.0,"qty":0.1,"pnl":50.0}
+{"ts":1704074400000,"pair":"ETH/USD","side":"long","entry":2300.0,"exit":2350.0,"qty":1.0,"pnl":50.0}
+{"ts":1704078000000,"pair":"BTC/USD","side":"long","entry":45500.0,"exit":45200.0,"qty":0.1,"pnl":-30.0}
+{"ts":1704081600000,"pair":"ETH/USD","side":"short","entry":2350.0,"exit":2400.0,"qty":1.0,"pnl":-50.0}
+{"ts":1704085200000,"pair":"BTC/USD","side":"long","entry":45200.0,"exit":45800.0,"qty":0.1,"pnl":60.0}
+{"ts":1704153600000,"pair":"BTC/USD","side":"long","entry":45800.0,"exit":46200.0,"qty":0.1,"pnl":40.0}
+{"ts":1704157200000,"pair":"ETH/USD","side":"long","entry":2400.0,"exit":2450.0,"qty":1.0,"pnl":50.0}
+{"ts":1704160800000,"pair":"BTC/USD","side":"short","entry":46200.0,"exit":45900.0,"qty":0.1,"pnl":30.0}
+{"ts":1704164400000,"pair":"BTC/USD","side":"long","entry":45900.0,"exit":46500.0,"qty":0.1,"pnl":60.0}

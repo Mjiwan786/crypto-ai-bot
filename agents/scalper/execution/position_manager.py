@@ -34,6 +34,16 @@ from pydantic import BaseModel, Field
 
 from utils.logger import get_logger
 
+# Dynamic position sizing integration
+try:
+    from agents.scalper.risk.dynamic_sizing import DynamicPositionSizer, create_sizer_from_dict
+    from agents.scalper.risk.sizing_integration import DynamicSizingIntegration
+    DYNAMIC_SIZING_AVAILABLE = True
+except ImportError:
+    DYNAMIC_SIZING_AVAILABLE = False
+    DynamicPositionSizer = None
+    DynamicSizingIntegration = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -235,6 +245,9 @@ class PositionManager:
         initial_capital: float = 10000.0,
         sizing_config: Optional[PositionSizingConfig] = None,
         max_positions: int = 5,
+        dynamic_sizing_config: Optional[Dict[str, Any]] = None,
+        redis_bus: Optional[Any] = None,
+        state_manager: Optional[Any] = None,
     ):
         self.agent_id = agent_id
         self.initial_capital = float(initial_capital)
@@ -264,7 +277,40 @@ class PositionManager:
         self.logger = get_logger(f"position_manager.{agent_id}")
         self.logger.info(f"Position manager initialized with ${initial_capital:,.2f} capital")
 
+        # Dynamic position sizing (optional)
+        self.dynamic_sizing: Optional[DynamicSizingIntegration] = None
+        if DYNAMIC_SIZING_AVAILABLE and dynamic_sizing_config and dynamic_sizing_config.get("enabled", False):
+            try:
+                self.dynamic_sizing = DynamicSizingIntegration(
+                    config_dict=dynamic_sizing_config,
+                    redis_bus=redis_bus,
+                    state_manager=state_manager,
+                    agent_id=agent_id,
+                )
+                self.logger.info("Dynamic position sizing enabled")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize dynamic sizing: {e}", exc_info=True)
+                self.dynamic_sizing = None
+
     # ------------------------------- Lifecycle --------------------------------
+
+    async def start(self) -> None:
+        """Start the position manager (initializes dynamic sizing if enabled)."""
+        if self.dynamic_sizing:
+            try:
+                await self.dynamic_sizing.start()
+                self.logger.info("Dynamic sizing started")
+            except Exception as e:
+                self.logger.error(f"Failed to start dynamic sizing: {e}", exc_info=True)
+
+    async def stop(self) -> None:
+        """Stop the position manager (shuts down dynamic sizing if enabled)."""
+        if self.dynamic_sizing:
+            try:
+                await self.dynamic_sizing.stop()
+                self.logger.info("Dynamic sizing stopped")
+            except Exception as e:
+                self.logger.error(f"Failed to stop dynamic sizing: {e}", exc_info=True)
 
     async def register_order(self, order: Order) -> None:
         """Register a new order so fills can be attached later."""
@@ -335,6 +381,37 @@ class PositionManager:
                             target_profit_bps, stop_loss_bps, signal_confidence
                         )
                         position_size = min(position_size, kelly_size)
+
+                    # Dynamic position sizing (NEW): apply adaptive multiplier
+                    if self.dynamic_sizing:
+                        try:
+                            # Calculate portfolio heat
+                            total_exposure = sum(
+                                abs(p.get("notional_value", 0.0))
+                                for p in (await self._get_all_positions()).values()
+                            )
+                            portfolio_heat_pct = (total_exposure / equity * 100.0) if equity > 0 else 0.0
+
+                            # Get current volatility (ATR%)
+                            volatility_atr_pct = await self._get_current_atr_pct(symbol)
+
+                            # Get dynamic size multiplier
+                            size_multiplier, breakdown = await self.dynamic_sizing.get_size_multiplier(
+                                current_equity_usd=equity,
+                                portfolio_heat_pct=portfolio_heat_pct,
+                                current_volatility_atr_pct=volatility_atr_pct,
+                            )
+
+                            # Apply multiplier
+                            position_size *= size_multiplier
+
+                            self.logger.debug(
+                                "Dynamic sizing applied: %.2fx multiplier (breakdown: %s)",
+                                size_multiplier,
+                                breakdown,
+                            )
+                        except Exception as e:
+                            self.logger.error("Error applying dynamic sizing: %s", e, exc_info=True)
 
                     # Limits
                     position_size = max(self.sizing_config.min_size_usd, position_size)
@@ -515,6 +592,17 @@ class PositionManager:
                         position_type="close",
                         pnl=realized_pnl,
                     )
+
+                    # Record trade outcome for dynamic sizing (NEW)
+                    if self.dynamic_sizing:
+                        try:
+                            await self.dynamic_sizing.record_trade_outcome(
+                                symbol=symbol,
+                                pnl_usd=realized_pnl,
+                                size_usd=close_size * exec_price,
+                            )
+                        except Exception as e:
+                            self.logger.error(f"Error recording trade for dynamic sizing: {e}", exc_info=True)
 
                     await self._update_metrics()
                     return True
@@ -751,6 +839,51 @@ class PositionManager:
         reserve_ratio = 0.20
         available = equity - (exposure + equity * reserve_ratio)
         return max(0.0, available)
+
+    async def _get_all_positions(self) -> Dict[str, Dict[str, Any]]:
+        """Get all positions formatted for risk calculations."""
+        return {
+            symbol: {
+                "size": float(pos.size),
+                "notional_value": float(pos.market_value),
+                "side": pos.side.value,
+            }
+            for symbol, pos in self.positions.items()
+        }
+
+    async def _get_current_atr_pct(self, symbol: str) -> Optional[float]:
+        """
+        Calculate current ATR% for volatility adjustment.
+
+        Returns None if insufficient data, otherwise ATR as % of price.
+        """
+        try:
+            price_data = self.price_history.get(symbol, [])
+            if len(price_data) < 14:
+                return None  # Not enough data for ATR
+
+            # Simple ATR calculation using last 14 periods
+            recent_prices = [p[1] for p in price_data[-14:]]
+            true_ranges = []
+            for i in range(1, len(recent_prices)):
+                high_low = abs(recent_prices[i] - recent_prices[i - 1])
+                true_ranges.append(high_low)
+
+            if not true_ranges:
+                return None
+
+            atr = sum(true_ranges) / len(true_ranges)
+            current_price = self.current_prices.get(symbol, recent_prices[-1])
+
+            if current_price <= 0:
+                return None
+
+            atr_pct = (atr / current_price) * 100.0
+            return atr_pct
+
+        except Exception as e:
+            self.logger.error(f"Error calculating ATR% for {symbol}: {e}")
+            return None
 
     async def _add_to_position(self, symbol: str, size: float, price: float, order_id: str) -> None:
         """Add to an existing same-direction position (recompute VWAP avg_price)."""

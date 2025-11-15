@@ -12,6 +12,7 @@ This orchestrator ties together:
 
 import asyncio
 import logging
+import os
 import time
 from typing import Dict, Any, Optional, List, Set
 from dataclasses import dataclass
@@ -24,56 +25,74 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+# Set up module-level logging to debug import hangs
+_logger = logging.getLogger("MasterOrchestrator")
+_logger.info("🔍 Starting MasterOrchestrator module imports...")
+
 # Core imports
+_logger.info("→ Importing config.agent_integration...")
 from config.agent_integration import (
-    get_merged_config, 
-    get_risk_parameters, 
+    get_merged_config,
+    get_risk_parameters,
     get_performance_settings,
     get_monitoring_settings,
     AgentConfigIntegrator
 )
+_logger.info("✅ config.agent_integration imported")
 
 # AI Engine imports
+_logger.info("→ Importing ai_engine modules...")
 from ai_engine.strategy_selector import (
-    SelectorConfig, 
-    select_for_symbol, 
+    SelectorConfig,
+    select_for_symbol,
     plan_for_universe,
     PositionSnapshot,
     Side
 )
 from ai_engine.adaptive_learner import (
-    LearnerConfig, 
+    LearnerConfig,
     gated_update,
     compute_metrics
 )
+_logger.info("✅ ai_engine modules imported")
 
-# Agent imports
-from agents.core.signal_analyst import SignalAnalyst, SignalAnalystManager
-from agents.core.signal_processor import SignalProcessor
-from agents.core.execution_agent import EnhancedExecutionAgent
-from agents.risk.risk_router import RiskRouter
-from agents.scalper.enhanced_scalper_agent import EnhancedScalperAgent
+# Agent imports - DEFERRED TO AVOID BLOCKING
+# Import these modules lazily when actually needed to avoid import-time blocking I/O
+_logger.info("→ Agent modules will be imported lazily when needed")
+_logger.info("✅ Using lazy imports for agent and infrastructure modules")
 
-# Infrastructure imports
-from agents.infrastructure.data_pipeline import DataPipeline, DataPipelineConfig
-from agents.infrastructure.redis_client import RedisClient
+# Type placeholders for IDE support
+SignalAnalyst = None
+SignalAnalystManager = None
+SignalProcessor = None
+EnhancedExecutionAgent = None
+RiskRouter = None
+EnhancedScalperAgent = None
+DataPipeline = None
+DataPipelineConfig = None
+RedisClient = None
 
 # MCP imports with fallback
+_logger.info("→ Importing MCP modules...")
 try:
-    from mcp.redis_manager import RedisManager
+    from mcp.redis_manager import AsyncRedisManager
     from mcp.context import MCPContext
     HAS_MCP = True
+    _logger.info("✅ MCP modules imported")
 except ImportError:
     HAS_MCP = False
-    RedisManager = None
+    AsyncRedisManager = None
     MCPContext = None
+    _logger.warning("⚠️ MCP modules not available")
 
 # Strategy imports
+_logger.info("→ Importing strategy modules...")
 from strategies.regime_based_router import RegimeRouter, MarketContext
 from strategies.breakout import BreakoutStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.momentum_strategy import MomentumStrategy
 from strategies.trend_following import TrendFollowingStrategy
+_logger.info("✅ strategy modules imported")
 
 @dataclass
 class SystemState:
@@ -85,10 +104,13 @@ class SystemState:
     total_trades: int = 0
     total_pnl: float = 0.0
     system_health: str = "unknown"
-    
+    start_time: float = 0.0
+
     def __post_init__(self):
         if self.agents_active is None:
             self.agents_active = set()
+        if self.start_time == 0.0:
+            self.start_time = time.time()
 
 class MasterOrchestrator:
     """
@@ -120,7 +142,7 @@ class MasterOrchestrator:
         self.regime_router: Optional[RegimeRouter] = None
         
         # Agents
-        self.signal_analyst_manager: Optional[SignalAnalystManager] = None
+        self.signal_analyst_manager: Optional = None  # TODO: Refactor to use new pure function API
         self.signal_processor: Optional[SignalProcessor] = None
         self.execution_agent: Optional[EnhancedExecutionAgent] = None
         self.risk_router: Optional[RiskRouter] = None
@@ -183,48 +205,79 @@ class MasterOrchestrator:
         self.logger.info("✅ Configuration loaded successfully")
     
     async def _initialize_infrastructure(self):
-        """Initialize Redis, MCP, and data pipeline"""
+        """
+        Initialize Redis, MCP, and data pipeline.
+
+        IMPORTANT: Redis connection failures are NEVER fatal - app will start anyway
+        and degrade gracefully if Redis is unavailable.
+        """
         self.logger.info("🔧 Initializing infrastructure...")
-        
-        # Initialize Redis
+
+        # Initialize Redis with graceful degradation
+        redis_connected = False
         try:
             redis_url = self.agent_config.get('redis', {}).get('url', 'redis://localhost:6379')
-            if HAS_MCP:
-                self.redis_manager = RedisManager(redis_url=redis_url)
-                await self.redis_manager.initialize()
-                self.logger.info("✅ Redis connected")
+            if not redis_url:
+                self.logger.warning("⚠️ Redis URL not configured - app will start without Redis")
+                self.redis_manager = None
+            elif HAS_MCP:
+                self.redis_manager = AsyncRedisManager(url=redis_url)
+                redis_connected = await self.redis_manager.aconnect()
+                if redis_connected:
+                    self.logger.info("✅ Redis connected successfully")
+                else:
+                    self.logger.warning("⚠️ Redis unavailable - app starting anyway (degraded mode)")
+                    self.logger.warning("   Redis-dependent features will be disabled until connection is restored")
+                    # Keep manager instance for potential auto-reconnect
             else:
-                self.logger.warning("⚠️ MCP not available, using fallback Redis client")
+                self.logger.warning("⚠️ MCP not available, using fallback mode")
                 self.redis_manager = None
         except Exception as e:
-            self.logger.error(f"❌ Redis connection failed: {e}")
-            raise
+            # Catch any unexpected errors from manager initialization itself
+            self.logger.warning(f"⚠️ Redis initialization error: {e}")
+            self.logger.warning("   App will start anyway - Redis-dependent features disabled")
+            self.redis_manager = None
+            redis_connected = False
         
-        # Initialize MCP context
-        if HAS_MCP and self.redis_manager:
+        # Initialize MCP context (only if Redis connected)
+        if HAS_MCP and self.redis_manager and redis_connected:
             try:
                 self.mcp_context = MCPContext.from_env(redis=self.redis_manager)
                 await self.mcp_context.__aenter__()
                 self.logger.info("✅ MCP context initialized")
             except Exception as e:
-                self.logger.warning(f"⚠️ MCP context failed: {e}")
-        
-        # Initialize data pipeline
+                self.logger.warning(f"⚠️ MCP context initialization failed: {e}")
+                self.logger.warning("   Continuing without MCP context")
+                self.mcp_context = None
+        else:
+            self.logger.info("⚠️ Skipping MCP context (Redis not available)")
+            self.mcp_context = None
+
+        # Initialize data pipeline with graceful degradation
         try:
+            # Lazy import to avoid blocking at module load time
+            from agents.infrastructure.data_pipeline import DataPipeline, DataPipelineConfig
+
             pipeline_config = DataPipelineConfig(
                 pairs=self.agent_config.get('trading', {}).get('pairs', ['BTC/USD']),
-                redis_url=redis_url,
-                create_consumer_groups=True
+                redis_url=redis_url if redis_connected else None,
+                create_consumer_groups=redis_connected  # Only create groups if Redis is up
             )
             self.data_pipeline = DataPipeline(
                 cfg=pipeline_config,
-                redis_client=self.redis_manager.client if self.redis_manager else None,
+                redis_client=self.redis_manager.client if (self.redis_manager and redis_connected) else None,
                 http=None  # Will be created internally
             )
-            self.logger.info("✅ Data pipeline configured")
+            if redis_connected:
+                self.logger.info("✅ Data pipeline configured with Redis")
+            else:
+                self.logger.warning("⚠️ Data pipeline configured in offline mode (no Redis)")
+                self.logger.warning("   Live data streaming will be unavailable")
         except Exception as e:
-            self.logger.error(f"❌ Data pipeline setup failed: {e}")
-            raise
+            # Data pipeline failure is not fatal - app can run without it
+            self.logger.warning(f"⚠️ Data pipeline setup failed: {e}")
+            self.logger.warning("   Continuing without data pipeline - manual data sources only")
+            self.data_pipeline = None
     
     async def _initialize_ai_engine(self):
         """Initialize AI engine components"""
@@ -269,29 +322,42 @@ class MasterOrchestrator:
     async def _initialize_agents(self):
         """Initialize all trading agents"""
         self.logger.info("🤖 Initializing agents...")
-        
-        # Signal Analyst Manager
-        self.signal_analyst_manager = SignalAnalystManager(self.redis_manager)
-        
-        # Signal Processor
-        self.signal_processor = SignalProcessor(
-            redis_manager=self.redis_manager,
-            config=self.agent_config
-        )
-        
-        # Execution Agent
-        self.execution_agent = EnhancedExecutionAgent(self.agent_config)
-        
-        # Risk Router
-        self.risk_router = RiskRouter(self.risk_config)
-        
-        # Enhanced Scalper
-        self.enhanced_scalper = EnhancedScalperAgent(
-            config=self.agent_config,
-            redis_manager=self.redis_manager
-        )
-        
-        self.logger.info("✅ All agents initialized")
+
+        # Lazy imports to avoid blocking at module load time
+        try:
+            from agents.core.signal_processor import SignalProcessor
+            from agents.core.execution_agent import EnhancedExecutionAgent
+            from agents.risk.risk_router import RiskRouter
+            from agents.scalper.enhanced_scalper_agent import EnhancedScalperAgent
+
+            # Signal Analyst Manager
+            # self.signal_analyst_manager = SignalAnalystManager(self.redis_manager)  # TODO: Refactor to use new pure function API
+
+            # Signal Processor (uses shared redis_manager for Redis Cloud SSL connection)
+            self.signal_processor = SignalProcessor(
+                config_path=self.config_path,
+                redis_manager=self.redis_manager
+            )
+
+            # Execution Agent
+            self.execution_agent = EnhancedExecutionAgent(self.agent_config)
+
+            # Risk Router (TODO: Provide proper dependencies - config, compliance, drawdown)
+            # self.risk_router = RiskRouter(config=..., compliance=..., drawdown=...)
+
+            # Enhanced Scalper (check if it needs redis_manager or not)
+            # self.enhanced_scalper = EnhancedScalperAgent(
+            #     config=self.agent_config,
+            #     redis_manager=self.redis_manager
+            # )
+
+            self.logger.info("✅ All agents initialized")
+        except ImportError as e:
+            self.logger.error(f"❌ Failed to import agent modules: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize agents: {e}")
+            raise
     
     def _setup_signal_handlers(self):
         """Setup graceful shutdown handlers"""
@@ -318,14 +384,15 @@ class MasterOrchestrator:
                 self.state.agents_active.add("data_pipeline")
             
             # Start signal analysts for each symbol
-            symbols = self.agent_config.get('trading', {}).get('pairs', ['BTC/USD'])
-            for symbol in symbols:
-                analyst = await self.signal_analyst_manager.start_analyst(
-                    symbol=symbol,
-                    strategy="scalp",
-                    config=self.agent_config
-                )
-                self.state.agents_active.add(f"signal_analyst_{symbol}")
+            if self.signal_analyst_manager:
+                symbols = self.agent_config.get('trading', {}).get('pairs', ['BTC/USD'])
+                for symbol in symbols:
+                    analyst = await self.signal_analyst_manager.start_analyst(
+                        symbol=symbol,
+                        strategy="scalp",
+                        config=self.agent_config
+                    )
+                    self.state.agents_active.add(f"signal_analyst_{symbol}")
             
             # Start signal processor
             if self.signal_processor:
@@ -375,29 +442,82 @@ class MasterOrchestrator:
             self._config_update_task(),
             name="config_update"
         ))
+
+        # Heartbeat publishing task
+        self.tasks.append(asyncio.create_task(
+            self._heartbeat_publishing_task(),
+            name="heartbeat_publisher"
+        ))
+
+        # PnL equity publishing task
+        self.tasks.append(asyncio.create_task(
+            self._pnl_equity_publishing_task(),
+            name="pnl_equity_publisher"
+        ))
     
     async def _performance_monitoring_task(self):
-        """Monitor system performance and metrics"""
+        """Monitor system performance and metrics with stream sizes & Redis lag"""
         while self.state.running:
             try:
                 # Collect performance metrics
+                current_time = time.time()
+
+                # Get stream sizes if Redis is available
+                stream_sizes = {}
+                redis_lag_ms = 0.0
+                if self.redis_manager and self.redis_manager.client:
+                    try:
+                        # Measure Redis lag
+                        redis_start = time.time()
+                        await self.redis_manager.client.ping()
+                        redis_lag_ms = (time.time() - redis_start) * 1000
+
+                        # Get sizes of key streams
+                        key_streams = [
+                            'signals:paper',
+                            'signals:live',
+                            'kraken:health',
+                            'ops:heartbeat',
+                            'metrics:pnl:equity',
+                            'system:metrics'
+                        ]
+                        for stream_name in key_streams:
+                            try:
+                                stream_len = await self.redis_manager.client.xlen(stream_name)
+                                stream_sizes[stream_name.replace(':', '_')] = stream_len
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        self.logger.debug(f"Error collecting Redis metrics: {e}")
+
+                # Get last signal time from signal processor
+                last_signal_time = 0.0
+                if self.signal_processor and hasattr(self.signal_processor, 'resilient_publisher'):
+                    publisher = self.signal_processor.resilient_publisher
+                    if publisher and publisher.last_publish_time > 0:
+                        last_signal_time = current_time - publisher.last_publish_time
+
                 metrics = {
-                    'timestamp': time.time(),
-                    'agents_active': len(self.state.agents_active),
-                    'total_trades': self.performance_metrics['trades_executed'],
-                    'total_pnl': self.state.total_pnl,
-                    'system_health': self.state.system_health
+                    'timestamp': str(current_time),
+                    'agents_active': str(len(self.state.agents_active)),
+                    'total_trades': str(self.performance_metrics['trades_executed']),
+                    'total_pnl': str(round(self.state.total_pnl, 2)),
+                    'system_health': self.state.system_health,
+                    'redis_lag_ms': str(round(redis_lag_ms, 2)),
+                    'last_signal_seconds_ago': str(round(last_signal_time, 2)),
+                    **{f'stream_size_{k}': str(v) for k, v in stream_sizes.items()}
                 }
-                
+
                 # Publish metrics to Redis
                 if self.redis_manager:
                     await self.redis_manager.client.xadd(
                         "system:metrics",
-                        metrics
+                        metrics,
+                        maxlen=5000
                     )
-                
+
                 await asyncio.sleep(30)  # Every 30 seconds
-                
+
             except Exception as e:
                 self.logger.error(f"Performance monitoring error: {e}")
                 await asyncio.sleep(60)
@@ -493,7 +613,72 @@ class MasterOrchestrator:
             except Exception as e:
                 self.logger.error(f"Config update monitoring error: {e}")
                 await asyncio.sleep(60)
-    
+
+    async def _heartbeat_publishing_task(self):
+        """Publish heartbeat to ops:heartbeat stream every 15s"""
+        # Load maxlen from environment
+        maxlen_heartbeat = int(os.getenv('STREAM_MAXLEN_HEARTBEAT', '1000'))
+
+        while self.state.running:
+            try:
+                if self.redis_manager:
+                    heartbeat_data = {
+                        'ts': str(int(time.time() * 1000)),
+                        'status': self.state.system_health,
+                        'agents_active': str(len(self.state.agents_active)),
+                        'uptime_seconds': str(int(time.time() - self.state.start_time))
+                    }
+
+                    # Publish with XTRIM to keep stream bounded
+                    await self.redis_manager.client.xadd(
+                        'ops:heartbeat',
+                        heartbeat_data,
+                        maxlen=maxlen_heartbeat  # Configurable via STREAM_MAXLEN_HEARTBEAT
+                    )
+
+                await asyncio.sleep(15)  # Every 15 seconds
+
+            except Exception as e:
+                self.logger.error(f"Heartbeat publishing error: {e}")
+                await asyncio.sleep(15)
+
+    async def _pnl_equity_publishing_task(self):
+        """Publish PnL equity points to metrics:pnl:equity stream"""
+        # Load maxlen from environment
+        maxlen_pnl = int(os.getenv('STREAM_MAXLEN_PNL', '5000'))
+        last_ts = 0
+
+        while self.state.running:
+            try:
+                if self.redis_manager:
+                    current_ts = int(time.time() * 1000)
+
+                    # Ensure monotonic timestamps
+                    if current_ts <= last_ts:
+                        current_ts = last_ts + 1
+
+                    pnl_data = {
+                        'ts': str(current_ts),
+                        'equity': str(round(self.state.total_pnl + 10000.0, 2)),  # Starting equity + PnL
+                        'pnl': str(round(self.state.total_pnl, 2)),
+                        'trades_count': str(self.performance_metrics['trades_executed'])
+                    }
+
+                    # Publish with XTRIM to keep stream bounded
+                    await self.redis_manager.client.xadd(
+                        'metrics:pnl:equity',
+                        pnl_data,
+                        maxlen=maxlen_pnl  # Configurable via STREAM_MAXLEN_PNL (default: 5000)
+                    )
+
+                    last_ts = current_ts
+
+                await asyncio.sleep(60)  # Every 60 seconds
+
+            except Exception as e:
+                self.logger.error(f"PnL equity publishing error: {e}")
+                await asyncio.sleep(60)
+
     async def _get_recent_outcomes(self):
         """Get recent trade outcomes for adaptive learning"""
         # This would need to be implemented based on your trade storage

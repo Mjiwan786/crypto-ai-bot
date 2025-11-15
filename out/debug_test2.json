@@ -1,0 +1,17 @@
+{
+  "total_return_pct": 0.0,
+  "profit_factor": 0.0,
+  "max_dd_pct": 0.0,
+  "sharpe_ratio": 0.0,
+  "win_rate_pct": 0.0,
+  "total_trades": 0,
+  "winning_trades": 0,
+  "losing_trades": 0,
+  "gross_profit": 0.0,
+  "gross_loss": 0.0,
+  "avg_win": 0.0,
+  "avg_loss": 0.0,
+  "final_capital": 10000.0,
+  "period_days": 29,
+  "status": "NO_TRADES"
+}

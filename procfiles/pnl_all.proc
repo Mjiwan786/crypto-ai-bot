@@ -1,0 +1,28 @@
+# Complete PnL Infrastructure Process Configuration
+#
+# Runs all PnL services together: aggregator + health checks
+#
+# Usage:
+#   foreman start -f procfiles/pnl_all.proc
+#   goreman -f procfiles/pnl_all.proc start
+#
+# Prerequisites:
+#   1. Run backfill first: python scripts/backfill_pnl_from_fills.py
+#   2. Set REDIS_URL environment variable
+#   3. Ensure Redis Cloud is accessible
+#
+# Environment Variables:
+#   REDIS_URL - Redis connection string (required)
+#   START_EQUITY - Initial equity (default: 10000)
+#   POLL_MS - Poll interval in ms (default: 500)
+#   PNL_METRICS_PORT - Prometheus port (optional, default: disabled)
+#   USE_PANDAS - Enable stats (optional, default: false)
+
+# Main aggregator service
+pnl-aggregator: python -m monitoring.pnl_aggregator
+
+# Health check (runs every 60 seconds)
+pnl-health: while true; do python scripts/health_check_pnl.py --verbose; sleep 60; done
+
+# Optional: Prometheus metrics exporter
+# pnl-metrics: PNL_METRICS_PORT=9309 python -m monitoring.pnl_aggregator
