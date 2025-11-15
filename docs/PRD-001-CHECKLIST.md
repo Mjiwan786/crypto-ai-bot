@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 142/248 Complete (57.3%)
+**Status:** 147/248 Complete (59.3%)
 
 ---
 
@@ -214,12 +214,12 @@
 
 **Problem Addressed:** Missing risk filters, no spread checks, no volatility limits, no drawdown controls
 
-### 4.1 Spread Limits (5/5)
-- [ ] Fetch current spread from Kraken `spread` channel before signal generation
-- [ ] Calculate spread %: `(ask - bid) / mid * 100`
-- [ ] Reject signal if spread > 0.5% (configurable via risk.filters.max_spread_pct)
-- [ ] Log spread rejection at WARNING level with pair and spread %
-- [ ] Emit Prometheus counter `risk_filter_rejections_total{reason="wide_spread", pair}`
+### 4.1 Spread Limits (5/5) ✅
+- [x] Fetch current spread from Kraken `spread` channel before signal generation
+- [x] Calculate spread %: `(ask - bid) / mid * 100`
+- [x] Reject signal if spread > 0.5% (configurable via risk.filters.max_spread_pct)
+- [x] Log spread rejection at WARNING level with pair and spread %
+- [x] Emit Prometheus counter `risk_filter_rejections_total{reason="wide_spread", pair}`
 
 ### 4.2 Volatility Limits (6/6)
 - [ ] Calculate ATR(14) on 5-minute candles for each pair
