@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 224/248 Complete (90.3%)
+**Status:** 229/248 Complete (92.3%)
 
 ---
 
@@ -332,12 +332,12 @@
 - [x] Block deployment if backtest fails acceptance criteria
 - [x] Add backtest acceptance unit test with known good/bad results
 
-### 6.4 Automation (5/5)
-- [ ] Implement backtest script: `scripts/run_backtest.py --strategy scalper --period 365`
-- [ ] Run backtests in CI/CD on every strategy code change
-- [ ] Store backtest results in `out/backtests/` directory with timestamp
-- [ ] Generate backtest report with equity curve chart (`docs/backtest_report_{date}.html`)
-- [ ] Fail CI build if backtest doesn't meet acceptance criteria
+### 6.4 Automation (5/5) ✅
+- [x] Implement backtest script: `scripts/run_prd_backtest.py --strategy scalper --period 365`
+- [x] Run backtests in CI/CD on every strategy code change
+- [x] Store backtest results in `out/backtests/` directory with timestamp
+- [x] Generate backtest report with equity curve chart (`docs/backtest_report_{date}.html`)
+- [x] Fail CI build if backtest doesn't meet acceptance criteria
 
 ---
 

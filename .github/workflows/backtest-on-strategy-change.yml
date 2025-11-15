@@ -1,0 +1,147 @@
+name: Backtest on Strategy Change
+
+# PRD-001 Section 6.4: Run backtests in CI/CD on every strategy code change
+# This workflow runs automated backtests whenever strategy code is modified
+
+on:
+  push:
+    paths:
+      - 'strategies/**'
+      - 'agents/strategies/**'
+      - 'backtesting/**'
+      - 'config/**/*.yaml'
+  pull_request:
+    paths:
+      - 'strategies/**'
+      - 'agents/strategies/**'
+      - 'backtesting/**'
+      - 'config/**/*.yaml'
+
+jobs:
+  backtest:
+    name: Run PRD-Compliant Backtests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        strategy: [scalper, momentum, mean_reversion]
+        pair: [BTC/USD, ETH/USD]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run PRD backtest
+        id: backtest
+        run: |
+          # PRD-001 Section 6.4: Run backtest with acceptance criteria enforcement
+          python scripts/run_prd_backtest.py \
+            --strategy ${{ matrix.strategy }} \
+            --pair "${{ matrix.pair }}" \
+            --period 365 \
+            --html \
+            --strict
+        continue-on-error: false
+        env:
+          PYTHONUNBUFFERED: 1
+
+      - name: Upload backtest results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: backtest-results-${{ matrix.strategy }}-${{ matrix.pair }}
+          path: |
+            out/backtests/*.json
+            docs/backtest_report_*.html
+          retention-days: 30
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: html-report-${{ matrix.strategy }}-${{ matrix.pair }}
+          path: docs/backtest_report_*.html
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Find the latest backtest JSON result
+            const backtestDir = 'out/backtests';
+            const files = fs.readdirSync(backtestDir);
+            const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+            if (jsonFiles.length === 0) {
+              console.log('No backtest results found');
+              return;
+            }
+
+            // Get the latest file
+            const latestFile = jsonFiles[jsonFiles.length - 1];
+            const resultPath = path.join(backtestDir, latestFile);
+            const result = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
+
+            // Format results as markdown comment
+            const passEmoji = result.acceptance_result.passed ? '✅' : '❌';
+            const status = result.acceptance_result.passed ? 'PASSED' : 'FAILED';
+
+            let comment = `## ${passEmoji} Backtest Results: ${result.strategy} | ${result.pair}\n\n`;
+            comment += `**Status:** ${status}\n\n`;
+            comment += `### Metrics\n`;
+            comment += `- **Total Return:** ${result.metrics.total_return_pct.toFixed(2)}%\n`;
+            comment += `- **Sharpe Ratio:** ${result.metrics.sharpe_ratio.toFixed(2)}\n`;
+            comment += `- **Max Drawdown:** ${result.metrics.max_drawdown_pct.toFixed(2)}%\n`;
+            comment += `- **Win Rate:** ${result.metrics.win_rate.toFixed(2)}%\n`;
+            comment += `- **Profit Factor:** ${result.metrics.profit_factor.toFixed(2)}\n`;
+            comment += `- **Total Trades:** ${result.metrics.total_trades}\n\n`;
+
+            if (!result.acceptance_result.passed) {
+              comment += `### ❌ Acceptance Criteria Failures\n`;
+              result.acceptance_result.failures.forEach(failure => {
+                comment += `- ${failure}\n`;
+              });
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  summary:
+    name: Backtest Summary
+    runs-on: ubuntu-latest
+    needs: backtest
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Generate summary
+        run: |
+          echo "## Backtest Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All backtests completed. Check artifacts for detailed results." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          ls -R artifacts/ >> $GITHUB_STEP_SUMMARY || echo "No artifacts found" >> $GITHUB_STEP_SUMMARY
