@@ -744,7 +744,70 @@ class KrakenWebSocketClient:
             self.logger.info(
                 f"Initial subscriptions complete: {sent_count}/{len(subscriptions)} sent successfully"
             )
-    
+
+    async def handle_ticker_data(self, channel_id: int, data: dict, channel: str, pair: str):
+        """Handle ticker data and store in Redis with TTL (PRD-001 Section 1.6)"""
+        operation_id = f"ticker_{channel_id}_{time.time()}"
+
+        if self.latency_tracker:
+            self.latency_tracker.start_timing(operation_id)
+
+        try:
+            # Extract ticker information from Kraken format
+            ticker_info = {
+                "pair": pair,
+                "ask": data.get("a", [None, None, None]),  # [price, whole lot volume, lot volume]
+                "bid": data.get("b", [None, None, None]),  # [price, whole lot volume, lot volume]
+                "close": data.get("c", [None, None]),  # [price, lot volume]
+                "volume": data.get("v", [None, None]),  # [today, last 24 hours]
+                "vwap": data.get("p", [None, None]),  # [today, last 24 hours]
+                "trades": data.get("t", [None, None]),  # [today, last 24 hours]
+                "low": data.get("l", [None, None]),  # [today, last 24 hours]
+                "high": data.get("h", [None, None]),  # [today, last 24 hours]
+                "open": data.get("o", [None, None]),  # [today, last 24 hours]
+                "timestamp": time.time(),  # PRD-001 Section 1.6: Add timestamp
+                "sequence": channel_id  # PRD-001 Section 1.6: Add sequence number
+            }
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, ticker_info)
+
+            # Store latest ticker in Redis with 60s TTL (PRD-001 Section 1.6)
+            if self.redis_manager.redis_client:
+                try:
+                    async with self.redis_manager.get_connection() as redis_conn:
+                        # Use simple key format: kraken:ticker:{pair}
+                        redis_key = f"{self.config.redis_streams['ticker']}:{pair.replace('/', '-')}"
+
+                        # Store as JSON with 60s TTL
+                        await redis_conn.setex(
+                            redis_key,
+                            60,  # TTL: 60 seconds
+                            orjson.dumps(ticker_info).decode('utf-8')
+                        )
+                        self.logger.debug(f"✅ Stored ticker data to Redis key {redis_key}")
+
+                except Exception as e:
+                    if "MAXMEMORY" in str(e) or "OOM" in str(e):
+                        self.logger.warning(f"Redis Cloud memory limit reached: {e}")
+                    else:
+                        self.logger.debug(f"Redis write failed (non-critical): {e}")
+
+            # Call registered callbacks
+            for callback in self.callbacks["ticker"]:
+                try:
+                    await callback(pair, ticker_info)
+                except Exception as e:
+                    self.logger.error(f"Error in ticker callback: {e}")
+
+        except Exception as e:
+            self.stats["errors"] += 1
+            self.logger.error(f"Error handling ticker data: {e}")
+        finally:
+            if self.latency_tracker:
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='ticker')
+                await self.check_latency_circuit_breaker(latency_ms)
+
     async def handle_trade_data(self, channel_id: int, data: List, channel: str, pair: str):
         """Handle trade data with enhanced logging and debugging"""
         operation_id = f"trade_{channel_id}_{time.time()}"
@@ -812,21 +875,24 @@ class KrakenWebSocketClient:
                         )
                         
                         # Redis Cloud optimized data structure
+                        # PRD-001 Section 1.6: Include timestamp and sequence number
                         stream_data = {
                             "channel": "trade",
                             "pair": pair,
                             "trades": orjson.dumps(trades).decode('utf-8'),
                             "timestamp": str(time.time()),
+                            "sequence": str(channel_id),  # PRD-001 Section 1.6
                             "shard": pair.replace('/', '-'),
                             "batch_size": str(len(trades)),
                             "redis_optimized": "true"
                         }
                         
                         # Use Redis Cloud optimized stream operations
+                        # PRD-001 Section 1.6: MAXLEN 1000 for trade events
                         await redis_conn.xadd(
-                            stream_name, 
-                            stream_data, 
-                            maxlen=self.config.redis_memory_threshold_mb * 10
+                            stream_name,
+                            stream_data,
+                            maxlen=1000
                         )
                         self.logger.debug(
                             f"✅ Stored {len(trades)} trades to Redis stream {stream_name}"
@@ -875,9 +941,10 @@ class KrakenWebSocketClient:
                 "timestamp": float(data[2]),
                 "bid_volume": float(data[3]),
                 "ask_volume": float(data[4]),
-                "received_at": time.time()
+                "received_at": time.time(),
+                "sequence": channel_id  # PRD-001 Section 1.6: Add sequence number
             }
-            
+
             # Calculate spread in basis points
             spread_bps = ((spread_info["ask"] - spread_info["bid"]) / spread_info["bid"]) * 10000
             spread_info["spread_bps"] = spread_bps
@@ -888,24 +955,31 @@ class KrakenWebSocketClient:
             # Check spread circuit breaker
             await self.check_spread_circuit_breaker(spread_bps, pair)
 
-            # Stream to Redis only if available - Redis Cloud optimized
+            # Persist to Redis (PRD-001 Section 1.6)
             if self.redis_manager.redis_client:
                 try:
                     async with self.redis_manager.get_connection() as redis_conn:
-                        stream_name = (
-                            f"{self.config.redis_streams['spread']}:"
-                            f"{pair.replace('/', '-')}"
+                        # Store latest spread as Redis key with 60s TTL (PRD-001 Section 1.6)
+                        redis_key = f"{self.config.redis_streams['spread']}:{pair.replace('/', '-')}"
+                        await redis_conn.setex(
+                            redis_key,
+                            60,  # TTL: 60 seconds
+                            orjson.dumps(spread_info).decode('utf-8')
                         )
-                        
+
+                        # Also publish to stream for historical tracking
+                        stream_name = f"{self.config.redis_streams['spread']}:stream:{pair.replace('/', '-')}"
+
                         stream_data = {
                             "channel": "spread",
                             "pair": pair,
                             "data": orjson.dumps(spread_info).decode('utf-8'),
                             "timestamp": str(time.time()),
+                            "sequence": str(channel_id),  # PRD-001 Section 1.6
                             "spread_bps": str(spread_bps),
                             "shard": pair.replace('/', '-')
                         }
-                        
+
                         await redis_conn.xadd(stream_name, stream_data, maxlen=5000)
                 except Exception as e:
                     if "MAXMEMORY" in str(e) or "OOM" in str(e):
@@ -944,29 +1018,37 @@ class KrakenWebSocketClient:
                 "asks": [[float(price), float(volume), float(timestamp)]
                         for price, volume, timestamp in data.get("as", [])],
                 "checksum": data.get("c"),
-                "received_at": time.time()
+                "received_at": time.time(),
+                "sequence": channel_id  # PRD-001 Section 1.6: Add sequence number
             }
 
             # Cache data for graceful degradation (PRD-001 Section 1.4)
             self.cache_data(channel, pair, book_data)
 
-            # Stream to Redis only if available - Redis Cloud optimized
+            # Persist to Redis (PRD-001 Section 1.6)
             if self.redis_manager.redis_client:
                 try:
                     async with self.redis_manager.get_connection() as redis_conn:
-                        stream_name = (
-                            f"{self.config.redis_streams['book']}:"
-                            f"{pair.replace('/', '-')}"
+                        # Store latest book snapshot as Redis key with 60s TTL (PRD-001 Section 1.6)
+                        redis_key = f"{self.config.redis_streams['book']}:{pair.replace('/', '-')}"
+                        await redis_conn.setex(
+                            redis_key,
+                            60,  # TTL: 60 seconds
+                            orjson.dumps(book_data).decode('utf-8')
                         )
-                        
+
+                        # Also publish to stream for historical tracking
+                        stream_name = f"{self.config.redis_streams['book']}:stream:{pair.replace('/', '-')}"
+
                         stream_data = {
                             "channel": "book",
                             "pair": pair,
                             "data": orjson.dumps(book_data).decode('utf-8'),
                             "timestamp": str(time.time()),
+                            "sequence": str(channel_id),  # PRD-001 Section 1.6
                             "shard": pair.replace('/', '-')
                         }
-                        
+
                         await redis_conn.xadd(stream_name, stream_data, maxlen=3000)
                 except Exception as e:
                     if "MAXMEMORY" in str(e) or "OOM" in str(e):
@@ -1515,7 +1597,11 @@ class KrakenWebSocketClient:
 
                 # Route to appropriate handler with circuit breaker protection
                 try:
-                    if channel.startswith("trade"):
+                    if channel.startswith("ticker"):
+                        await self.circuit_breakers["connection"].call(
+                            self.handle_ticker_data, channel_id, payload, channel, pair
+                        )
+                    elif channel.startswith("trade"):
                         await self.circuit_breakers["connection"].call(
                             self.handle_trade_data, channel_id, payload, channel, pair
                         )

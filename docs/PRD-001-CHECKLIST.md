@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 48/248 Complete (19.4%)
+**Status:** 53/248 Complete (21.4%)
 
 ---
 
@@ -78,12 +78,12 @@
 - [x] Implement backpressure detection: queue depth > 1000 → log warning, drop oldest messages
 - [x] Memory bound WebSocket buffers to max 100MB total
 
-### 1.6 Data Persistence (5/5)
-- [ ] Store latest ticker data in Redis: `kraken:ticker:{pair}` with 60s TTL
-- [ ] Store latest spread data in Redis: `kraken:spread:{pair}` with 60s TTL
-- [ ] Store latest book snapshot (L2) in Redis: `kraken:book:{pair}` with 60s TTL
-- [ ] Publish trade events to Redis stream `kraken:trade:{pair}` with MAXLEN 1000
-- [ ] Add timestamp and sequence number to all persisted data
+### 1.6 Data Persistence (5/5) ✅ COMPLETE
+- [x] Store latest ticker data in Redis: `kraken:ticker:{pair}` with 60s TTL
+- [x] Store latest spread data in Redis: `kraken:spread:{pair}` with 60s TTL
+- [x] Store latest book snapshot (L2) in Redis: `kraken:book:{pair}` with 60s TTL
+- [x] Publish trade events to Redis stream `kraken:trade:{pair}` with MAXLEN 1000
+- [x] Add timestamp and sequence number to all persisted data
 
 ---
 
