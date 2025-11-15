@@ -32,6 +32,14 @@ except ImportError:
     PROMETHEUS_AVAILABLE = False
     KRAKEN_WS_CONNECTIONS_TOTAL = None
 
+# Discord alerts (optional) - PRD-001 Section 4.2
+try:
+    from monitoring.discord_alerts import send_alert
+    DISCORD_ALERTS_AVAILABLE = True
+except ImportError:
+    DISCORD_ALERTS_AVAILABLE = False
+    send_alert = None
+
 
 class ConnectionState(str, Enum):
     """WebSocket connection states per PRD-001 Section 4.1"""
@@ -496,10 +504,17 @@ class KrakenWebSocketClient:
     @property
     def is_healthy(self) -> bool:
         """
-        Check if bot is healthy based on connection state (PRD-001 Section 4.1).
+        Check if bot is healthy based on connection state (PRD-001 Section 4.1 & 4.2).
 
-        Returns False if WebSocket has been disconnected for > 2 minutes.
+        Returns False if:
+        - WebSocket has been disconnected for > 2 minutes, OR
+        - Reconnection attempts have reached or exceeded max_retries
         """
+        # Unhealthy if max reconnection attempts reached (PRD-001 Section 4.2)
+        if self.reconnection_attempt >= self.config.max_retries:
+            return False
+
+        # Unhealthy if not disconnected (connecting, connected, reconnecting are all healthy)
         if self.connection_state != ConnectionState.DISCONNECTED:
             return True
 
@@ -1235,6 +1250,28 @@ class KrakenWebSocketClient:
                     self.logger.error("Kraken WS max reconnection attempts reached")
                     # Set state to DISCONNECTED after max retries
                     self._set_connection_state(ConnectionState.DISCONNECTED, "Max reconnection attempts reached")
+
+                    # Trigger critical alert (PRD-001 Section 4.2)
+                    if DISCORD_ALERTS_AVAILABLE and send_alert:
+                        try:
+                            send_alert(
+                                title="⚠️ Kraken WebSocket: Max Reconnection Attempts Reached",
+                                description=(
+                                    f"Bot has failed to reconnect after {self.config.max_retries} attempts. "
+                                    f"WebSocket connection to {self.config.url} is down. "
+                                    f"Bot is now marked as UNHEALTHY and requires intervention."
+                                ),
+                                severity="CRITICAL",
+                                tags={
+                                    "component": "kraken_ws",
+                                    "max_retries": str(self.config.max_retries),
+                                    "pairs": ", ".join(self.config.pairs)
+                                }
+                            )
+                            self.logger.info("Critical alert sent for max reconnection attempts")
+                        except Exception as alert_error:
+                            self.logger.error(f"Failed to send critical alert: {alert_error}")
+
                     break
 
                 # Calculate backoff with ±20% jitter (PRD-001 Section 4.2)

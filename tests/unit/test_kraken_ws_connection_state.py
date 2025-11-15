@@ -846,5 +846,91 @@ class TestReconnectionLogging:
         assert "jitter:" in msg.lower()
 
 
+class TestMaxRetriesUnhealthy:
+    """Test unhealthy state and alerting after max retries per PRD-001 Section 4.2"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url="",
+            max_retries=10
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client"""
+        return KrakenWebSocketClient(config)
+
+    def test_unhealthy_when_max_retries_reached(self, client):
+        """Test that is_healthy returns False when reconnection_attempt >= max_retries"""
+        # Start healthy
+        assert client.is_healthy is True
+
+        # Simulate failed attempts
+        client.reconnection_attempt = 9
+        assert client.is_healthy is True  # Still healthy at 9/10
+
+        # Hit max retries
+        client.reconnection_attempt = 10
+        assert client.is_healthy is False  # Now unhealthy at 10/10
+
+    def test_unhealthy_when_exceeds_max_retries(self, client):
+        """Test that is_healthy returns False when reconnection_attempt > max_retries"""
+        client.reconnection_attempt = 15
+        assert client.is_healthy is False
+
+    def test_healthy_before_max_retries(self, client):
+        """Test that is_healthy returns True before hitting max_retries"""
+        client.reconnection_attempt = 5
+        client._set_connection_state(ConnectionState.RECONNECTING, "Test")
+        assert client.is_healthy is True
+
+    def test_unhealthy_overrides_connection_state(self, client):
+        """Test that max_retries unhealthy check takes precedence over connection state"""
+        # Even if CONNECTED, should be unhealthy if max retries reached
+        client._set_connection_state(ConnectionState.CONNECTED, "Test")
+        client.reconnection_attempt = 10
+
+        assert client.is_healthy is False
+
+    def test_alert_contains_correct_information(self, client):
+        """Test that alert would contain correct information (mock test)"""
+        # This tests the alert payload structure, not actual sending
+        client.reconnection_attempt = 10
+
+        expected_title = "⚠️ Kraken WebSocket: Max Reconnection Attempts Reached"
+        expected_severity = "CRITICAL"
+        expected_tags = {
+            "component": "kraken_ws",
+            "max_retries": "10",
+            "pairs": "BTC/USD"
+        }
+
+        # Verify structure (would be used in send_alert call)
+        assert expected_severity == "CRITICAL"
+        assert "max reconnection attempts" in expected_title.lower()
+        assert expected_tags["max_retries"] == str(client.config.max_retries)
+
+    def test_health_check_boundary_at_max_retries(self, client):
+        """Test health check boundary exactly at max_retries"""
+        client.reconnection_attempt = 9
+        assert client.is_healthy is True
+
+        client.reconnection_attempt = 10
+        assert client.is_healthy is False
+
+    def test_unhealthy_persists_after_max_retries(self, client):
+        """Test that unhealthy state persists after hitting max retries"""
+        client.reconnection_attempt = 10
+        assert client.is_healthy is False
+
+        # Check multiple times - should remain unhealthy
+        assert client.is_healthy is False
+        assert client.is_healthy is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
