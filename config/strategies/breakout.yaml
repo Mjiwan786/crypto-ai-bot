@@ -1,0 +1,53 @@
+# Breakout Strategy Configuration
+# PRD-001 Section 7.1: Individual strategy configuration
+
+strategy:
+  name: breakout
+  description: "Breakout strategy trading range expansions and new highs/lows"
+
+  # Entry/Exit Parameters
+  entry:
+    lookback_period: 20  # Period for range calculation
+    breakout_threshold_pct: 1.0  # Minimum breakout size (% of range)
+    min_edge_bps: 30  # Minimum edge in basis points
+    max_spread_bps: 12  # Maximum spread to enter
+    volume_surge_ratio: 2.0  # Volume must be 2x average
+
+  exit:
+    take_profit_bps: 150  # Take profit target (1.5%)
+    stop_loss_bps: 75  # Stop loss (0.75%)
+    trailing_stop_bps: 50  # Trailing stop
+    max_hold_hours: 72  # Maximum position hold time
+    exit_on_reversal: true  # Exit if price re-enters range
+
+  # Position Sizing
+  position:
+    risk_per_trade_pct: 2.5  # Risk per trade (% of capital)
+    max_position_size_usd: 6000  # Maximum position size
+    min_position_size_usd: 250  # Minimum position size
+    scale_in_on_continuation: true  # Add to position on continuation
+
+  # Risk Management
+  risk:
+    max_daily_trades: 8
+    max_consecutive_losses: 2
+    cooldown_after_loss_minutes: 60
+    require_consolidation: true  # Require pre-breakout consolidation
+
+  # Indicators
+  indicators:
+    atr_period: 14
+    atr_multiplier: 1.5  # ATR multiplier for stop/target
+    volume_ma_period: 20
+    bollinger_period: 20
+    bollinger_std: 2.5
+    consolidation_period: 10  # Bars to detect consolidation
+
+  # Filters
+  filters:
+    min_liquidity_usd: 10000000
+    min_volatility_pct: 1.5
+    max_volatility_pct: 15.0
+    min_range_pct: 2.0  # Minimum range size
+    max_range_pct: 10.0  # Maximum range size
+    trading_hours_utc: "00:00-23:59"  # 24/7

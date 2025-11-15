@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 229/248 Complete (92.3%)
+**Status:** 235/248 Complete (94.8%)
 
 ---
 
@@ -345,13 +345,13 @@
 
 **Problem Addressed:** Hardcoded values, no environment separation, missing validation
 
-### 7.1 Configuration Files (6/6)
-- [ ] Create base config: `config/settings.yaml` with all defaults
-- [ ] Create paper trading config: `.env.paper` with TRADING_MODE=paper
-- [ ] Create live trading config: `.env.live` with TRADING_MODE=live
-- [ ] Create strategy configs: `config/strategies/scalper.yaml`, `trend.yaml`, etc.
-- [ ] Create risk config: `config/risk_config.yaml` with all risk limits
-- [ ] Load config based on TRADING_MODE environment variable
+### 7.1 Configuration Files (6/6) ✅
+- [x] Create base config: `config/settings.yaml` with all defaults
+- [x] Create paper trading config: `.env.paper` with TRADING_MODE=paper
+- [x] Create live trading config: `.env.live` with TRADING_MODE=live
+- [x] Create strategy configs: `config/strategies/scalper.yaml`, `trend.yaml`, etc.
+- [x] Create risk config: `config/risk_config.yaml` with all risk limits
+- [x] Load config based on TRADING_MODE environment variable
 
 ### 7.2 Environment Variables (8/8)
 - [ ] Define REDIS_URL (required, no default)

@@ -1,0 +1,180 @@
+# Risk Configuration
+# PRD-001 Section 7.1: Centralized risk management configuration
+
+# Portfolio-Level Risk Limits
+portfolio:
+  # Maximum portfolio drawdown before circuit breaker
+  max_drawdown_pct: 15.0  # PRD-001 Section 4.3
+
+  # Maximum total exposure (sum of all positions)
+  max_total_exposure_usd: 50000
+
+  # Maximum single position size
+  max_single_position_usd: 10000
+
+  # Maximum number of concurrent positions
+  max_concurrent_positions: 10
+
+  # Daily loss limit (triggers halt)
+  max_daily_loss_pct: 5.0  # PRD-001 Section 4.3
+  max_daily_loss_usd: 1000
+
+# Position-Level Risk Limits
+position:
+  # Position sizing
+  min_position_size_usd: 100
+  max_position_size_usd: 10000
+  default_risk_per_trade_pct: 1.0
+
+  # Stop loss and take profit
+  min_stop_loss_bps: 10
+  max_stop_loss_bps: 500
+  min_take_profit_bps: 15
+  max_take_profit_bps: 1000
+
+  # Position duration
+  max_position_duration_hours: 168  # 1 week
+  force_close_on_timeout: true
+
+# Trading Frequency Limits
+frequency:
+  # Maximum trades per period
+  max_trades_per_minute: 10
+  max_trades_per_hour: 100
+  max_trades_per_day: 500  # PRD-001 Section 4.5
+
+  # Consecutive loss management
+  max_consecutive_losses: 5  # PRD-001 Section 4.5
+  cooldown_after_losses_minutes: 30
+
+  # Daily limits
+  halt_on_max_daily_trades: true
+  reset_daily_limits_utc_hour: 0
+
+# Market Condition Limits
+market_conditions:
+  # Spread limits (PRD-001 Section 4.1)
+  max_spread_bps: 10.0
+  reject_trade_on_wide_spread: true
+
+  # Volatility limits (PRD-001 Section 4.2)
+  min_volatility_pct: 0.5
+  max_volatility_pct: 10.0
+  halt_on_extreme_volatility: true
+
+  # Liquidity requirements
+  min_24h_volume_usd: 1000000
+  min_orderbook_depth_usd: 100000
+
+# Latency and Performance
+performance:
+  # Maximum latency before rejection
+  max_latency_ms: 500
+  reject_trade_on_high_latency: true
+
+  # Execution quality
+  max_slippage_bps: 10
+  reject_trade_on_high_slippage: true
+
+# Circuit Breakers
+circuit_breakers:
+  # Enable/disable circuit breakers
+  enabled: true
+
+  # Drawdown circuit breaker (PRD-001 Section 4.3)
+  drawdown:
+    enabled: true
+    threshold_pct: 15.0
+    action: halt_all_trading
+    notification: true
+
+  # Loss streak circuit breaker (PRD-001 Section 4.5)
+  loss_streak:
+    enabled: true
+    threshold: 5
+    action: pause_strategy
+    cooldown_minutes: 30
+
+  # Spread circuit breaker (PRD-001 Section 4.1)
+  spread:
+    enabled: true
+    threshold_bps: 10.0
+    action: reject_trade
+
+  # Volatility circuit breaker (PRD-001 Section 4.2)
+  volatility:
+    enabled: true
+    threshold_pct: 10.0
+    action: reduce_position_size
+
+# Kill Switch
+kill_switch:
+  # Global kill switch
+  enabled: false  # Manual override to stop all trading
+
+  # Conditions that trigger kill switch
+  auto_triggers:
+    extreme_loss: true
+    extreme_loss_threshold_pct: 20.0
+
+    system_error: true
+    repeated_errors_count: 10
+
+    connection_loss: true
+    connection_timeout_seconds: 60
+
+# Notifications and Alerts
+notifications:
+  # Risk events to notify
+  notify_on_drawdown_warning: true
+  notify_on_circuit_breaker: true
+  notify_on_kill_switch: true
+  notify_on_large_loss: true
+  large_loss_threshold_usd: 500
+
+  # Notification channels
+  channels:
+    discord: true
+    email: false
+    sms: false
+    prometheus: true
+
+# Compliance and Safety
+compliance:
+  # Allowed symbols
+  allowed_symbols:
+    - BTC/USD
+    - ETH/USD
+    - SOL/USD
+    - MATIC/USD
+    - LINK/USD
+
+  # Banned symbols (overrides allowed list)
+  banned_symbols: []
+
+  # Quote currencies
+  allowed_quote_currencies:
+    - USD
+
+  # Time restrictions
+  trading_hours_utc: "00:00-23:59"  # 24/7 for crypto
+  blackout_dates: []  # Dates to halt trading (YYYY-MM-DD)
+
+  # Regulatory limits
+  max_leverage: 1.0  # No leverage for spot trading
+  require_kyc: false  # Not applicable for API trading
+
+# Monitoring and Logging
+monitoring:
+  # Log all risk events
+  log_risk_events: true
+  log_circuit_breaker_triggers: true
+  log_rejected_trades: true
+
+  # Metrics collection
+  collect_risk_metrics: true
+  metrics_interval_seconds: 60
+
+  # Health checks
+  health_check_interval_seconds: 30
+  alert_on_unhealthy: true

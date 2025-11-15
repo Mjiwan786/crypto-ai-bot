@@ -1,0 +1,50 @@
+# Mean Reversion Strategy Configuration
+# PRD-001 Section 7.1: Individual strategy configuration
+
+strategy:
+  name: mean_reversion
+  description: "Mean reversion strategy trading oversold/overbought conditions"
+
+  # Entry/Exit Parameters
+  entry:
+    rsi_oversold: 25  # RSI threshold for oversold (long entry)
+    rsi_overbought: 75  # RSI threshold for overbought (short entry)
+    min_edge_bps: 20  # Minimum edge in basis points
+    max_spread_bps: 8  # Maximum spread to enter
+    bollinger_bands_std: 2.0  # BB standard deviations
+
+  exit:
+    take_profit_bps: 50  # Take profit target (0.5%)
+    stop_loss_bps: 35  # Stop loss (0.35%)
+    exit_at_mean: true  # Exit when price returns to mean
+    max_hold_hours: 24  # Maximum position hold time
+
+  # Position Sizing
+  position:
+    risk_per_trade_pct: 1.5  # Risk per trade (% of capital)
+    max_position_size_usd: 3000  # Maximum position size
+    min_position_size_usd: 150  # Minimum position size
+
+  # Risk Management
+  risk:
+    max_daily_trades: 20
+    max_consecutive_losses: 3
+    cooldown_after_loss_minutes: 15
+    avoid_trending_markets: true  # Skip if strong trend detected
+
+  # Indicators
+  indicators:
+    rsi_period: 14
+    bollinger_period: 20
+    bollinger_std: 2.0
+    mean_period: 20  # SMA for mean calculation
+    adx_period: 14
+    adx_max_trend: 20  # Max ADX to avoid trending markets
+
+  # Filters
+  filters:
+    min_liquidity_usd: 2000000
+    min_volatility_pct: 0.5
+    max_volatility_pct: 8.0
+    require_range_bound_market: true
+    trading_hours_utc: "00:00-23:59"  # 24/7

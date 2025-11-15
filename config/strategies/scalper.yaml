@@ -1,0 +1,45 @@
+# Scalper Strategy Configuration
+# PRD-001 Section 7.1: Individual strategy configuration
+
+strategy:
+  name: scalper
+  description: "High-frequency scalping strategy targeting small price movements"
+
+  # Entry/Exit Parameters
+  entry:
+    min_edge_bps: 10  # Minimum edge in basis points
+    max_spread_bps: 5  # Maximum spread to enter
+    volume_threshold: 1.5  # Minimum volume ratio
+
+  exit:
+    take_profit_bps: 15  # Take profit target
+    stop_loss_bps: 10  # Stop loss
+    trailing_stop_bps: 5  # Trailing stop
+    max_hold_minutes: 15  # Maximum position hold time
+
+  # Position Sizing
+  position:
+    risk_per_trade_pct: 1.0  # Risk per trade (% of capital)
+    max_position_size_usd: 2000  # Maximum position size
+    min_position_size_usd: 100  # Minimum position size
+
+  # Risk Management
+  risk:
+    max_daily_trades: 50
+    max_consecutive_losses: 3
+    cooldown_after_loss_minutes: 5
+
+  # Indicators
+  indicators:
+    rsi_period: 14
+    rsi_oversold: 30
+    rsi_overbought: 70
+    ema_fast: 9
+    ema_slow: 21
+
+  # Filters
+  filters:
+    min_liquidity_usd: 1000000
+    min_volatility_pct: 0.5
+    max_volatility_pct: 5.0
+    trading_hours_utc: "00:00-23:59"  # 24/7
