@@ -872,6 +872,350 @@ class TestStaleMessagePrometheusMetrics:
         assert future_final == future_initial + 1
 
 
+class TestMessageDeduplication:
+    """Test message deduplication cache (PRD-001 Section 1.3)"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD", "ETH/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client for testing"""
+        return KrakenWebSocketClient(config)
+
+    def test_dedup_cache_initialized(self, client):
+        """Test that deduplication cache is initialized"""
+        assert hasattr(client, 'dedup_cache')
+        assert isinstance(client.dedup_cache, dict)
+        assert len(client.dedup_cache) == 0  # Initially empty
+
+    def test_generate_message_id_basic(self, client):
+        """Test basic message ID generation"""
+        data = [123, {"timestamp": 1234567890.0, "s": 100}, "trade", "BTC/USD"]
+        msg_id = client.generate_message_id(data, "trade", "BTC/USD")
+
+        assert msg_id != ""
+        assert "trade" in msg_id
+        assert "BTC/USD" in msg_id
+        assert "1234567890.0" in msg_id
+        assert "100" in msg_id
+
+    def test_generate_message_id_without_timestamp(self, client):
+        """Test message ID generation without timestamp"""
+        data = [123, {"price": "50000"}, "ticker", "BTC/USD"]
+        msg_id = client.generate_message_id(data, "ticker", "BTC/USD")
+
+        assert msg_id != ""
+        assert "ticker" in msg_id
+        assert "BTC/USD" in msg_id
+
+    def test_generate_message_id_with_ts_field(self, client):
+        """Test message ID generation with 'ts' field instead of 'timestamp'"""
+        data = [123, {"ts": 1234567890.0}, "spread", "ETH/USD"]
+        msg_id = client.generate_message_id(data, "spread", "ETH/USD")
+
+        assert msg_id != ""
+        assert "1234567890.0" in msg_id
+
+    def test_generate_message_id_consistent(self, client):
+        """Test that same message generates same ID"""
+        data = [123, {"timestamp": 1234567890.0, "s": 100}, "trade", "BTC/USD"]
+
+        id1 = client.generate_message_id(data, "trade", "BTC/USD")
+        id2 = client.generate_message_id(data, "trade", "BTC/USD")
+
+        assert id1 == id2
+
+    def test_generate_message_id_different_for_different_messages(self, client):
+        """Test that different messages generate different IDs"""
+        data1 = [123, {"timestamp": 1234567890.0, "s": 100}, "trade", "BTC/USD"]
+        data2 = [123, {"timestamp": 1234567891.0, "s": 101}, "trade", "BTC/USD"]
+
+        id1 = client.generate_message_id(data1, "trade", "BTC/USD")
+        id2 = client.generate_message_id(data2, "trade", "BTC/USD")
+
+        assert id1 != id2
+
+    def test_check_duplicate_new_message(self, client):
+        """Test that new messages are not flagged as duplicates"""
+        data = [123, {"timestamp": 1234567890.0}, "trade", "BTC/USD"]
+
+        is_duplicate = client.check_duplicate(data, "trade", "BTC/USD")
+
+        assert is_duplicate is False
+
+    def test_check_duplicate_detects_duplicate(self, client):
+        """Test that duplicate messages are detected"""
+        data = [123, {"timestamp": 1234567890.0, "s": 100}, "trade", "BTC/USD"]
+
+        # First time - not duplicate
+        is_dup1 = client.check_duplicate(data, "trade", "BTC/USD")
+        assert is_dup1 is False
+
+        # Second time - duplicate
+        is_dup2 = client.check_duplicate(data, "trade", "BTC/USD")
+        assert is_dup2 is True
+
+    def test_check_duplicate_logs_warning(self, client, caplog):
+        """Test that duplicate detection logs warning"""
+        import logging
+
+        data = [123, {"timestamp": 1234567890.0}, "trade", "BTC/USD"]
+
+        # First message
+        client.check_duplicate(data, "trade", "BTC/USD")
+
+        # Second message (duplicate)
+        with caplog.at_level(logging.WARNING):
+            client.check_duplicate(data, "trade", "BTC/USD")
+
+        warning_logs = [record for record in caplog.records if record.levelname == "WARNING"]
+        assert len(warning_logs) > 0
+        assert any("Duplicate message detected" in log.message for log in warning_logs)
+
+    def test_dedup_cache_created_per_channel(self, client):
+        """Test that dedup cache is created per channel:pair"""
+        data = [123, {"timestamp": 1234567890.0}, "trade", "BTC/USD"]
+
+        client.check_duplicate(data, "trade", "BTC/USD")
+
+        # Cache should be created for this channel:pair
+        assert "trade:BTC/USD" in client.dedup_cache
+        assert len(client.dedup_cache["trade:BTC/USD"]) == 1
+
+    def test_dedup_cache_different_channels_separate(self, client):
+        """Test that different channels maintain separate caches"""
+        data1 = [123, {"timestamp": 1234567890.0}, "trade", "BTC/USD"]
+        data2 = [456, {"timestamp": 1234567890.0}, "spread", "BTC/USD"]
+
+        client.check_duplicate(data1, "trade", "BTC/USD")
+        client.check_duplicate(data2, "spread", "BTC/USD")
+
+        # Should have separate caches
+        assert "trade:BTC/USD" in client.dedup_cache
+        assert "spread:BTC/USD" in client.dedup_cache
+        assert len(client.dedup_cache) == 2
+
+    def test_dedup_cache_different_pairs_separate(self, client):
+        """Test that different pairs maintain separate caches"""
+        data1 = [123, {"timestamp": 1234567890.0}, "trade", "BTC/USD"]
+        data2 = [123, {"timestamp": 1234567890.0}, "trade", "ETH/USD"]
+
+        client.check_duplicate(data1, "trade", "BTC/USD")
+        client.check_duplicate(data2, "trade", "ETH/USD")
+
+        # Should have separate caches
+        assert "trade:BTC/USD" in client.dedup_cache
+        assert "trade:ETH/USD" in client.dedup_cache
+        assert len(client.dedup_cache) == 2
+
+    def test_dedup_cache_max_size_100(self, client):
+        """Test that dedup cache maintains max 100 entries per channel"""
+        # Add 150 unique messages
+        for i in range(150):
+            data = [123, {"timestamp": float(i), "s": i}, "trade", "BTC/USD"]
+            client.check_duplicate(data, "trade", "BTC/USD")
+
+        # Cache should only have 100 entries (oldest 50 evicted)
+        assert len(client.dedup_cache["trade:BTC/USD"]) == 100
+
+    def test_dedup_cache_evicts_oldest_messages(self, client):
+        """Test that oldest messages are evicted when cache is full"""
+        # Add 101 unique messages
+        for i in range(101):
+            data = [123, {"timestamp": float(i)}, "trade", "BTC/USD"]
+            client.check_duplicate(data, "trade", "BTC/USD")
+
+        # First message should be evicted
+        first_data = [123, {"timestamp": 0.0}, "trade", "BTC/USD"]
+        first_id = client.generate_message_id(first_data, "trade", "BTC/USD")
+
+        # First ID should NOT be in cache anymore
+        assert first_id not in client.dedup_cache["trade:BTC/USD"]
+
+        # Last message should still be in cache
+        last_data = [123, {"timestamp": 100.0}, "trade", "BTC/USD"]
+        last_id = client.generate_message_id(last_data, "trade", "BTC/USD")
+        assert last_id in client.dedup_cache["trade:BTC/USD"]
+
+    def test_dedup_gracefully_handles_invalid_data(self, client):
+        """Test that dedup handles invalid data gracefully"""
+        # Empty list
+        is_dup = client.check_duplicate([], "trade", "BTC/USD")
+        assert is_dup is False
+
+        # Too short list
+        is_dup = client.check_duplicate([123], "trade", "BTC/USD")
+        assert is_dup is False
+
+
+class TestDuplicatePrometheusMetrics:
+    """Test Prometheus metrics for duplicate detection"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client for testing"""
+        return KrakenWebSocketClient(config)
+
+    def test_duplicates_counter_exists(self):
+        """Test that Prometheus duplicates counter is defined"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_DUPLICATES_REJECTED_TOTAL
+
+        if PROMETHEUS_AVAILABLE:
+            assert KRAKEN_WS_DUPLICATES_REJECTED_TOTAL is not None
+            assert hasattr(KRAKEN_WS_DUPLICATES_REJECTED_TOTAL, 'labels')
+
+    def test_counter_increments_on_duplicate(self, client):
+        """Test that counter increments when duplicate is detected"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_DUPLICATES_REJECTED_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial counter value
+        initial_value = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='trade')._value.get()
+
+        # Send same message twice
+        data = [123, {"timestamp": 1234567890.0}, "trade", "BTC/USD"]
+        client.check_duplicate(data, "trade", "BTC/USD")  # First time
+        client.check_duplicate(data, "trade", "BTC/USD")  # Duplicate
+
+        # Counter should have incremented by 1
+        final_value = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='trade')._value.get()
+        assert final_value == initial_value + 1
+
+    def test_counter_not_incremented_for_new_message(self, client):
+        """Test that counter doesn't increment for new messages"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_DUPLICATES_REJECTED_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial counter value
+        initial_value = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='book')._value.get()
+
+        # Send unique message
+        data = [123, {"timestamp": 1234567890.0}, "book", "BTC/USD"]
+        client.check_duplicate(data, "book", "BTC/USD")
+
+        # Counter should NOT have incremented
+        final_value = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='book')._value.get()
+        assert final_value == initial_value
+
+    def test_counter_has_channel_label(self):
+        """Test that counter has channel label"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_DUPLICATES_REJECTED_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Should be able to create labels for different channels
+        metric1 = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='trade')
+        metric2 = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='book')
+
+        assert metric1 is not None
+        assert metric2 is not None
+
+    def test_different_channels_counted_separately(self, client):
+        """Test that duplicates for different channels are counted separately"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_DUPLICATES_REJECTED_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Get initial values
+        trade_initial = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='trade')._value.get()
+        spread_initial = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='spread')._value.get()
+
+        # Create duplicates for different channels
+        trade_data = [123, {"timestamp": 1234567890.0}, "trade", "BTC/USD"]
+        client.check_duplicate(trade_data, "trade", "BTC/USD")
+        client.check_duplicate(trade_data, "trade", "BTC/USD")  # Duplicate
+
+        spread_data = [456, {"timestamp": 1234567890.0}, "spread", "BTC/USD"]
+        client.check_duplicate(spread_data, "spread", "BTC/USD")
+        client.check_duplicate(spread_data, "spread", "BTC/USD")  # Duplicate
+
+        # Both should have incremented
+        trade_final = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='trade')._value.get()
+        spread_final = KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel='spread')._value.get()
+
+        assert trade_final == trade_initial + 1
+        assert spread_final == spread_initial + 1
+
+    def test_metric_name_and_description(self):
+        """Test that metric has correct name and description"""
+        from utils.kraken_ws import PROMETHEUS_AVAILABLE, KRAKEN_WS_DUPLICATES_REJECTED_TOTAL
+
+        if not PROMETHEUS_AVAILABLE:
+            pytest.skip("Prometheus not available")
+
+        # Check metric name (Prometheus auto-removes _total suffix from Counter names)
+        assert KRAKEN_WS_DUPLICATES_REJECTED_TOTAL._name == 'kraken_ws_duplicates_rejected'
+        assert KRAKEN_WS_DUPLICATES_REJECTED_TOTAL._documentation == 'Total duplicate messages rejected'
+
+
+class TestDeduplicationIntegration:
+    """Test deduplication integration with handle_message"""
+
+    @pytest.fixture
+    def config(self):
+        """Create test configuration"""
+        return KrakenWSConfig(
+            url="wss://ws.kraken.com",
+            pairs=["BTC/USD"],
+            redis_url=""
+        )
+
+    @pytest.fixture
+    def client(self, config):
+        """Create WebSocket client for testing"""
+        return KrakenWebSocketClient(config)
+
+    @pytest.mark.asyncio
+    async def test_duplicate_message_rejected_in_handle_message(self, client, caplog):
+        """Test that handle_message rejects duplicate messages"""
+        import logging
+        import json
+        import time
+
+        # Create a valid message
+        message_data = [123, {"timestamp": time.time(), "s": 100, "price": "50000"}, "trade", "BTC/USD"]
+        message = json.dumps(message_data)
+
+        # Process first time (should succeed)
+        with caplog.at_level(logging.DEBUG):
+            await client.handle_message(message)
+
+        # Check that it was processed (not rejected)
+        initial_errors = client.stats["errors"]
+
+        # Process second time (should be rejected as duplicate)
+        await client.handle_message(message)
+
+        # Error count should have incremented
+        assert client.stats["errors"] == initial_errors + 1
+
+        # Should have warning log about duplicate detection or debug log about rejection
+        all_logs = [record for record in caplog.records]
+        assert any("duplicate" in log.message.lower() for log in all_logs)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 

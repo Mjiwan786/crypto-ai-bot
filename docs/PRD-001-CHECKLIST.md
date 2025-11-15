@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 32/248 Complete (12.9%)
+**Status:** 35/248 Complete (14.1%)
 
 ---
 
@@ -47,7 +47,7 @@
 - [x] Handle reconnection during graceful shutdown (cancel reconnection attempts)
 - [x] Add reconnection unit test with mocked WebSocket failures
 
-### 1.3 Message Validation (9/12)
+### 1.3 Message Validation (12/12) ✅ COMPLETE
 - [x] Verify Kraken message schema on receipt (check required fields: channel, pair, data)
 - [x] Extract and validate sequence numbers from Kraken messages
 - [x] Track last sequence number per channel: `last_seq[channel]`
@@ -57,9 +57,9 @@
 - [x] Reject messages with timestamps > 5 seconds in the future (clock skew protection)
 - [x] Log timestamp validation failures at WARNING level with delta
 - [x] Emit Prometheus counter `kraken_ws_stale_messages_total{channel}` on stale message rejection
-- [ ] Implement deduplication cache (store last 100 message IDs per channel)
-- [ ] Check incoming messages against deduplication cache before processing
-- [ ] Emit Prometheus counter `kraken_ws_duplicates_rejected_total{channel}` on duplicate detection
+- [x] Implement deduplication cache (store last 100 message IDs per channel)
+- [x] Check incoming messages against deduplication cache before processing
+- [x] Emit Prometheus counter `kraken_ws_duplicates_rejected_total{channel}` on duplicate detection
 
 ### 1.4 Error Handling (8/8)
 - [ ] Wrap all WebSocket operations in try/except blocks

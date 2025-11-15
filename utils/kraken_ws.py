@@ -12,6 +12,7 @@ import os
 import random
 from typing import Dict, List, Optional, Callable, Any
 from enum import Enum
+from collections import deque
 import websockets
 import redis.asyncio as redis
 import orjson
@@ -41,6 +42,11 @@ try:
         'Total stale or future-dated messages rejected',
         ['channel', 'reason']
     )
+    KRAKEN_WS_DUPLICATES_REJECTED_TOTAL = Counter(
+        'kraken_ws_duplicates_rejected_total',
+        'Total duplicate messages rejected',
+        ['channel']
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -48,6 +54,7 @@ except ImportError:
     KRAKEN_WS_RECONNECTS_TOTAL = None
     KRAKEN_WS_MESSAGE_GAPS_TOTAL = None
     KRAKEN_WS_STALE_MESSAGES_TOTAL = None
+    KRAKEN_WS_DUPLICATES_REJECTED_TOTAL = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -481,6 +488,10 @@ class KrakenWebSocketClient:
 
         # Sequence number tracking per channel (PRD-001 Section 1.3)
         self.last_sequence: Dict[str, int] = {}
+
+        # Message deduplication cache (PRD-001 Section 1.3)
+        # Store last 100 message IDs per channel to detect duplicates
+        self.dedup_cache: Dict[str, deque] = {}
 
         # Scalping rate limiting
         self.trade_timestamps = []
@@ -1174,6 +1185,76 @@ class KrakenWebSocketClient:
         # No timestamp found or timestamp is valid
         return True, ""
 
+    def generate_message_id(self, data: list, channel: str, pair: str) -> str:
+        """
+        Generate unique message ID for deduplication (PRD-001 Section 1.3).
+
+        Creates ID from: channel + pair + timestamp + sequence + payload hash
+
+        Returns:
+            str: Unique message ID
+        """
+        if not isinstance(data, list) or len(data) < 2:
+            return ""
+
+        payload = data[1]
+
+        # Start with channel and pair
+        id_parts = [channel, pair]
+
+        # Add timestamp if available
+        if isinstance(payload, dict):
+            timestamp = payload.get("timestamp") or payload.get("ts") or payload.get("time")
+            if timestamp:
+                id_parts.append(str(timestamp))
+
+            # Add sequence if available
+            sequence = payload.get("s") or payload.get("sequence")
+            if sequence:
+                id_parts.append(str(sequence))
+
+        # Add a hash of the payload for uniqueness
+        # Use a simple string representation to keep it lightweight
+        payload_str = str(payload)[:100]  # First 100 chars to keep it manageable
+        id_parts.append(str(hash(payload_str)))
+
+        return ":".join(id_parts)
+
+    def check_duplicate(self, data: list, channel: str, pair: str) -> bool:
+        """
+        Check if message is a duplicate (PRD-001 Section 1.3).
+
+        Maintains a cache of last 100 message IDs per channel.
+
+        Returns:
+            bool: True if duplicate, False if new message
+        """
+        # Generate message ID
+        msg_id = self.generate_message_id(data, channel, pair)
+
+        if not msg_id:
+            return False  # Can't determine, assume not duplicate
+
+        # Get or create dedup cache for this channel
+        channel_key = f"{channel}:{pair}"
+        if channel_key not in self.dedup_cache:
+            self.dedup_cache[channel_key] = deque(maxlen=100)
+
+        # Check if message ID is in cache
+        if msg_id in self.dedup_cache[channel_key]:
+            # Duplicate detected!
+            self.logger.warning(f"Duplicate message detected for {channel}/{pair}: {msg_id}")
+
+            # Emit Prometheus counter (PRD-001 Section 1.3)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_DUPLICATES_REJECTED_TOTAL:
+                KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel=channel).inc()
+
+            return True
+
+        # Not a duplicate - add to cache
+        self.dedup_cache[channel_key].append(msg_id)
+        return False
+
     async def handle_message(self, message: str):
         """Handle incoming WebSocket messages with enhanced debugging and validation (PRD-001 Section 1.3)"""
         message_start_time = time.time()
@@ -1219,6 +1300,12 @@ class KrakenWebSocketClient:
                 is_valid_timestamp, rejection_reason = self.validate_message_timestamp(data, channel)
                 if not is_valid_timestamp:
                     self.logger.debug(f"Message rejected due to timestamp: {rejection_reason}")
+                    self.stats["errors"] += 1
+                    return
+
+                # Check for duplicate messages (PRD-001 Section 1.3)
+                if self.check_duplicate(data, channel, pair):
+                    self.logger.debug(f"Message rejected: duplicate")
                     self.stats["errors"] += 1
                     return
 
