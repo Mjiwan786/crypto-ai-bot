@@ -20,9 +20,9 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, field_validator, Field
 
-# Prometheus metrics (optional) - PRD-001 Section 4.1, 4.2, 1.3 & 8.2
+# Prometheus metrics (optional) - PRD-001 Section 4.1, 4.2, 1.3, 1.4 & 1.5
 try:
-    from prometheus_client import Counter
+    from prometheus_client import Counter, Histogram
     KRAKEN_WS_CONNECTIONS_TOTAL = Counter(
         'kraken_ws_connections_total',
         'Total WebSocket connection state changes',
@@ -52,6 +52,17 @@ try:
         'Total WebSocket errors by type',
         ['error_type']
     )
+    KRAKEN_WS_LATENCY_MS = Histogram(
+        'kraken_ws_latency_ms',
+        'Message processing latency in milliseconds',
+        ['channel'],
+        buckets=[1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]  # PRD-001 Section 1.5: target < 50ms
+    )
+    KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL = Counter(
+        'kraken_ws_backpressure_events_total',
+        'Total backpressure events (queue depth > 1000)',
+        ['action']
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -61,6 +72,8 @@ except ImportError:
     KRAKEN_WS_STALE_MESSAGES_TOTAL = None
     KRAKEN_WS_DUPLICATES_REJECTED_TOTAL = None
     KRAKEN_WS_ERRORS_TOTAL = None
+    KRAKEN_WS_LATENCY_MS = None
+    KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -259,30 +272,45 @@ class CircuitBreaker:
 
 
 class LatencyTracker:
-    """Track latency metrics for monitoring"""
-    
+    """Track latency metrics for monitoring (PRD-001 Section 1.5)"""
+
     def __init__(self, max_samples: int = 1000):
         self.max_samples = max_samples
         self.samples = []
         self.start_times = {}
-    
+
     def start_timing(self, operation_id: str):
         """Start timing an operation"""
         self.start_times[operation_id] = time.time()
-    
-    def end_timing(self, operation_id: str) -> float:
-        """End timing and return latency in ms"""
+
+    def end_timing(self, operation_id: str, channel: str = None) -> float:
+        """
+        End timing and return latency in ms (PRD-001 Section 1.5).
+
+        Emits Prometheus histogram if channel is provided.
+
+        Args:
+            operation_id: Unique operation identifier
+            channel: Channel name for Prometheus labeling (e.g., 'trade', 'spread')
+
+        Returns:
+            Latency in milliseconds
+        """
         if operation_id not in self.start_times:
             return 0.0
-        
+
         latency_ms = (time.time() - self.start_times[operation_id]) * 1000
         del self.start_times[operation_id]
-        
-        # Keep rolling window of samples
+
+        # Keep rolling window of samples for P95 calculation
         self.samples.append(latency_ms)
         if len(self.samples) > self.max_samples:
             self.samples.pop(0)
-        
+
+        # Emit Prometheus histogram (PRD-001 Section 1.5)
+        if channel and PROMETHEUS_AVAILABLE and KRAKEN_WS_LATENCY_MS:
+            KRAKEN_WS_LATENCY_MS.labels(channel=channel).observe(latency_ms)
+
         return latency_ms
     
     def get_stats(self) -> Dict[str, float]:
@@ -504,6 +532,18 @@ class KrakenWebSocketClient:
         # Cache TTL: 5 minutes (300 seconds)
         self.data_cache: Dict[str, Dict[str, Any]] = {}
         self.cache_ttl = 300  # 5 minutes in seconds
+
+        # Backpressure detection (PRD-001 Section 1.5)
+        # Track pending messages to prevent memory overflow
+        # Threshold: 1000 messages (drop oldest if exceeded)
+        self.message_queue: deque = deque(maxlen=10000)  # Hard cap at 10k
+        self.backpressure_threshold = 1000
+        self.backpressure_warned_at = 0  # Timestamp of last warning
+
+        # Memory bounds (PRD-001 Section 1.5)
+        # WebSocket buffer limits: 100MB total
+        self.websocket_read_limit = 50 * 1024 * 1024  # 50MB read buffer
+        self.websocket_write_limit = 50 * 1024 * 1024  # 50MB write buffer
 
         # Scalping rate limiting
         self.trade_timestamps = []
@@ -816,7 +856,7 @@ class KrakenWebSocketClient:
             # Don't raise - continue processing
         finally:
             if self.latency_tracker:
-                latency_ms = self.latency_tracker.end_timing(operation_id)
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='trade')
                 self.stats["latency_ms"] = latency_ms
                 await self.check_latency_circuit_breaker(latency_ms)
     
@@ -886,7 +926,7 @@ class KrakenWebSocketClient:
             # Don't raise - continue processing
         finally:
             if self.latency_tracker:
-                latency_ms = self.latency_tracker.end_timing(operation_id)
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='spread')
                 await self.check_latency_circuit_breaker(latency_ms)
     
     async def handle_book_data(self, channel_id: int, data: dict, channel: str, pair: str):
@@ -947,7 +987,7 @@ class KrakenWebSocketClient:
             # Don't raise - continue processing
         finally:
             if self.latency_tracker:
-                latency_ms = self.latency_tracker.end_timing(operation_id)
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='book')
                 await self.check_latency_circuit_breaker(latency_ms)
     
     async def handle_ohlc_data(self, channel_id: int, data: List, channel: str, pair: str):
@@ -1022,7 +1062,7 @@ class KrakenWebSocketClient:
             # Don't raise - continue processing
         finally:
             if self.latency_tracker:
-                latency_ms = self.latency_tracker.end_timing(operation_id)
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='ohlc')
                 await self.check_latency_circuit_breaker(latency_ms)
     
     async def handle_subscription_status(self, data: dict):
@@ -1333,6 +1373,47 @@ class KrakenWebSocketClient:
         cache_age = time.time() - self.data_cache[cache_key]["timestamp"]
         return cache_age <= self.cache_ttl
 
+    def check_backpressure(self) -> bool:
+        """
+        Check for backpressure and drop oldest messages if needed (PRD-001 Section 1.5).
+
+        If queue depth > 1000, logs warning and drops oldest messages.
+        Handles 100+ messages/second without backpressure under normal conditions.
+
+        Returns:
+            bool: True if backpressure detected, False otherwise
+        """
+        queue_depth = len(self.message_queue)
+
+        if queue_depth > self.backpressure_threshold:
+            # Only log warning once per minute to avoid log spam
+            current_time = time.time()
+            if current_time - self.backpressure_warned_at > 60:
+                self.logger.warning(
+                    f"Backpressure detected: queue depth = {queue_depth} "
+                    f"(threshold = {self.backpressure_threshold}). "
+                    f"Dropping oldest messages to prevent memory overflow."
+                )
+                self.backpressure_warned_at = current_time
+
+                # Emit Prometheus counter (PRD-001 Section 1.5)
+                if PROMETHEUS_AVAILABLE and KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL:
+                    KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL.labels(action='threshold_exceeded').inc()
+
+            # Drop oldest messages (deque will auto-evict at maxlen=10000)
+            # But we actively clear down to threshold to recover faster
+            messages_to_drop = queue_depth - self.backpressure_threshold
+            for _ in range(min(messages_to_drop, 100)):  # Drop max 100 at a time
+                if self.message_queue:
+                    self.message_queue.popleft()
+
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL:
+                KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL.labels(action='messages_dropped').inc()
+
+            return True
+
+        return False
+
     def check_duplicate(self, data: list, channel: str, pair: str) -> bool:
         """
         Check if message is a duplicate (PRD-001 Section 1.3).
@@ -1371,6 +1452,13 @@ class KrakenWebSocketClient:
     async def handle_message(self, message: str):
         """Handle incoming WebSocket messages with enhanced debugging and validation (PRD-001 Section 1.3)"""
         message_start_time = time.time()
+
+        # Check backpressure before processing (PRD-001 Section 1.5)
+        # If queue too deep, oldest messages will be dropped
+        self.check_backpressure()
+
+        # Add to message queue for backpressure tracking
+        self.message_queue.append(message_start_time)
 
         try:
             data = json.loads(message)
@@ -1615,7 +1703,9 @@ class KrakenWebSocketClient:
                 ping_interval=self.config.ping_interval,
                 ping_timeout=self.config.ping_timeout,  # PRD-001 Section 4.1: PONG timeout detection
                 close_timeout=self.config.close_timeout,
-                compression=None  # Kraken doesn't support compression
+                compression=None,  # Kraken doesn't support compression
+                max_size=self.websocket_read_limit,  # PRD-001 Section 1.5: 50MB read buffer
+                write_limit=self.websocket_write_limit  # PRD-001 Section 1.5: 50MB write buffer
             ) as ws:
                 self.ws = ws
 

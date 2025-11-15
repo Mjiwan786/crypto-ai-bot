@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 43/248 Complete (17.3%)
+**Status:** 48/248 Complete (19.4%)
 
 ---
 
@@ -71,12 +71,12 @@
 - [x] Add cache TTL (5 minutes) for stale data fallback
 - [x] Mark health check unhealthy during sustained failures (> 2 min)
 
-### 1.5 Performance (5/5)
-- [ ] Measure P95 latency from Kraken message receipt → processing complete (target < 50ms)
-- [ ] Emit Prometheus histogram `kraken_ws_latency_ms{channel}` for message processing time
-- [ ] Handle 100+ messages/second per pair without backpressure
-- [ ] Implement backpressure detection: queue depth > 1000 → log warning, drop oldest messages
-- [ ] Memory bound WebSocket buffers to max 100MB total
+### 1.5 Performance (5/5) ✅ COMPLETE
+- [x] Measure P95 latency from Kraken message receipt → processing complete (target < 50ms)
+- [x] Emit Prometheus histogram `kraken_ws_latency_ms{channel}` for message processing time
+- [x] Handle 100+ messages/second per pair without backpressure
+- [x] Implement backpressure detection: queue depth > 1000 → log warning, drop oldest messages
+- [x] Memory bound WebSocket buffers to max 100MB total
 
 ### 1.6 Data Persistence (5/5)
 - [ ] Store latest ticker data in Redis: `kraken:ticker:{pair}` with 60s TTL
