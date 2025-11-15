@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 147/248 Complete (59.3%)
+**Status:** 153/248 Complete (61.7%)
 
 ---
 
@@ -221,13 +221,13 @@
 - [x] Log spread rejection at WARNING level with pair and spread %
 - [x] Emit Prometheus counter `risk_filter_rejections_total{reason="wide_spread", pair}`
 
-### 4.2 Volatility Limits (6/6)
-- [ ] Calculate ATR(14) on 5-minute candles for each pair
-- [ ] Track 30-day rolling average ATR for each pair
-- [ ] If current_ATR > 3.0 × avg_ATR, reduce position size by 50%
-- [ ] If current_ATR > 5.0 × avg_ATR, halt new signals (circuit breaker)
-- [ ] Log volatility adjustments at INFO level with ATR ratio
-- [ ] Emit Prometheus counter `risk_filter_rejections_total{reason="high_volatility", pair}`
+### 4.2 Volatility Limits (6/6) ✅
+- [x] Calculate ATR(14) on 5-minute candles for each pair
+- [x] Track 30-day rolling average ATR for each pair
+- [x] If current_ATR > 3.0 × avg_ATR, reduce position size by 50%
+- [x] If current_ATR > 5.0 × avg_ATR, halt new signals (circuit breaker)
+- [x] Log volatility adjustments at INFO level with ATR ratio
+- [x] Emit Prometheus counter `risk_filter_rejections_total{reason="high_volatility", pair}`
 
 ### 4.3 Daily Drawdown Circuit Breaker (7/7)
 - [ ] Track P&L from midnight UTC daily reset
