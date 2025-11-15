@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 59/248 Complete (23.8%)
+**Status:** 67/248 Complete (27.0%)
 
 ---
 
@@ -99,15 +99,15 @@
 - [x] Track Redis connection state (CONNECTED, DISCONNECTED, RECONNECTING)
 - [x] Emit Prometheus gauge `redis_connected{instance}` (1=connected, 0=disconnected)
 
-### 2.2 Stream Configuration (8/8)
-- [ ] Configure signal stream name based on TRADING_MODE: `signals:paper` or `signals:live`
-- [ ] Configure PnL stream: `pnl:signals` with MAXLEN 50000
-- [ ] Configure events stream: `events:bus` with MAXLEN 5000
-- [ ] Set MAXLEN=10000 on signal streams (automatic trimming)
-- [ ] Use approximate trimming (~) for performance: `XADD ... MAXLEN ~ 10000`
-- [ ] Verify stream configuration on startup (XINFO STREAM)
-- [ ] Log stream configuration at INFO level on startup
-- [ ] Emit Prometheus gauge `redis_stream_length{stream}` for all streams
+### 2.2 Stream Configuration (8/8) ✅ COMPLETE
+- [x] Configure signal stream name based on TRADING_MODE: `signals:paper` or `signals:live`
+- [x] Configure PnL stream: `pnl:signals` with MAXLEN 50000
+- [x] Configure events stream: `events:bus` with MAXLEN 5000
+- [x] Set MAXLEN=10000 on signal streams (automatic trimming)
+- [x] Use approximate trimming (~) for performance: `XADD ... MAXLEN ~ 10000`
+- [x] Verify stream configuration on startup (XINFO STREAM)
+- [x] Log stream configuration at INFO level on startup
+- [x] Emit Prometheus gauge `redis_stream_length{stream}` for all streams
 
 ### 2.3 Publishing Guarantees (12/12)
 - [ ] Use `signal_id` (UUID v4) as Redis message ID for idempotency

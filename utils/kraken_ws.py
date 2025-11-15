@@ -68,6 +68,11 @@ try:
         'Redis connection status (1=connected, 0=disconnected)',
         ['instance']
     )
+    REDIS_STREAM_LENGTH = Gauge(
+        'redis_stream_length',
+        'Current length of Redis streams',
+        ['stream']
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -80,6 +85,7 @@ except ImportError:
     KRAKEN_WS_LATENCY_MS = None
     KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL = None
     REDIS_CONNECTED = None
+    REDIS_STREAM_LENGTH = None
 
 # Discord alerts (optional) - PRD-001 Section 4.2
 try:
@@ -114,6 +120,10 @@ class KrakenWSConfig(BaseModel):
         default_factory=lambda: os.getenv("TIMEFRAMES", "15s,1m,3m,5m").split(",")
     )
     redis_url: str = Field(default_factory=lambda: os.getenv("REDIS_URL", ""))
+
+    # PRD-001 Section 2.2: Stream configuration based on trading mode
+    trading_mode: str = Field(default_factory=lambda: os.getenv("TRADING_MODE", "paper"))
+
     redis_streams: Dict[str, str] = Field(default_factory=lambda: {
         "ticker": "kraken:ticker",
         "trade": "kraken:trade",
@@ -122,7 +132,26 @@ class KrakenWSConfig(BaseModel):
         "ohlc": "kraken:ohlc",
         "scalp_signals": "kraken:scalp"
     })
-    
+
+    # PRD-001 Section 2.2: Stream MAXLEN configuration
+    stream_maxlen: Dict[str, int] = Field(default_factory=lambda: {
+        "signals": 10000,      # PRD-001 Section 2.2: Signal streams
+        "pnl": 50000,          # PRD-001 Section 2.2: PnL stream
+        "events": 5000         # PRD-001 Section 2.2: Events stream
+    })
+
+    def get_signal_stream_name(self) -> str:
+        """Get signal stream name based on TRADING_MODE (PRD-001 Section 2.2)"""
+        return f"signals:{self.trading_mode}"
+
+    def get_pnl_stream_name(self) -> str:
+        """Get PnL stream name (PRD-001 Section 2.2)"""
+        return "pnl:signals"
+
+    def get_events_stream_name(self) -> str:
+        """Get events stream name (PRD-001 Section 2.2)"""
+        return "events:bus"
+
     # UPDATED: Redis Cloud optimized connection settings (PRD-001 compliant)
     reconnect_delay: int = Field(
         default=int(os.getenv("WEBSOCKET_RECONNECT_DELAY", "1")), ge=1, le=60
@@ -519,6 +548,75 @@ class RedisConnectionManager:
             self.logger.warning(f"Redis health check failed: {e}")
             self._set_connection_state(RedisConnectionState.DISCONNECTED)
             return False
+
+    async def verify_stream_configuration(self):
+        """Verify stream configuration on startup (PRD-001 Section 2.2)"""
+        if not self.redis_client:
+            self.logger.warning("Cannot verify streams: Redis not connected")
+            return
+
+        try:
+            # PRD-001 Section 2.2: Get stream names from config
+            signal_stream = self.config.get_signal_stream_name()
+            pnl_stream = self.config.get_pnl_stream_name()
+            events_stream = self.config.get_events_stream_name()
+
+            streams_to_check = [signal_stream, pnl_stream, events_stream]
+
+            # PRD-001 Section 2.2: Verify each stream and log configuration
+            for stream_name in streams_to_check:
+                try:
+                    # Try to get stream info
+                    info = await self.redis_client.xinfo_stream(stream_name)
+                    stream_length = info.get('length', 0)
+
+                    # PRD-001 Section 2.2: Log stream configuration at INFO level
+                    self.logger.info(
+                        f"Stream '{stream_name}': length={stream_length}, "
+                        f"first_entry={info.get('first-entry')}, "
+                        f"last_entry={info.get('last-entry')}"
+                    )
+
+                    # PRD-001 Section 2.2: Emit Prometheus gauge for stream length
+                    if PROMETHEUS_AVAILABLE and REDIS_STREAM_LENGTH:
+                        REDIS_STREAM_LENGTH.labels(stream=stream_name).set(stream_length)
+
+                except Exception as e:
+                    # Stream doesn't exist yet - this is OK
+                    self.logger.info(f"Stream '{stream_name}' not yet created (will be created on first publish)")
+
+            # Log overall stream configuration
+            self.logger.info(
+                f"Stream configuration verified - "
+                f"signal_stream={signal_stream}, "
+                f"pnl_stream={pnl_stream}, "
+                f"events_stream={events_stream}"
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error verifying stream configuration: {e}")
+
+    async def update_stream_metrics(self):
+        """Update stream length metrics for all configured streams (PRD-001 Section 2.2)"""
+        if not self.redis_client or not PROMETHEUS_AVAILABLE or not REDIS_STREAM_LENGTH:
+            return
+
+        try:
+            signal_stream = self.config.get_signal_stream_name()
+            pnl_stream = self.config.get_pnl_stream_name()
+            events_stream = self.config.get_events_stream_name()
+
+            for stream_name in [signal_stream, pnl_stream, events_stream]:
+                try:
+                    info = await self.redis_client.xinfo_stream(stream_name)
+                    stream_length = info.get('length', 0)
+                    REDIS_STREAM_LENGTH.labels(stream=stream_name).set(stream_length)
+                except:
+                    # Stream doesn't exist yet
+                    pass
+
+        except Exception as e:
+            self.logger.debug(f"Error updating stream metrics: {e}")
 
     async def close(self):
         """Close Redis connection"""
@@ -1779,6 +1877,9 @@ class KrakenWebSocketClient:
                 # PRD-001 Section 2.1: Redis PING health check every 60 seconds
                 await self.redis_manager.health_check()
 
+                # PRD-001 Section 2.2: Update stream length metrics
+                await self.redis_manager.update_stream_metrics()
+
                 # Check overall health status (PRD-001 Section 4.1)
                 if not self.is_healthy:
                     time_disconnected = current_time - self.connection_state_changed_at
@@ -1960,6 +2061,9 @@ class KrakenWebSocketClient:
         """Start the WebSocket client with enhanced reconnection logic (PRD-001 Section 4.2)"""
         self.running = True
         await self.redis_manager.initialize_pool()
+
+        # PRD-001 Section 2.2: Verify stream configuration on startup
+        await self.redis_manager.verify_stream_configuration()
 
         backoff = self.config.reconnect_delay
         max_backoff = 60
