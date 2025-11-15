@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 137/248 Complete (55.2%)
+**Status:** 142/248 Complete (57.3%)
 
 ---
 
@@ -201,12 +201,12 @@
 - [x] Implement weekly retraining schedule (Sunday 00:00 UTC via cron) - script ready for cron
 - [x] Only deploy new model if accuracy improves by ≥ 2% vs current model
 
-### 3.6 Ensemble & Confidence (5/5)
-- [ ] Implement weighted ensemble: RF (60%) + LSTM (40%)
-- [ ] Adjust weights based on recent accuracy (last 100 predictions)
-- [ ] Calculate confidence from model agreement: both agree → 0.9, disagree → 0.5
-- [ ] Log ensemble prediction and confidence at DEBUG level
-- [ ] Add ensemble unit test with known RF and LSTM predictions
+### 3.6 Ensemble & Confidence (5/5) ✅
+- [x] Implement weighted ensemble: RF (60%) + LSTM (40%)
+- [x] Adjust weights based on recent accuracy (last 100 predictions)
+- [x] Calculate confidence from model agreement: both agree → 0.9, disagree → 0.5
+- [x] Log ensemble prediction and confidence at DEBUG level
+- [x] Add ensemble unit test with known RF and LSTM predictions
 
 ---
 
