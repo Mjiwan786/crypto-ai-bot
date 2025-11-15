@@ -4,13 +4,15 @@ PRD-001 Section 6.1 Backtest Data Provider
 This module implements PRD-001 Section 6.1 data requirements with:
 - Fetch 1 year (365 days) historical OHLCV data for BTC/USD, ETH/USD, SOL/USD
 - Use Kraken exchange as data source (via CCXT)
+- Fetch data up to current time (most recent market prices)
+- Automatic staleness detection and cache refresh (24h default)
 - Implement slippage model: 5 bps (0.05%) per trade
 - Implement fee calculation: Kraken fee tiers (maker 16 bps, taker 26 bps)
 - Simulate realistic order fills
 - Store historical data in cache for reuse (data/ohlcv/)
 
 Author: Crypto AI Bot Team
-Version: 1.0.0
+Version: 1.1.0
 """
 
 from __future__ import annotations
@@ -337,6 +339,95 @@ class PRDBacktestDataProvider:
         except Exception as e:
             logger.warning(f"Error loading cache file {cache_file}: {e}")
             return None
+
+    def is_cache_stale(
+        self,
+        pair: str,
+        days: int,
+        timeframe: str,
+        max_age_hours: int = 24
+    ) -> bool:
+        """
+        Check if cached data is stale (outdated).
+
+        Args:
+            pair: Trading pair
+            days: Number of days
+            timeframe: Timeframe
+            max_age_hours: Maximum age in hours before cache is stale (default 24)
+
+        Returns:
+            True if cache is stale or missing, False otherwise
+        """
+        cache_file = self._get_cache_filename(pair, days, timeframe)
+
+        if not cache_file.exists():
+            return True
+
+        # Check file modification time
+        try:
+            import os
+            file_mtime = os.path.getmtime(cache_file)
+            file_age_hours = (datetime.now().timestamp() - file_mtime) / 3600
+
+            is_stale = file_age_hours > max_age_hours
+
+            if is_stale:
+                logger.info(
+                    f"[CACHE STALE] {cache_file.name} is {file_age_hours:.1f}h old "
+                    f"(max {max_age_hours}h)"
+                )
+            else:
+                logger.debug(
+                    f"[CACHE FRESH] {cache_file.name} is {file_age_hours:.1f}h old"
+                )
+
+            return is_stale
+        except Exception as e:
+            logger.warning(f"Error checking cache age for {cache_file}: {e}")
+            return True  # Treat as stale if we can't check
+
+    def fetch_latest_ohlcv(
+        self,
+        pair: str,
+        days: int = 365,
+        timeframe: str = "1h",
+        max_cache_age_hours: int = 24
+    ) -> pd.DataFrame:
+        """
+        Fetch latest OHLCV data with automatic staleness detection.
+
+        This method automatically refreshes data if the cache is older than
+        max_cache_age_hours. Use this when you need the most recent market data.
+
+        Args:
+            pair: Trading pair (e.g., "BTC/USD")
+            days: Number of days of historical data (default 365)
+            timeframe: Candle timeframe (default "1h")
+            max_cache_age_hours: Max cache age in hours before refresh (default 24)
+
+        Returns:
+            DataFrame with latest OHLCV data up to current time
+
+        Example:
+            # Get BTC/USD data with most recent prices
+            provider = PRDBacktestDataProvider()
+            btc_data = provider.fetch_latest_ohlcv("BTC/USD", days=365)
+        """
+        # Check if cache is stale
+        force_refresh = self.is_cache_stale(pair, days, timeframe, max_cache_age_hours)
+
+        if force_refresh:
+            logger.info(
+                f"[FETCH LATEST] Cache stale for {pair}, fetching fresh data..."
+            )
+
+        return self.fetch_ohlcv(
+            pair=pair,
+            days=days,
+            timeframe=timeframe,
+            force_refresh=force_refresh
+        )
 
     def _save_to_cache(
         self,

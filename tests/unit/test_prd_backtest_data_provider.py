@@ -423,3 +423,92 @@ class TestSingletonInstance:
         provider2 = get_data_provider()
 
         assert provider1 is provider2
+
+
+
+class TestCacheStaleness:
+    """Test cache staleness detection."""
+
+    def test_is_cache_stale_missing_cache(self):
+        """Test that missing cache is considered stale."""
+        provider = PRDBacktestDataProvider()
+        
+        # Non-existent pair should be stale
+        is_stale = provider.is_cache_stale("FAKE/PAIR", 365, "1h")
+        
+        assert is_stale is True
+
+    def test_fetch_latest_ohlcv_forces_refresh_on_stale(self):
+        """Test that fetch_latest_ohlcv forces refresh when cache is stale."""
+        provider = PRDBacktestDataProvider()
+        
+        # Use very short max_cache_age to force refresh
+        data = provider.fetch_latest_ohlcv(
+            "BTC/USD",
+            days=30,  # Use shorter period for faster test
+            timeframe="1h",
+            max_cache_age_hours=0  # Force refresh
+        )
+        
+        assert data is not None
+        assert len(data) > 0
+        assert "timestamp" in data.columns
+        
+        # Check that data extends to recent time
+        latest_timestamp = data['timestamp'].max()
+        hours_old = (datetime.now() - latest_timestamp).total_seconds() / 3600
+        
+        # Data should be no more than a few hours old
+        assert hours_old < 48, f"Latest data is {hours_old:.1f}h old"
+
+    def test_fetch_latest_ohlcv_default_behavior(self):
+        """Test fetch_latest_ohlcv with default cache age (24h)."""
+        provider = PRDBacktestDataProvider()
+        
+        # First fetch - should fetch from exchange or cache
+        data = provider.fetch_latest_ohlcv("BTC/USD", days=30)
+        
+        assert data is not None
+        assert len(data) > 0
+        assert "close" in data.columns
+
+
+class TestLatestMarketData:
+    """Test latest market data fetching."""
+
+    def test_fetch_data_up_to_current_time(self):
+        """Test that fetched data includes most recent market prices."""
+        provider = PRDBacktestDataProvider()
+        
+        # Force fresh fetch
+        data = provider.fetch_ohlcv("BTC/USD", days=7, force_refresh=True)
+        
+        assert data is not None
+        assert len(data) > 0
+        
+        # Check that latest timestamp is recent (within last 48 hours)
+        latest_timestamp = data['timestamp'].max()
+        hours_ago = (datetime.now() - latest_timestamp).total_seconds() / 3600
+        
+        assert hours_ago < 48, (
+            f"Latest data is {hours_ago:.1f}h old, expected < 48h. "
+            f"Latest timestamp: {latest_timestamp}"
+        )
+
+    def test_data_spans_requested_period(self):
+        """Test that data spans the requested historical period."""
+        provider = PRDBacktestDataProvider()
+        
+        days = 30
+        data = provider.fetch_latest_ohlcv("BTC/USD", days=days)
+        
+        assert data is not None
+        
+        # Calculate actual time span
+        time_span = (data['timestamp'].max() - data['timestamp'].min())
+        days_span = time_span.total_seconds() / (24 * 3600)
+        
+        # Should be close to requested days (allow some tolerance)
+        assert days_span >= days * 0.8, (
+            f"Data spans {days_span:.1f} days, expected ~{days} days"
+        )
