@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 160/248 Complete (64.5%)
+**Status:** 168/248 Complete (67.7%)
 
 ---
 
@@ -238,15 +238,15 @@
 - [x] Emit Prometheus gauge `current_drawdown_pct` (updated real-time)
 - [x] Add daily drawdown unit test with simulated losing trades
 
-### 4.4 Position Sizing (8/8)
-- [ ] Implement position sizing formula: `size = base_size * confidence * (avg_ATR / ATR)`
-- [ ] Set base_size = $100 per signal (configurable via risk.position_sizing.base_usd)
-- [ ] Apply volatility adjustment: divide by (ATR / avg_ATR) to reduce size in high vol
-- [ ] Apply confidence scaling: multiply by signal.confidence (0.6 - 1.0)
-- [ ] Cap position size at $2,000 max per signal (risk.position_sizing.max_position_usd)
-- [ ] Enforce max total exposure: sum of all open positions ≤ $10,000
-- [ ] Log position sizing calculation at DEBUG level with all factors
-- [ ] Add position sizing unit tests with various confidence and ATR scenarios
+### 4.4 Position Sizing (8/8) ✅
+- [x] Implement position sizing formula: `size = base_size * confidence * (avg_ATR / ATR)`
+- [x] Set base_size = $100 per signal (configurable via risk.position_sizing.base_usd)
+- [x] Apply volatility adjustment: divide by (ATR / avg_ATR) to reduce size in high vol
+- [x] Apply confidence scaling: multiply by signal.confidence (0.6 - 1.0)
+- [x] Cap position size at $2,000 max per signal (risk.position_sizing.max_position_usd)
+- [x] Enforce max total exposure: sum of all open positions ≤ $10,000
+- [x] Log position sizing calculation at DEBUG level with all factors
+- [x] Add position sizing unit tests with various confidence and ATR scenarios
 
 ### 4.5 Loss Streak Management (8/8)
 - [ ] Implement LossStreakTracker class to track consecutive losses per strategy
