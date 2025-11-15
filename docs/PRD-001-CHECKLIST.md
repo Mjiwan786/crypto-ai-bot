@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 217/248 Complete (87.5%)
+**Status:** 224/248 Complete (90.3%)
 
 ---
 
@@ -323,14 +323,14 @@
 - [x] Count total trades in backtest period
 - [x] Log all metrics to `out/backtests/{strategy}_{date}.json`
 
-### 6.3 Acceptance Criteria (7/7)
-- [ ] Enforce Sharpe ratio ≥ 1.5 for production deployment
-- [ ] Enforce max drawdown ≤ -15%
-- [ ] Enforce win rate ≥ 45%
-- [ ] Enforce profit factor ≥ 1.3
-- [ ] Enforce minimum 200 trades in backtest period
-- [ ] Block deployment if backtest fails acceptance criteria
-- [ ] Add backtest acceptance unit test with known good/bad results
+### 6.3 Acceptance Criteria (7/7) ✅
+- [x] Enforce Sharpe ratio ≥ 1.5 for production deployment
+- [x] Enforce max drawdown ≤ -15%
+- [x] Enforce win rate ≥ 45%
+- [x] Enforce profit factor ≥ 1.3
+- [x] Enforce minimum 200 trades in backtest period
+- [x] Block deployment if backtest fails acceptance criteria
+- [x] Add backtest acceptance unit test with known good/bad results
 
 ### 6.4 Automation (5/5)
 - [ ] Implement backtest script: `scripts/run_backtest.py --strategy scalper --period 365`
