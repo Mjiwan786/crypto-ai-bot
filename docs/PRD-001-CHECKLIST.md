@@ -2,7 +2,7 @@
 
 **PRD Location:** `docs/PRD-001-CRYPTO-AI-BOT.md`
 **Generated:** 2025-11-14
-**Status:** 176/248 Complete (71.0%)
+**Status:** 180/248 Complete (72.6%)
 
 ---
 
@@ -258,11 +258,11 @@
 - [x] Store loss streak state in Redis: `state:loss_streak:{strategy}` with 7-day TTL
 - [x] Add loss streak unit test with sequence of wins/losses
 
-### 4.6 Position Concentration (4/4)
-- [ ] Calculate position concentration per symbol: position_size / total_portfolio_value
-- [ ] Reject signal if position concentration > 40% for any single symbol
-- [ ] Log concentration rejection at WARNING level with symbol and concentration %
-- [ ] Emit Prometheus counter `risk_filter_rejections_total{reason="concentration", pair}`
+### 4.6 Position Concentration (4/4) ✅
+- [x] Calculate position concentration per symbol: position_size / total_portfolio_value
+- [x] Reject signal if position concentration > 40% for any single symbol
+- [x] Log concentration rejection at WARNING level with symbol and concentration %
+- [x] Emit Prometheus counter `risk_filter_rejections_total{reason="concentration", pair}`
 
 ---
 
