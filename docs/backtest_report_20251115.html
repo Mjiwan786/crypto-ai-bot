@@ -1,0 +1,149 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Backtest Report - scalper | BTC/USD</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            background-color: #dc3545;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .failures {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .failure-item {
+            color: #856404;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SCALPER | BTC/USD</h1>
+        <p>Generated: 2025-11-15 16:38:42</p>
+        <p>Period: 30 days | Timeframe: 1h</p>
+        <div class="status-badge">❌ FAILED</div>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-label">Total Return</div>
+            <div class="metric-value">-0.52%</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Sharpe Ratio</div>
+            <div class="metric-value">0.00</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Max Drawdown</div>
+            <div class="metric-value">-0.52%</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Win Rate</div>
+            <div class="metric-value">0.0%</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Profit Factor</div>
+            <div class="metric-value">0.00</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Total Trades</div>
+            <div class="metric-value">1</div>
+        </div>
+    </div>
+
+    <div class="failures"><h3>❌ Acceptance Criteria Failures:</h3><div class="failure-item">• Sharpe ratio 0.00 < 1.5 (FAIL)</div><div class="failure-item">• Win rate 0.00% < 45.0% (FAIL)</div><div class="failure-item">• Profit factor 0.00 < 1.3 (FAIL)</div><div class="failure-item">• Total trades 1 < 200 (FAIL)</div></div>
+
+    <div class="chart-container">
+        <h2>Equity Curve</h2>
+        <canvas id="equityChart"></canvas>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('equityChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {"labels": ["2025-10-16", "2025-10-16", "2025-10-16", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-17", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-18", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-19", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-20", "2025-10-21"], "datasets": [{"label": "Equity", "data": [10000.0, 9948.0], "borderColor": "rgb(75, 192, 192)", "backgroundColor": "rgba(75, 192, 192, 0.1)", "tension": 0.1, "fill": true}]},
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Equity Curve Over Time'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Equity ($)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

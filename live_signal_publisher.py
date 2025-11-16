@@ -340,7 +340,8 @@ class LiveSignalPublisher:
         await asyncio.sleep(random.uniform(0.01, 0.05))
 
         # Generate signal with realistic parameters
-        side = "long" if random.random() > 0.5 else "short"
+        # Use "buy"/"sell" to match signals-api schema (not "long"/"short")
+        side = "buy" if random.random() > 0.5 else "sell"
 
         # Use realistic price ranges for each pair
         price_ranges = {
@@ -357,10 +358,10 @@ class LiveSignalPublisher:
         # Calculate SL and TP based on volatility
         volatility = 0.02  # 2% moves
 
-        if side == "long":
+        if side == "buy":
             sl = entry * (1 - volatility * 1.5)
             tp = entry * (1 + volatility * 2.0)
-        else:
+        else:  # sell
             sl = entry * (1 + volatility * 1.5)
             tp = entry * (1 - volatility * 2.0)
 

@@ -169,8 +169,13 @@ logs/
 reports/
 artifacts/
 data/tmp/
+data/backtests/
+data/ohlcv/
+out/
 .benchmarks/
 .ruff_cache/
+.claude/settings.local.json
+nul
 
 # OS-specific files
 .DS_Store

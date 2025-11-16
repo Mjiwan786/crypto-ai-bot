@@ -13,6 +13,20 @@ primary_region = 'iad'
   LOG_LEVEL = "INFO"
   PYTHONUNBUFFERED = "1"
   REDIS_TLS_CERT_PATH = "/app/config/certs/redis_ca.pem"
+  HEARTBEAT_KEY = "bot:heartbeat"
+  HEARTBEAT_TTL_SEC = "60"
+
+# Graceful shutdown configuration
+[deploy]
+  strategy = "rolling"
+
+# Process lifecycle management
+# kill_signal: Signal to send for graceful shutdown (SIGTERM = graceful, SIGKILL = immediate)
+kill_signal = "SIGTERM"
+
+# Process definitions
+[processes]
+  app = "python -u -m main run --mode paper"
 
 # HTTP service configuration for health endpoint
 [[services]]

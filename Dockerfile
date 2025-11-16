@@ -88,6 +88,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Default command: run continuous publisher with health endpoint
-# This publishes signals to Redis for the signals-api to consume
-CMD ["python", "publisher_with_health.py"]
+# Default command: run the bot with integrated health endpoint and heartbeat
+# Use main.py which provides graceful shutdown, health checks, and heartbeat
+CMD ["python", "-u", "-m", "main", "run", "--mode", "paper"]

@@ -42,11 +42,16 @@ class Signal(BaseModel):
     """
     Standardized trading signal with idempotent ID.
 
+    SCHEMA COMPATIBILITY: This schema matches signals-api SignalDTO exactly.
+    - Field names: ts (not ts_ms), pair, side, entry, sl, tp, strategy, confidence, mode
+    - Side values: "buy" or "sell" (not "long" or "short")
+    - Compatible with both Redis XADD and JSON serialization
+
     Attributes:
-        id: Idempotent signal ID (SHA256 hash of ts_ms|pair|strategy)
-        ts_ms: Timestamp in milliseconds (UTC)
+        id: Idempotent signal ID (SHA256 hash of ts|pair|strategy)
+        ts: Timestamp in milliseconds (UTC)
         pair: Trading pair (e.g., "BTC/USD", "ETH/USD")
-        side: Trade direction ("long" or "short")
+        side: Trade direction ("buy" or "sell") - matches signals-api
         entry: Entry price (float)
         sl: Stop loss price (float)
         tp: Take profit price (float)
@@ -60,12 +65,12 @@ class Signal(BaseModel):
     # Idempotent identifier
     id: str = Field(description="Idempotent signal ID (32-char hash)")
 
-    # Timestamp
-    ts_ms: int = Field(ge=0, description="Timestamp in milliseconds (UTC)")
+    # Timestamp (changed from ts_ms to ts for API compatibility)
+    ts: int = Field(ge=0, description="Timestamp in milliseconds (UTC)")
 
     # Market data
     pair: str = Field(min_length=3, description="Trading pair (e.g., BTC/USD)")
-    side: Literal["long", "short"] = Field(description="Trade direction")
+    side: Literal["buy", "sell"] = Field(description="Trade direction (buy or sell)")
 
     # Execution parameters
     entry: float = Field(gt=0.0, description="Entry price")
@@ -132,22 +137,29 @@ class Signal(BaseModel):
     def get_stream_key(self) -> str:
         """
         Get Redis stream key for this signal.
-        Returns: signals:{mode}:{pair} (e.g., "signals:live:BTC/USD")
+
+        Uses UNIFIED stream pattern for signals-api compatibility:
+        - signals:paper (all paper signals)
+        - signals:live (all live signals)
+
+        This replaces the old per-pair sharding pattern (signals:live:BTC-USD)
+        to ensure compatibility with signals-api which reads from unified streams.
+
+        Returns:
+            Unified stream key (e.g., "signals:paper" or "signals:live")
         """
-        # Replace / with - for Redis key compatibility
-        pair_key = self.pair.replace("/", "-")
-        return f"signals:{self.mode}:{pair_key}"
+        return f"signals:{self.mode}"
 
 
-def generate_signal_id(ts_ms: int, pair: str, strategy: str) -> str:
+def generate_signal_id(ts: int, pair: str, strategy: str) -> str:
     """
     Generate idempotent signal ID from timestamp, pair, and strategy.
 
-    Uses SHA256 hash of "ts_ms|pair|strategy" for deterministic IDs.
+    Uses SHA256 hash of "ts|pair|strategy" for deterministic IDs.
     This prevents duplicate signal processing across the pipeline.
 
     Args:
-        ts_ms: Timestamp in milliseconds
+        ts: Timestamp in milliseconds
         pair: Trading pair (e.g., "BTC/USD")
         strategy: Strategy name (e.g., "momentum_v1")
 
@@ -162,7 +174,7 @@ def generate_signal_id(ts_ms: int, pair: str, strategy: str) -> str:
     pair_normalized = pair.replace("-", "/").upper()
 
     # Create deterministic string
-    components = f"{ts_ms}|{pair_normalized}|{strategy}"
+    components = f"{ts}|{pair_normalized}|{strategy}"
 
     # Hash with SHA256
     hash_obj = hashlib.sha256(components.encode("utf-8"))
@@ -173,28 +185,31 @@ def generate_signal_id(ts_ms: int, pair: str, strategy: str) -> str:
 
 def create_signal(
     pair: str,
-    side: Literal["long", "short"],
+    side: Literal["buy", "sell"],
     entry: float,
     sl: float,
     tp: float,
     strategy: str,
     confidence: float,
     mode: Literal["paper", "live"],
-    ts_ms: int | None = None,
+    ts: int | None = None,
 ) -> Signal:
     """
     Convenience function to create Signal with auto-generated ID and timestamp.
 
+    SCHEMA COMPATIBILITY: Uses "buy"/"sell" for side (not "long"/"short")
+    to match signals-api expectations.
+
     Args:
-        pair: Trading pair
-        side: Trade direction
+        pair: Trading pair (e.g., "BTC/USD")
+        side: Trade direction ("buy" or "sell")
         entry: Entry price
         sl: Stop loss price
         tp: Take profit price
         strategy: Strategy name
         confidence: Signal confidence [0,1]
-        mode: Trading mode
-        ts_ms: Optional timestamp in milliseconds (defaults to now)
+        mode: Trading mode ("paper" or "live")
+        ts: Optional timestamp in milliseconds (defaults to now)
 
     Returns:
         Validated Signal instance with auto-generated ID
@@ -202,7 +217,7 @@ def create_signal(
     Example:
         >>> signal = create_signal(
         ...     pair="BTC/USD",
-        ...     side="long",
+        ...     side="buy",
         ...     entry=50000.0,
         ...     sl=49000.0,
         ...     tp=52000.0,
@@ -212,15 +227,15 @@ def create_signal(
         ... )
     """
     # Generate timestamp if not provided
-    if ts_ms is None:
-        ts_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    if ts is None:
+        ts = int(datetime.now(timezone.utc).timestamp() * 1000)
 
     # Generate idempotent ID
-    signal_id = generate_signal_id(ts_ms, pair, strategy)
+    signal_id = generate_signal_id(ts, pair, strategy)
 
     return Signal(
         id=signal_id,
-        ts_ms=ts_ms,
+        ts=ts,
         pair=pair,
         side=side,
         entry=entry,

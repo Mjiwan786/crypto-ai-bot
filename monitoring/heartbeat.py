@@ -90,35 +90,55 @@ def _sync_heartbeat_loop(redis_client, key: str, ttl: int) -> None:
 async def start_heartbeat(redis_client, key: Optional[str] = None, ttl: Optional[int] = None) -> None:
     """
     Start the async heartbeat loop.
-    
+
     Args:
         redis_client: Redis client (async or sync)
         key: Heartbeat key (defaults to HEARTBEAT_KEY env var)
         ttl: TTL in seconds (defaults to HEARTBEAT_TTL_SEC env var)
-    
+
     Raises:
         RuntimeError: If heartbeat is already running
     """
     global _heartbeat_task, _heartbeat_running
-    
+
     if _heartbeat_running:
         raise RuntimeError("Heartbeat is already running")
-    
+
     heartbeat_key = key or HEARTBEAT_KEY
     heartbeat_ttl = ttl or HEARTBEAT_TTL_SEC
-    
-    # Check if redis_client is async or sync
-    if hasattr(redis_client, 'setex') and asyncio.iscoroutinefunction(redis_client.setex):
+
+    # Check if redis_client is async by testing if it has an async ping method
+    # redis.asyncio.Redis methods return coroutines, so we check for that
+    is_async = False
+    if hasattr(redis_client, 'ping'):
+        # Try to detect async by checking the module name or by testing a method call
+        client_module = type(redis_client).__module__
+        if 'asyncio' in client_module or 'aioredis' in client_module:
+            is_async = True
+        else:
+            # Fallback: check if ping returns a coroutine
+            try:
+                result = redis_client.ping()
+                if asyncio.iscoroutine(result):
+                    is_async = True
+                    # Cancel the pending coroutine
+                    result.close()
+            except:
+                pass
+
+    if is_async:
         # Async Redis client
+        logger.info(f"Detected async Redis client: {type(redis_client).__name__}")
         _heartbeat_task = asyncio.create_task(
             _async_heartbeat_loop(redis_client, heartbeat_key, heartbeat_ttl)
         )
     else:
         # Sync Redis client - run in thread
+        logger.info(f"Detected sync Redis client: {type(redis_client).__name__}")
         import threading
         def run_sync_heartbeat():
             _sync_heartbeat_loop(redis_client, heartbeat_key, heartbeat_ttl)
-        
+
         heartbeat_thread = threading.Thread(target=run_sync_heartbeat, daemon=True)
         heartbeat_thread.start()
         logger.info("Started sync heartbeat in background thread")
