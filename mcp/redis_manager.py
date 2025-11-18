@@ -794,7 +794,7 @@ class AsyncRedisManager(BaseRedisManager):
                     # Use from_url with SSL parameters (avoid RedisSSLContext)
                     extra_kwargs = {}
                     if self.config.ssl:
-                        extra_kwargs["ssl_cert_reqs"] = "required" if self.config.ssl_verify else "none"
+                        extra_kwargs["ssl_cert_reqs"] = ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE
                         if self.config.ca_cert and os.path.exists(self.config.ca_cert):
                             extra_kwargs["ssl_ca_certs"] = self.config.ca_cert
                             self.logger.debug(f"Using CA certificate from {self.config.ca_cert}")
