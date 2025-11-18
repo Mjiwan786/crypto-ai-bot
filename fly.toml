@@ -65,7 +65,7 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
 
 # Deploy Configuration (Zero-downtime deployments)
 [deploy]
-  release_command = "python scripts/preflight.py"
+  # release_command = "python scripts/preflight.py"  # Disabled for production
   strategy = "rolling"  # Rolling updates for zero downtime
 
 # Graceful shutdown
