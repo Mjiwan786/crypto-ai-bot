@@ -74,7 +74,7 @@ kill_timeout = "30s"  # Allow 30s for graceful shutdown
 
 # Process Configuration
 [processes]
-  app = "python -u agents/core/integrated_signal_pipeline.py"
+  app = "/app/docker-entrypoint.sh"
 
 # HTTP Service for Health Checks & Metrics
 [[services]]
