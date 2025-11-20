@@ -316,12 +316,12 @@ class ProductionEngine:
             return
 
         heartbeat = {
-            "timestamp": time.time(),
+            "timestamp": str(time.time()),
             "timestamp_iso": datetime.now(timezone.utc).isoformat(),
             "mode": self.config.mode,
             "status": "healthy",
-            "uptime_seconds": time.time() - self._start_time,
-            "kraken_ws_running": getattr(self.kraken_ws, 'running', False) if self.kraken_ws else False,
+            "uptime_seconds": str(time.time() - self._start_time),
+            "kraken_ws_running": str(getattr(self.kraken_ws, 'running', False) if self.kraken_ws else False),
         }
 
         # Publish to stream
@@ -342,10 +342,10 @@ class ProductionEngine:
         self.metrics["uptime_seconds"] = time.time() - self._start_time
 
         metrics_data = {
-            "timestamp": time.time(),
+            "timestamp": str(time.time()),
             "timestamp_iso": datetime.now(timezone.utc).isoformat(),
             "mode": self.config.mode,
-            **self.metrics,
+            **{k: str(v) for k, v in self.metrics.items()},
         }
 
         # Publish to stream
