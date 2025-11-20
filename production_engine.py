@@ -321,7 +321,7 @@ class ProductionEngine:
             "mode": self.config.mode,
             "status": "healthy",
             "uptime_seconds": time.time() - self._start_time,
-            "kraken_ws_state": self.kraken_ws.state.value if self.kraken_ws else "disconnected",
+            "kraken_ws_running": getattr(self.kraken_ws, 'running', False) if self.kraken_ws else False,
         }
 
         # Publish to stream
