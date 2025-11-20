@@ -368,15 +368,17 @@ class ProductionEngine:
         if not self.pnl_tracker:
             return
 
-        # Get current prices and update unrealized PnL
-        # For now, we'll use last_price from positions
-        # In production, you'd get this from market data
-        await self.pnl_tracker.update_unrealized_pnl()
+        # NOTE: PnL tracker is initialized but not updated here since
+        # this engine only publishes signals, not executes trades.
+        # PnL updates will happen when actual trades are executed
+        # by the execution engine that consumes these signals.
 
-        # Publish PnL summary
-        await self.pnl_tracker.publish_summary()
-
-        self._last_pnl_update = time.time()
+        # Just publish current summary (if any positions exist)
+        try:
+            await self.pnl_tracker.publish_summary()
+            self._last_pnl_update = time.time()
+        except Exception as e:
+            logger.debug(f"PnL update skipped: {e}")
 
     async def generate_and_publish_signal(self, pair: str) -> None:
         """
