@@ -32,7 +32,7 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
 
   # Redis Cloud Configuration (non-sensitive)
   REDIS_SSL = "true"
-  REDIS_TLS_CERT_PATH = "/app/config/certs/redis_ca.pem"
+  REDIS_CA_CERT = "/app/config/certs/redis_ca.pem"
   REDIS_MAX_CONNECTIONS = "30"
   REDIS_SOCKET_TIMEOUT = "10"
   REDIS_RETRY_ATTEMPTS = "3"
@@ -74,7 +74,7 @@ kill_timeout = "30s"  # Allow 30s for graceful shutdown
 
 # Process Configuration
 [processes]
-  app = "/app/docker-entrypoint.sh"
+  app = "python -u production_engine.py --mode paper"
 
 # HTTP Service for Health Checks & Metrics
 [[services]]

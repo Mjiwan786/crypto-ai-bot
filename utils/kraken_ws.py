@@ -497,6 +497,7 @@ class RedisConnectionManager:
                 # PRD-001 Section 2.1: Connection pooling with max 10 connections
                 self.redis_client = redis.from_url(
                     self.config.redis_url,
+                    ssl=ssl_context,
                     ssl_cert_reqs='required',
                     decode_responses=False,
                     socket_timeout=self.config.redis_socket_timeout,
