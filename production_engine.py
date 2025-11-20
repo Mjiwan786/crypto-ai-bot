@@ -325,7 +325,7 @@ class ProductionEngine:
         }
 
         # Publish to stream
-        await self.redis_client.client.xadd(
+        await self.redis_client.xadd(
             "kraken:heartbeat",
             heartbeat,
             maxlen=1000,
@@ -349,7 +349,7 @@ class ProductionEngine:
         }
 
         # Publish to stream
-        await self.redis_client.client.xadd(
+        await self.redis_client.xadd(
             "kraken:metrics",
             metrics_data,
             maxlen=10000,
@@ -492,9 +492,10 @@ async def create_health_app(engine: ProductionEngine) -> web.Application:
         reason = "Publishing normally"
 
         # Check if Kraken WS is connected
-        if engine.kraken_ws and engine.kraken_ws.state != ConnectionState.CONNECTED:
+        kraken_ws_running = getattr(engine.kraken_ws, 'running', False) if engine.kraken_ws else False
+        if engine.kraken_ws and not kraken_ws_running:
             status = "degraded"
-            reason = f"Kraken WebSocket: {engine.kraken_ws.state.value}"
+            reason = "Kraken WebSocket not running"
 
         # Check freshness of signals (should have published in last 60s)
         if engine.metrics["signals_published"] == 0 and uptime > 60:
