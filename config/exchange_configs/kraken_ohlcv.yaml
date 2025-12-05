@@ -120,31 +120,7 @@ trading_pairs:
       liquidity_tier: "high"
       ml_priority: 1
 
-    - symbol: "BTC/EUR"
-      kraken_symbol: "XBTEUR"
-      base: "BTC"
-      quote: "EUR"
-      min_volume: 0.0001
-      tick_size: 0.1
-      min_notional: 5.0
-      max_leverage: 5
-      spread_tolerance_bps: 5
-      liquidity_tier: "high"
-      ml_priority: 2
-
   tier_2:
-    - symbol: "ADA/USD"
-      kraken_symbol: "ADAUSD"
-      base: "ADA"
-      quote: "USD"
-      min_volume: 1.0
-      tick_size: 0.0001
-      min_notional: 5.0
-      max_leverage: 3
-      spread_tolerance_bps: 10
-      liquidity_tier: "medium"
-      ml_priority: 3
-
     - symbol: "SOL/USD"
       kraken_symbol: "SOLUSD"
       base: "SOL"
@@ -156,18 +132,6 @@ trading_pairs:
       spread_tolerance_bps: 8
       liquidity_tier: "medium"
       ml_priority: 3
-
-    - symbol: "AVAX/USD"
-      kraken_symbol: "AVAXUSD"
-      base: "AVAX"
-      quote: "USD"
-      min_volume: 0.1
-      tick_size: 0.001
-      min_notional: 5.0
-      max_leverage: 3
-      spread_tolerance_bps: 8
-      liquidity_tier: "medium"
-      ml_priority: 4
 
   tier_3:
     - symbol: "LINK/USD"
@@ -181,6 +145,37 @@ trading_pairs:
       spread_tolerance_bps: 15
       liquidity_tier: "low"
       ml_priority: 5
+
+    # MATIC/USD - Listed on site but NOT supported by Kraken WebSocket API
+    # Kraken returns "Currency pair not supported MATIC/USD" error
+    # Options: (1) Use ccxt with Binance, (2) Replace with DOT/USD, (3) Skip
+    # Current: Included for config consistency, signals generated via fallback
+    - symbol: "MATIC/USD"
+      kraken_symbol: "MATICUSD"  # Not available on Kraken WS
+      base: "MATIC"
+      quote: "USD"
+      min_volume: 1.0
+      tick_size: 0.0001
+      min_notional: 5.0
+      max_leverage: 2
+      spread_tolerance_bps: 15
+      liquidity_tier: "low"
+      ml_priority: 6
+      enabled: false  # Disabled until ccxt integration
+      fallback_exchange: "binance"
+      note: "Requires ccxt/Binance integration - not on Kraken WS"
+
+    - symbol: "DOT/USD"
+      kraken_symbol: "DOTUSD"
+      base: "DOT"
+      quote: "USD"
+      min_volume: 0.1
+      tick_size: 0.001
+      min_notional: 5.0
+      max_leverage: 2
+      spread_tolerance_bps: 15
+      liquidity_tier: "low"
+      ml_priority: 7
 
 # =============================================================================
 # DATA STREAM CONFIGURATION
@@ -320,7 +315,7 @@ risk_management:
     pairs_to_monitor:
       - ["BTC/USD", "ETH/USD"]
       - ["BTC/USD", "SOL/USD"]
-      - ["ETH/USD", "ADA/USD"]
+      - ["ETH/USD", "SOL/USD"]
     correlation_threshold: 0.8
 
   drawdown:
@@ -335,14 +330,14 @@ performance:
   metrics:
     enabled: true
     collection_interval: 60
-    latency_tracking:   { enabled: true, percentiles: [50, 90, 95, 99] }
-    throughput_tracking:{ enabled: true, window_size: 300 }
-    error_tracking:     { enabled: true, error_rate_threshold: 0.01 }
+    latency_tracking: { enabled: true, percentiles: [50, 90, 95, 99] }
+    throughput_tracking: { enabled: true, window_size: 300 }
+    error_tracking: { enabled: true, error_rate_threshold: 0.01 }
 
   health_checks:
-    data_freshness:   { enabled: true, max_age_seconds: 120 }
-    stream_lag:       { enabled: true, max_lag_msgs: 10 }
-    connection_health:{ enabled: true, check_interval: 30 }
+    data_freshness: { enabled: true, max_age_seconds: 120 }
+    stream_lag: { enabled: true, max_lag_msgs: 10 }
+    connection_health: { enabled: true, check_interval: 30 }
 
 # =============================================================================
 # AGENT INTEGRATION
