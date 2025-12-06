@@ -36,7 +36,8 @@ risk:
     max_usd: 10000.0
   compliance:
     kill_switch: false
-    allowed_symbols: ["BTC/USD", "ETH/USD"]
+    # Canonical trading pairs per PRD-001 (5 pairs)
+    allowed_symbols: ["BTC/USD", "ETH/USD", "SOL/USD", "MATIC/USD", "LINK/USD"]
     banned_symbols: []
     quote_currencies_allowed: ["USD"]
 

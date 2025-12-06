@@ -148,8 +148,8 @@ trading_pairs:
 
     # MATIC/USD - Listed on site but NOT supported by Kraken WebSocket API
     # Kraken returns "Currency pair not supported MATIC/USD" error
-    # Options: (1) Use ccxt with Binance, (2) Replace with DOT/USD, (3) Skip
-    # Current: Included for config consistency, signals generated via fallback
+    # Options: (1) Use ccxt with Binance, (2) Skip
+    # Current: Included for config consistency per PRD-001, but disabled until ccxt integration
     - symbol: "MATIC/USD"
       kraken_symbol: "MATICUSD"  # Not available on Kraken WS
       base: "MATIC"
@@ -164,18 +164,6 @@ trading_pairs:
       enabled: false  # Disabled until ccxt integration
       fallback_exchange: "binance"
       note: "Requires ccxt/Binance integration - not on Kraken WS"
-
-    - symbol: "DOT/USD"
-      kraken_symbol: "DOTUSD"
-      base: "DOT"
-      quote: "USD"
-      min_volume: 0.1
-      tick_size: 0.001
-      min_notional: 5.0
-      max_leverage: 2
-      spread_tolerance_bps: 15
-      liquidity_tier: "low"
-      ml_priority: 7
 
 # =============================================================================
 # DATA STREAM CONFIGURATION
