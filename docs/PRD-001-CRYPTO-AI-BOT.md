@@ -1,8 +1,8 @@
 # PRD-001: Crypto AI Bot - Core Intelligence Engine
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Authoritative
-**Last Updated:** 2025-11-14
+**Last Updated:** 2025-11-22
 **Owner:** Product & Engineering
 
 ---
@@ -22,11 +22,14 @@ This repository is **Repo 1 of 3** in the complete trading infrastructure:
 3. **signals-site**: Front-end SaaS portal - displays signals, performance metrics, and system health to end users
 
 The crypto-ai-bot operates as a **headless, event-driven service** that:
-- Runs continuously (24/7) in production on Fly.io
+- Runs continuously (24/7) in production on Fly.io (new account, legacy apps suspended)
+- Deployed via `Dockerfile.production` as a single long-lived Python process
 - Maintains persistent WebSocket connections to Kraken
-- Publishes structured signals to Redis Cloud (TLS-secured)
+- Publishes structured signals to Redis Cloud (TLS-secured with CA certificate)
+- Exposes health check endpoint (`/health`) for Fly.io orchestration
 - Exposes Prometheus metrics for observability
 - Operates independently of the API and UI layers
+- Supports both paper and live modes via `ENGINE_MODE` environment variable
 
 ### Problems That Existed Before
 
@@ -381,43 +384,66 @@ Publish validated, schema-compliant signals to Redis Cloud for consumption by si
 **Requirements:**
 
 1. **Connection Management**
-   - Connect to Redis Cloud via TLS (rediss://)
+   - Connect to Redis Cloud via TLS (rediss:// scheme required)
    - Use connection pooling (max 10 connections)
-   - Credential management via environment variable: `REDIS_URL`
-   - Certificate path: `config/certs/redis_ca.pem`
+   - Credential management via environment variables:
+     - `REDIS_URL`: Full connection string with TLS (rediss://)
+     - `REDIS_SSL`: Set to `true`
+     - `REDIS_CA_CERT`: Path to CA certificate (e.g., `/app/config/certs/redis_ca.pem`)
+   - Certificate validation: Verify CA cert exists and is readable on startup
    - Health check integration (PING every 60s)
+   - Connection retry: 3 attempts with exponential backoff (1s, 2s, 4s)
 
-2. **Stream Configuration**
-   - Signal stream: `signals:paper` (paper trading) or `signals:live` (production)
-   - PnL stream: `pnl:signals` (performance attribution)
-   - Events stream: `events:bus` (system events, alerts)
-   - MAXLEN: 10,000 messages per stream (automatic trimming)
-   - TTL: 7 days (Redis Cloud auto-expiration)
+2. **Stream Configuration and Naming Convention**
+   - **Signal streams**: Mode-specific and pair-specific
+     - Paper mode: `signals:paper:<PAIR>` (e.g., `signals:paper:BTC/USD`, `signals:paper:ETH/USD`)
+     - Live mode: `signals:live:<PAIR>` (e.g., `signals:live:BTC/USD`, `signals:live:ETH/USD`)
+   - **PnL streams**: Mode-specific equity tracking
+     - Paper mode: `pnl:paper:equity_curve`
+     - Live mode: `pnl:live:equity_curve`
+   - **Kraken metrics streams**:
+     - `kraken:metrics` (WebSocket latency, message counts, reconnections)
+     - `kraken:heartbeat` (connection health, PING/PONG status)
+   - **Events stream**: `events:bus` (system events, alerts, errors)
+   - MAXLEN: 10,000 messages per stream (automatic trimming with `~` approximate)
+   - TTL: 7 days for signals, 30 days for PnL (Redis Cloud auto-expiration)
 
-3. **Publishing Guarantees**
+3. **Mode-Based Stream Routing**
+   - Routing is determined by `ENGINE_MODE` environment variable
+   - Paper mode (`ENGINE_MODE=paper`): All signals → `signals:paper:<PAIR>`
+   - Live mode (`ENGINE_MODE=live`): All signals → `signals:live:<PAIR>`
+   - Strict separation: Paper and live data never share streams
+   - Validation: Reject signals if ENGINE_MODE is not set or invalid
+
+4. **Publishing Guarantees**
    - Idempotency: use `signal_id` as message ID (dedupe)
    - Atomicity: all signal fields published in single XADD command
    - Ordering: timestamp-based (server-side ordering in Redis)
    - Schema validation before publish (Pydantic model)
    - Retry logic: 3 attempts with exponential backoff on publish failure
+   - TLS verification: All publishes occur over encrypted TLS connection
 
-4. **Performance**
-   - P95 publish latency < 20ms
+5. **Performance**
+   - P95 publish latency < 20ms (including TLS overhead)
    - Handle 50+ signals/sec
    - Max queue depth: 1000 pending messages (backpressure)
+   - Connection pool reuse: Minimize TLS handshake overhead
 
 **Configuration:**
 ```yaml
 redis:
-  url: "${REDIS_URL}"  # rediss://default:<password>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+  url: "${REDIS_URL}"  # rediss://default:<password>@redis-19818.c9.us-east-1-4.ec2.cloud.redislabs.com:19818
+  ssl_enabled: true
   ssl_cert_path: "config/certs/redis_ca.pem"
   connection_pool:
     max_connections: 10
     timeout_sec: 5
   streams:
-    signals_paper: "signals:paper"
-    signals_live: "signals:live"
-    pnl: "pnl:signals"
+    # Stream naming is dynamic based on ENGINE_MODE
+    signals_pattern: "signals:${ENGINE_MODE}:<PAIR>"  # e.g., signals:paper:BTC/USD
+    pnl_pattern: "pnl:${ENGINE_MODE}:equity_curve"  # e.g., pnl:paper:equity_curve
+    kraken_metrics: "kraken:metrics"
+    kraken_heartbeat: "kraken:heartbeat"
     events: "events:bus"
   maxlen: 10000
   ttl_days: 7
@@ -616,27 +642,47 @@ Centralize all system configuration with environment-specific overrides.
    - Risk configs: `config/risk/*.yaml`
 
 2. **Environment Variables**
-   - `REDIS_URL`: Redis Cloud connection string
-   - `TRADING_MODE`: `paper` or `live`
+   - `ENGINE_MODE`: `paper` or `live` (determines stream routing and data separation)
+   - `REDIS_URL`: Redis Cloud TLS connection string (rediss:// scheme required)
+   - `REDIS_SSL`: Set to `true` to enable TLS/SSL connections
+   - `REDIS_CA_CERT`: Path to Redis CA certificate file (e.g., `/app/config/certs/redis_ca.pem`)
+   - `TRADING_MODE`: `paper` or `live` (legacy, use ENGINE_MODE)
    - `LOG_LEVEL`: `DEBUG`, `INFO`, `WARNING`, `ERROR`
-   - `KRAKEN_API_KEY`, `KRAKEN_SECRET`: (for authenticated endpoints)
+   - `KRAKEN_API_KEY`, `KRAKEN_SECRET`: (for authenticated endpoints, live mode only)
 
-3. **Validation**
+3. **Redis TLS Configuration**
+   - **Connection Scheme**: Must use `rediss://` (note the double 's' for SSL/TLS)
+   - **TLS Certificate**: CA certificate required and must be accessible at runtime
+   - **Certificate Path**: Typically `config/certs/redis_ca.pem` (local) or `/app/config/certs/redis_ca.pem` (Docker)
+   - **Password Encoding**: Special characters must be URL-encoded in REDIS_URL (e.g., `$` becomes `%24`)
+   - **No Secrets in Code**: All credentials must be injected via environment variables, never hardcoded
+   - **Connection Pooling**: Use connection pooling (max 10 connections) to reduce TLS handshake overhead
+
+4. **Engine Mode Separation**
+   - `ENGINE_MODE=paper`: Routes signals to `signals:paper:<PAIR>` and `pnl:paper:equity_curve`
+   - `ENGINE_MODE=live`: Routes signals to `signals:live:<PAIR>` and `pnl:live:equity_curve`
+   - Paper and live streams are strictly separated and never mixed
+   - Mode is set at startup and cannot be changed without restart
+
+5. **Validation**
    - Pydantic models for all config sections
    - Schema validation on load (fail fast on invalid config)
    - Type checking (int, float, str, enum)
    - Range validation (min/max values)
+   - TLS certificate existence check on startup
+   - Redis connectivity test before accepting traffic
 
-4. **Hot Reload** (Optional)
+6. **Hot Reload** (Optional)
    - Watch config files for changes
    - Reload without restart (for non-critical params like log level)
-   - Restricted: cannot hot-reload Redis URL, trading pairs
+   - Restricted: cannot hot-reload Redis URL, ENGINE_MODE, trading pairs
 
 **Configuration:**
 ```yaml
 # config/settings.yaml
 mode:
-  bot_mode: PAPER  # or LIVE
+  engine_mode: PAPER  # or LIVE (determines stream routing)
+  bot_mode: PAPER  # or LIVE (legacy)
   enable_trading: false  # safety switch
 
 logging:
@@ -645,8 +691,12 @@ logging:
   format: json  # structured logging
 
 redis:
-  url: "${REDIS_URL}"
+  url: "${REDIS_URL}"  # rediss://default:<password>@redis-19818.c9.us-east-1-4.ec2.cloud.redislabs.com:19818
+  ssl_enabled: true
   ssl_cert_path: "config/certs/redis_ca.pem"
+  connection_pool:
+    max_connections: 10
+    timeout_sec: 5
 
 exchange:
   primary: "kraken"
@@ -1456,6 +1506,373 @@ async def main():
 
 ---
 
+## Deployment Requirements
+
+### 1. Fly.io Production Deployment
+
+**Overview:**
+The crypto-ai-bot engine deploys to Fly.io under a **new account** (legacy apps on old account are suspended and must be ignored).
+
+**Deployment Target:**
+- **Platform**: Fly.io
+- **App Name**: TBD (e.g., `crypto-bot-engine`, `crypto-signals-engine`)
+- **Dockerfile**: `Dockerfile.production` (multi-stage build optimized for production)
+- **Process Model**: Single long-lived Python process (not PM2, not multi-process)
+
+**Key Features:**
+- Runs 24/7 as a Fly machine (not Fly Apps v1, but Fly Machines)
+- Health check integration via `/health` endpoint
+- Graceful shutdown support (SIGTERM handling)
+- TLS-secured Redis Cloud connection
+- Environment variables injected via `fly secrets set`
+
+### 2. Dockerfile.production
+
+**Purpose:**
+Multi-stage Docker build optimized for production deployment.
+
+**Characteristics:**
+- **Base Image**: `python:3.10-slim-bullseye`
+- **Multi-stage**: Builder stage (compiles dependencies) + Runtime stage (minimal footprint)
+- **Non-root User**: Runs as `appuser` (UID 1000) for security
+- **Certificate Mounting**: Redis CA certificate copied into `/app/config/certs/redis_ca.pem`
+- **Health Check**: Exposes port 8080 for `/health` endpoint
+- **Entrypoint**: Runs `docker-entrypoint.sh` or `python main.py` directly
+
+**Build Command:**
+```bash
+docker build -f Dockerfile.production -t crypto-bot-engine:latest .
+```
+
+**Run Command (Local Testing):**
+```bash
+docker run --env-file .env.paper -p 8080:8080 crypto-bot-engine:latest
+```
+
+### 3. Fly.io Configuration (fly.toml)
+
+**Required Sections:**
+```toml
+app = "crypto-bot-engine"  # Replace with actual app name
+primary_region = "iad"  # US East
+
+[build]
+  dockerfile = "Dockerfile.production"
+
+[env]
+  ENGINE_MODE = "paper"  # or "live"
+  REDIS_SSL = "true"
+  REDIS_CA_CERT = "/app/config/certs/redis_ca.pem"
+  LOG_LEVEL = "INFO"
+
+# Secrets (set via fly secrets set)
+# REDIS_URL (contains password)
+# KRAKEN_API_KEY (live mode only)
+# KRAKEN_SECRET (live mode only)
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+[[services.http_checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+```
+
+### 4. Deployment Workflow
+
+**Initial Setup:**
+```bash
+# 1. Authenticate to Fly.io (new account)
+fly auth login
+
+# 2. Create app
+fly apps create crypto-bot-engine --org <your-org>
+
+# 3. Set secrets (NEVER commit these to git)
+fly secrets set REDIS_URL="rediss://default:<password>@redis-19818.c9.us-east-1-4.ec2.cloud.redislabs.com:19818"
+fly secrets set KRAKEN_API_KEY="<key>"  # Live mode only
+fly secrets set KRAKEN_SECRET="<secret>"  # Live mode only
+
+# 4. Deploy
+fly deploy --config fly.toml
+```
+
+**Update Deployment:**
+```bash
+# Deploy new version (automatically builds from Dockerfile.production)
+fly deploy
+
+# View logs
+fly logs
+
+# Check status
+fly status
+
+# SSH into machine (debugging)
+fly ssh console
+```
+
+### 5. Health Check Integration
+
+**Endpoint:**
+- **Path**: `/health`
+- **Port**: 8080
+- **Method**: GET
+- **Response**: JSON `{"status": "healthy", "uptime_sec": 12345, "last_signal_sec_ago": 45}`
+
+**Health Criteria:**
+- Kraken WebSocket connected
+- Redis connection alive (successful PING)
+- Signals published within last 10 minutes (during market hours)
+
+**Fly.io Behavior:**
+- If health check fails for >30s, Fly restarts the machine
+- Graceful shutdown triggered on restart (SIGTERM sent)
+
+### 6. Environment Variables (Production)
+
+**Required for All Modes:**
+```bash
+ENGINE_MODE=paper  # or "live"
+REDIS_URL=rediss://default:<password>@redis-19818.c9.us-east-1-4.ec2.cloud.redislabs.com:19818
+REDIS_SSL=true
+REDIS_CA_CERT=/app/config/certs/redis_ca.pem
+LOG_LEVEL=INFO
+TRADING_PAIRS=BTC/USD,ETH/USD,SOL/USD,MATIC/USD,LINK/USD
+```
+
+**Live Mode Only:**
+```bash
+KRAKEN_API_KEY=<key>
+KRAKEN_SECRET=<secret>
+ENABLE_TRADING=true
+LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_REAL_MONEY
+```
+
+### 7. Deployment Checklist
+
+Before deploying to production:
+- [ ] All tests passing (unit, integration, E2E)
+- [ ] `Dockerfile.production` builds successfully
+- [ ] Redis CA certificate present at `config/certs/redis_ca.pem`
+- [ ] All secrets set via `fly secrets set` (never in code or fly.toml)
+- [ ] Health check endpoint responding locally
+- [ ] Backtest validation passed (Sharpe ≥ 1.5, Drawdown ≤ -15%)
+- [ ] Dry-run on staging environment completed
+- [ ] Monitoring dashboards configured (Grafana, Prometheus)
+- [ ] Alert channels configured (PagerDuty, Slack)
+
+### 8. Rollback Procedure
+
+If deployment fails or causes issues:
+```bash
+# 1. View release history
+fly releases
+
+# 2. Rollback to previous version
+fly releases revert <version>
+
+# 3. Verify health
+fly status
+fly logs
+```
+
+---
+
+## Paper vs Live Mode Separation
+
+### Overview
+
+The crypto-ai-bot engine operates in one of two mutually exclusive modes:
+- **Paper Mode** (`ENGINE_MODE=paper`): Historical backtesting and simulated trading
+- **Live Mode** (`ENGINE_MODE=live`): Real-time market streaming and actual trading signals
+
+These modes are **strictly separated** to prevent data contamination and ensure data integrity.
+
+### Key Differences
+
+| Aspect | Paper Mode | Live Mode |
+|--------|-----------|-----------|
+| **Purpose** | Backtesting, validation, development | Production trading signals |
+| **Data Source** | Historical data or simulated feeds | Real-time Kraken WebSocket |
+| **Signal Streams** | `signals:paper:<PAIR>` | `signals:live:<PAIR>` |
+| **PnL Streams** | `pnl:paper:equity_curve` | `pnl:live:equity_curve` |
+| **Risk Level** | Zero financial risk | Real money at risk |
+| **API Keys** | Not required | Kraken API keys required |
+| **Trading Confirmation** | Not required | `LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_REAL_MONEY` |
+| **Validation** | Loose (development-friendly) | Strict (production-grade) |
+
+### Stream Isolation
+
+**Paper Mode Streams:**
+```
+signals:paper:BTC/USD
+signals:paper:ETH/USD
+signals:paper:SOL/USD
+signals:paper:MATIC/USD
+signals:paper:LINK/USD
+pnl:paper:equity_curve
+```
+
+**Live Mode Streams:**
+```
+signals:live:BTC/USD
+signals:live:ETH/USD
+signals:live:SOL/USD
+signals:live:MATIC/USD
+signals:live:LINK/USD
+pnl:live:equity_curve
+```
+
+**Shared Streams (mode-agnostic):**
+```
+kraken:metrics
+kraken:heartbeat
+events:bus
+```
+
+### Data Integrity Guarantees
+
+1. **No Cross-Contamination**
+   - Paper signals never appear in live streams
+   - Live signals never appear in paper streams
+   - Consumers (signals-api) can safely subscribe to either mode
+
+2. **Mode Immutability**
+   - `ENGINE_MODE` is set at startup and cannot be changed without restart
+   - Prevents accidental mode switching during operation
+   - Deployment requires explicit mode selection
+
+3. **Validation on Publish**
+   - Every signal publish verifies `ENGINE_MODE` matches target stream
+   - Example: If `ENGINE_MODE=paper`, signal to `signals:live:*` is rejected
+   - Emit error metric: `mode_mismatch_errors_total`
+
+4. **Consumer Responsibility**
+   - signals-api must subscribe to correct stream based on deployment mode
+   - Frontend (signals-site) displays mode indicator to users
+   - No mixing of paper and live data in UI
+
+### Use Cases
+
+**Paper Mode:**
+- Running backtests on historical data
+- Testing new strategies without financial risk
+- Development and debugging
+- Performance validation before live deployment
+- Investor demos and presentations
+
+**Live Mode:**
+- Production trading with real money
+- Real-time signal generation from live market data
+- Performance tracking with actual P&L
+- Execution via Kraken authenticated API
+
+### Safety Controls
+
+**Paper Mode Safety:**
+- No API keys required (cannot execute trades)
+- Unlimited signal generation (no rate limits)
+- Relaxed validation (fast iteration)
+
+**Live Mode Safety:**
+- Requires explicit confirmation: `LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_REAL_MONEY`
+- Kraken API keys required (validates credentials on startup)
+- Strict risk filters enforced (spread, volatility, drawdown)
+- Rate limits applied (prevent runaway signal generation)
+- Daily drawdown circuit breaker (-5% halts new signals)
+- Position size limits enforced ($2,000 max per signal, $10,000 total exposure)
+
+### Configuration Examples
+
+**Paper Mode (.env.paper):**
+```bash
+ENGINE_MODE=paper
+REDIS_URL=rediss://default:<password>@redis-19818.c9.us-east-1-4.ec2.cloud.redislabs.com:19818
+REDIS_SSL=true
+REDIS_CA_CERT=config/certs/redis_ca.pem
+LOG_LEVEL=INFO
+TRADING_PAIRS=BTC/USD,ETH/USD,SOL/USD
+```
+
+**Live Mode (.env.live):**
+```bash
+ENGINE_MODE=live
+REDIS_URL=rediss://default:<password>@redis-19818.c9.us-east-1-4.ec2.cloud.redislabs.com:19818
+REDIS_SSL=true
+REDIS_CA_CERT=config/certs/redis_ca.pem
+KRAKEN_API_KEY=<key>
+KRAKEN_SECRET=<secret>
+ENABLE_TRADING=true
+LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_REAL_MONEY
+LOG_LEVEL=WARNING  # Less verbose in production
+```
+
+### Deployment Implications
+
+**Paper Deployment:**
+- Can deploy multiple instances (A/B testing strategies)
+- No financial risk if deployment fails
+- Fast iteration and rollback
+- Suitable for staging environments
+
+**Live Deployment:**
+- Single instance per region (avoid duplicate signals)
+- Requires deployment approval and checklist completion
+- Gradual rollout recommended (deploy to paper first, validate, then promote to live)
+- Immediate rollback capability required
+- 24/7 monitoring and alerting mandatory
+
+### Monitoring and Observability
+
+**Mode-Specific Metrics:**
+```promql
+# Signals published by mode
+rate(signals_published_total{mode="paper"}[1m])
+rate(signals_published_total{mode="live"}[1m])
+
+# P&L by mode
+pnl_equity_curve{mode="paper"}
+pnl_equity_curve{mode="live"}
+
+# Mode mismatch errors (should always be 0)
+mode_mismatch_errors_total
+```
+
+**Alerts:**
+- **Critical**: Mode mismatch detected (signal published to wrong stream)
+- **Warning**: Live mode running without `LIVE_TRADING_CONFIRMATION`
+- **Info**: Mode switch detected (e.g., paper → live after restart)
+
+### Testing Strategy
+
+**Paper Mode Testing:**
+- Run full test suite in paper mode
+- Validate backtests pass acceptance criteria (Sharpe ≥ 1.5, Drawdown ≤ -15%)
+- Verify signals published to correct paper streams
+- Integration tests with signals-api (paper endpoint)
+
+**Live Mode Testing:**
+- Dry-run in staging with live market data (no actual trades)
+- Verify API credentials work
+- Confirm risk filters are active
+- Integration tests with signals-api (live endpoint)
+- Manual verification of signal quality before enabling trading
+
+---
+
 ## Testing Requirements
 
 ### 1. Unit Tests
@@ -1852,39 +2269,55 @@ pytest-cov==4.1.0
 
 ### Redis Cloud Connection
 
-**Connection String (URL-encoded):**
+**Connection String Format:**
 ```
-rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+# URL-encoded (for use in REDIS_URL env var)
+rediss://default:<YOUR_REDIS_PASSWORD_URL_ENCODED>@<REDIS_HOST>:<REDIS_PORT>
+
+# Plain text (for reference only, never commit)
+rediss://default:<YOUR_REDIS_PASSWORD>@<REDIS_HOST>:<REDIS_PORT>
 ```
+
+**Note:** Special characters (like `$`) must be URL-encoded (e.g., `%24`) when used in the REDIS_URL environment variable.
 
 **CLI Connection (for debugging):**
 ```bash
-redis-cli -u redis://default:<PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+# Windows (local development)
+redis-cli -u redis://default:<PASSWORD>@<REDIS_HOST>:<PORT> \
   --tls \
-  --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem
+  --cacert <PATH_TO_CA_CERT>
+
+# Linux/Docker (production)
+redis-cli -u redis://default:<PASSWORD>@<REDIS_HOST>:<PORT> \
+  --tls \
+  --cacert /app/config/certs/redis_ca.pem
 ```
+
+**TLS Certificate Requirements:**
+- **Local Development**: Store CA cert at `config/certs/redis_ca.pem`
+- **Docker/Production**: `/app/config/certs/redis_ca.pem`
+- Certificate must be readable by the application user
+- Certificate is required for all TLS connections (REDIS_SSL=true)
 
 **Environment Variable:**
 ```bash
-# .env.paper
-REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+# .env.paper (copy from .env.paper.example and fill in credentials)
+REDIS_URL=rediss://default:<PASSWORD>@<REDIS_HOST>:<PORT>
 REDIS_SSL=true
-REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
-```
-
-**Certificate Location:**
-```
-C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem
+REDIS_CA_CERT=config/certs/redis_ca.pem  # Local path
+# or
+REDIS_CA_CERT=/app/config/certs/redis_ca.pem  # Docker path
 ```
 
 ### Environment Variables (Reference)
 
 ```bash
-# .env.paper (paper trading)
-TRADING_MODE=paper
-REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+# .env.paper (paper trading) - See .env.paper.example for template
+ENGINE_MODE=paper
+TRADING_MODE=paper  # Legacy, use ENGINE_MODE
+REDIS_URL=rediss://default:<PASSWORD>@<REDIS_HOST>:<PORT>
 REDIS_SSL=true
-REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
+REDIS_CA_CERT=config/certs/redis_ca.pem
 ENABLE_5S_BARS=false
 SCALPER_MAX_TRADES_PER_MINUTE=4
 LATENCY_MS_MAX=100.0
@@ -1895,16 +2328,17 @@ TIMEFRAMES=15s,1m,5m
 ```
 
 ```bash
-# .env.live (production)
-TRADING_MODE=live
-REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+# .env.live (production) - See .env.live.example for template
+ENGINE_MODE=live
+TRADING_MODE=live  # Legacy, use ENGINE_MODE
+REDIS_URL=rediss://default:<PASSWORD>@<REDIS_HOST>:<PORT>
 REDIS_SSL=true
-REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
+REDIS_CA_CERT=/app/config/certs/redis_ca.pem
 ENABLE_TRADING=true
 LIVE_TRADING_CONFIRMATION=I_UNDERSTAND_REAL_MONEY
 KRAKEN_API_KEY=${KRAKEN_API_KEY}
 KRAKEN_SECRET=${KRAKEN_SECRET}
-LOG_LEVEL=INFO
+LOG_LEVEL=WARNING  # Less verbose in production
 ```
 
 ---
@@ -1913,6 +2347,7 @@ LOG_LEVEL=INFO
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.1.0 | 2025-11-22 | Product & Engineering | Updated for Redis TLS + Fly.io architecture: Added ENGINE_MODE configuration, updated stream naming (signals:paper:<PAIR> / signals:live:<PAIR>), added Deployment Requirements section, added Paper vs Live Separation section, updated Redis TLS configuration details, updated environment variables with current credentials |
 | 1.0.0 | 2025-11-14 | Product & Engineering | Initial authoritative PRD |
 
 ---
@@ -1933,30 +2368,63 @@ LOG_LEVEL=INFO
 
 ## Appendix B: Redis Streams Contract
 
-### Stream Names
+### Stream Names and Naming Convention
 
-| Stream | Purpose | Producer | Consumer | MAXLEN | TTL |
-|--------|---------|----------|----------|--------|-----|
-| `signals:paper` | Paper trading signals | crypto-ai-bot | signals-api | 10,000 | 7 days |
-| `signals:live` | Live trading signals | crypto-ai-bot | signals-api | 10,000 | 7 days |
-| `pnl:signals` | P&L attribution | crypto-ai-bot | signals-api | 50,000 | 30 days |
+| Stream Pattern | Purpose | Producer | Consumer | MAXLEN | TTL |
+|---------------|---------|----------|----------|--------|-----|
+| `signals:paper:<PAIR>` | Paper trading signals per pair | crypto-ai-bot | signals-api | 10,000 | 7 days |
+| `signals:live:<PAIR>` | Live trading signals per pair | crypto-ai-bot | signals-api | 10,000 | 7 days |
+| `pnl:paper:equity_curve` | Paper mode P&L tracking | crypto-ai-bot | signals-api | 50,000 | 30 days |
+| `pnl:live:equity_curve` | Live mode P&L tracking | crypto-ai-bot | signals-api | 50,000 | 30 days |
+| `kraken:metrics` | Kraken WebSocket metrics | crypto-ai-bot | signals-api, monitoring | 10,000 | 7 days |
+| `kraken:heartbeat` | Kraken connection health | crypto-ai-bot | signals-api, monitoring | 1,000 | 1 day |
 | `events:bus` | System events | crypto-ai-bot | signals-api, monitoring | 5,000 | 7 days |
+
+**Supported Trading Pairs:**
+- `BTC/USD`, `ETH/USD`, `SOL/USD`, `MATIC/USD`, `LINK/USD`
+
+**Stream Examples:**
+- Paper mode BTC signals: `signals:paper:BTC/USD`
+- Live mode ETH signals: `signals:live:ETH/USD`
+- Paper mode equity: `pnl:paper:equity_curve`
+- Live mode equity: `pnl:live:equity_curve`
+
+### TLS Connection Requirements
+
+All Redis connections must use TLS:
+- **Scheme**: `rediss://` (note double 's')
+- **Certificate**: CA certificate required at `config/certs/redis_ca.pem` (local) or `/app/config/certs/redis_ca.pem` (Docker)
+- **Environment Variables**:
+  - `REDIS_URL`: Full connection string with TLS
+  - `REDIS_SSL=true`
+  - `REDIS_CA_CERT`: Path to CA certificate file
 
 ### Message Format (Redis Streams)
 
 ```
-XADD signals:paper <signal_id> field1 value1 field2 value2 ...
+XADD signals:<MODE>:<PAIR> <signal_id> field1 value1 field2 value2 ...
 ```
 
-**Example:**
+**Example (Paper Mode):**
 ```
-XADD signals:paper a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
+XADD signals:paper:BTC/USD a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
   timestamp "2025-11-14T18:45:23.456Z" \
   pair "BTC/USD" \
   side "LONG" \
   strategy "SCALPER" \
   entry_price "43250.50" \
   confidence "0.72"
+```
+
+**Example (Live Mode):**
+```
+XADD signals:live:ETH/USD b2c3d4e5-f6a7-8901-bcde-f12345678901 \
+  timestamp "2025-11-14T18:46:15.123Z" \
+  pair "ETH/USD" \
+  side "SHORT" \
+  strategy "TREND" \
+  entry_price "2845.30" \
+  confidence "0.68"
 ```
 
 ---

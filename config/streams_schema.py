@@ -19,25 +19,38 @@ class StreamsConfig(BaseModel):
     @field_validator('publish')
     @classmethod
     def validate_publish_prefixes(cls, v: Dict[str, str], info) -> Dict[str, str]:
-        """Validate that publish stream names contain the expected prefix."""
+        """Validate that publish stream names contain the expected prefix.
+
+        Allows exceptions for mode-aware streams (signals:*, pnl:*).
+        """
         if not v:
             return v
-            
+
         # Get the prefix from the model data
         prefix = info.data.get('prefix', '')
         sep = info.data.get('sep', ':')
-        
+
         if not prefix:
             return v
-            
+
         expected_prefix = f"{prefix}{sep}"
-        
+
+        # Allowed prefixes for special streams (mode-aware streams)
+        allowed_prefixes = [expected_prefix, "signals:", "pnl:"]
+
         for stream_name, stream_pattern in v.items():
-            if not stream_pattern.startswith(expected_prefix):
+            # Check if stream starts with any allowed prefix
+            has_valid_prefix = any(
+                stream_pattern.startswith(allowed_prefix)
+                for allowed_prefix in allowed_prefixes
+            )
+
+            if not has_valid_prefix:
                 raise ValueError(
-                    f"Publish stream '{stream_name}' pattern '{stream_pattern}' must start with '{expected_prefix}'"
+                    f"Publish stream '{stream_name}' pattern '{stream_pattern}' must start with "
+                    f"one of: {', '.join(allowed_prefixes)}"
                 )
-        
+
         return v
     
     @field_validator('sep')

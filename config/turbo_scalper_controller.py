@@ -115,10 +115,9 @@ class TurboScalperController:
         self.config_file = Path(config_file)
 
         # Redis connection (optional)
-        self.redis_url = redis_url or os.getenv(
-            'REDIS_URL',
-            'rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818'
-        )
+        self.redis_url = redis_url or os.getenv('REDIS_URL')
+        if not self.redis_url:
+            logger.warning("[TurboScalperController] No REDIS_URL provided - Redis features disabled")
         self.redis = None
 
         # Change callbacks

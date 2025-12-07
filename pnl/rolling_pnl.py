@@ -7,14 +7,18 @@ FEATURES:
 - Realized PnL (from fills/trades)
 - Unrealized PnL (mark-to-market)
 - Rolling equity curve
-- Redis persistence: pnl:summary, pnl:equity_curve, pnl:last_update_ts
+- Mode-aware Redis persistence with complete paper/live separation
 - Per-pair position tracking
 - Support for both paper and live modes
 
-REDIS KEYS:
-- pnl:summary (STRING): Latest PnL snapshot JSON
-- pnl:equity_curve (STREAM): Historical equity curve events
-- pnl:last_update_ts (STRING): Timestamp of last update
+REDIS KEYS (MODE-AWARE):
+- pnl:{mode}:summary (STRING): Latest PnL snapshot JSON
+- pnl:{mode}:equity_curve (STREAM): Historical equity curve events
+- pnl:{mode}:last_update_ts (STRING): Timestamp of last update
+
+Example keys:
+- Paper mode: pnl:paper:summary, pnl:paper:equity_curve, pnl:paper:last_update_ts
+- Live mode: pnl:live:summary, pnl:live:equity_curve, pnl:live:last_update_ts
 
 PNL CALCULATION:
 - Realized PnL = Sum of (exit_price - entry_price) * quantity for closed positions
@@ -177,8 +181,9 @@ class PnLTracker:
             return
 
         try:
-            # Load summary from pnl:summary
-            summary_data = await self.redis_client.get("pnl:summary")
+            # Load summary from pnl:{mode}:summary (mode-aware)
+            summary_key = f"pnl:{self.mode}:summary"
+            summary_data = await self.redis_client.get(summary_key)
             if summary_data:
                 summary_dict = orjson.loads(summary_data)
                 summary = PnLSummary.model_validate(summary_dict)
@@ -191,7 +196,7 @@ class PnLTracker:
                 self.num_losses = summary.num_losses
 
                 logger.info(
-                    f"Loaded PnL state from Redis: equity=${summary.equity:.2f}, "
+                    f"Loaded PnL state from Redis ({summary_key}): equity=${summary.equity:.2f}, "
                     f"{len(self.positions)} open positions"
                 )
 
@@ -360,12 +365,16 @@ class PnLTracker:
 
     async def publish(self) -> None:
         """
-        Publish PnL summary to Redis.
+        Publish PnL summary to Redis with mode-aware stream names.
 
-        Updates:
-        - pnl:summary (STRING): Latest PnL snapshot
-        - pnl:equity_curve (STREAM): Historical equity curve
-        - pnl:last_update_ts (STRING): Timestamp of last update
+        Updates (mode-aware):
+        - pnl:{mode}:summary (STRING): Latest PnL snapshot
+        - pnl:{mode}:equity_curve (STREAM): Historical equity curve
+        - pnl:{mode}:last_update_ts (STRING): Timestamp of last update
+
+        Example streams:
+        - Paper mode: pnl:paper:summary, pnl:paper:equity_curve
+        - Live mode: pnl:live:summary, pnl:live:equity_curve
         """
         if not self.redis_client:
             raise ConnectionError("Not connected to Redis - call connect() first")
@@ -377,29 +386,35 @@ class PnLTracker:
             # Serialize to JSON
             summary_json = orjson.dumps(summary.model_dump())
 
-            # 1. Update pnl:summary (STRING)
-            await self.redis_client.set("pnl:summary", summary_json)
+            # Mode-aware stream keys
+            summary_key = f"pnl:{self.mode}:summary"
+            equity_key = f"pnl:{self.mode}:equity_curve"
+            ts_key = f"pnl:{self.mode}:last_update_ts"
 
-            # 2. Add to pnl:equity_curve (STREAM)
+            # 1. Update pnl:{mode}:summary (STRING)
+            await self.redis_client.set(summary_key, summary_json)
+
+            # 2. Add to pnl:{mode}:equity_curve (STREAM)
             equity_event = {
                 "timestamp": str(summary.timestamp),
                 "equity": str(summary.equity),
                 "realized_pnl": str(summary.realized_pnl),
                 "unrealized_pnl": str(summary.unrealized_pnl),
                 "num_positions": str(len(summary.positions)),
+                "mode": self.mode,  # Add mode for safety
             }
             await self.redis_client.xadd(
-                "pnl:equity_curve",
+                equity_key,
                 equity_event,
-                maxlen=10000,  # Keep last 10k equity snapshots
+                maxlen=50000,  # Keep last 50k equity snapshots (increased from 10k)
                 approximate=True,
             )
 
-            # 3. Update pnl:last_update_ts (STRING)
-            await self.redis_client.set("pnl:last_update_ts", str(summary.timestamp))
+            # 3. Update pnl:{mode}:last_update_ts (STRING)
+            await self.redis_client.set(ts_key, str(summary.timestamp))
 
             logger.debug(
-                f"Published PnL: equity=${summary.equity:.2f}, "
+                f"Published PnL to {equity_key}: equity=${summary.equity:.2f}, "
                 f"realized=${summary.realized_pnl:.2f}, "
                 f"unrealized=${summary.unrealized_pnl:.2f}"
             )

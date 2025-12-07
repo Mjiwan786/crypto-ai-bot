@@ -150,17 +150,102 @@ class ConnectionState(str, Enum):
 from dotenv import load_dotenv
 load_dotenv()
 
+# Setup module-level logger (must be defined before helper functions use it)
+logger = logging.getLogger(__name__)
+
+# Kraken pair normalization (XBT -> BTC) - PRD-001 compliance
+PAIR_NORMALIZE_MAP = {
+    "XBT/USD": "BTC/USD",
+    "XBT/EUR": "BTC/EUR",
+    "XBT/GBP": "BTC/GBP",
+    "XBT/CAD": "BTC/CAD",
+    "XBT/JPY": "BTC/JPY",
+    "XBT/AUD": "BTC/AUD",
+    "XBT/CHF": "BTC/CHF",
+}
+
+
+def normalize_kraken_pair(pair: str) -> str:
+    """Normalize Kraken pair names (XBT -> BTC) for PRD-001 compliance."""
+    return PAIR_NORMALIZE_MAP.get(pair, pair)
+
+
+# Import config loader for PRD-001 compliance
+try:
+    from utils.kraken_config_loader import get_kraken_config_loader
+    CONFIG_LOADER_AVAILABLE = True
+except ImportError:
+    CONFIG_LOADER_AVAILABLE = False
+    logger.warning("kraken_config_loader not available, using environment variables")
+
+
+# Helper functions for loading config (must be defined before KrakenWSConfig uses them)
+def _load_pairs_from_config() -> List[str]:
+    """
+    Load trading pairs from kraken_ohlcv.yaml (PRD-001 compliance).
+    
+    Falls back to environment variable or defaults if config not available.
+    """
+    if CONFIG_LOADER_AVAILABLE:
+        try:
+            config_loader = get_kraken_config_loader()
+            pairs = config_loader.get_all_pairs()
+            if pairs:
+                logger.info(f"Loaded {len(pairs)} pairs from kraken_ohlcv.yaml")
+                return pairs
+        except Exception as e:
+            logger.warning(f"Failed to load pairs from config: {e}, using env var fallback")
+    
+    # Fallback to environment variable (PRD-001 pairs)
+    env_pairs = os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD,SOL/USD,MATIC/USD,LINK/USD")
+    pairs = [p.strip() for p in env_pairs.split(",") if p.strip()]
+    logger.info(f"Using pairs from environment variable: {pairs}")
+    return pairs
+
+
+def _load_timeframes_from_config() -> List[str]:
+    """
+    Load timeframes from kraken_ohlcv.yaml (PRD-001 compliance).
+    
+    Falls back to environment variable or defaults if config not available.
+    """
+    if CONFIG_LOADER_AVAILABLE:
+        try:
+            config_loader = get_kraken_config_loader()
+            timeframes = config_loader.get_all_timeframes()
+            if timeframes:
+                logger.info(f"Loaded {len(timeframes)} timeframes from kraken_ohlcv.yaml")
+                return timeframes
+        except Exception as e:
+            logger.warning(f"Failed to load timeframes from config: {e}, using env var fallback")
+    
+    # Fallback to environment variable
+    env_timeframes = os.getenv("TIMEFRAMES", "1m,5m,15m,30m,1h,4h,1d,15s,30s")
+    timeframes = [tf.strip() for tf in env_timeframes.split(",") if tf.strip()]
+    logger.info(f"Using timeframes from environment variable: {timeframes}")
+    return timeframes
+
+
 # Pydantic configuration validation - Redis Cloud Optimized
 class KrakenWSConfig(BaseModel):
-    """Validated configuration matching YAML specs - Redis Cloud Optimized"""
+    """
+    Validated configuration matching YAML specs - Redis Cloud Optimized
+    
+    PRD-001 Compliance:
+    - Loads pairs from kraken_ohlcv.yaml (tier_1, tier_2, tier_3)
+    - Loads timeframes from kraken_ohlcv.yaml (primary, synthetic)
+    - Falls back to environment variables if config not found
+    """
     url: str = Field(default="wss://ws.kraken.com", pattern=r"^wss?://.*")
+    
+    # PRD-001: Load pairs from kraken_ohlcv.yaml
     pairs: List[str] = Field(
-        default_factory=lambda: os.getenv(
-            "TRADING_PAIRS", "BTC/USD,ETH/USD,SOL/USD,MATIC/USD,LINK/USD"
-        ).split(",")
+        default_factory=lambda: _load_pairs_from_config()
     )
+    
+    # PRD-001: Load timeframes from kraken_ohlcv.yaml
     timeframes: List[str] = Field(
-        default_factory=lambda: os.getenv("TIMEFRAMES", "15s,1m,3m,5m").split(",")
+        default_factory=lambda: _load_timeframes_from_config()
     )
     redis_url: str = Field(default_factory=lambda: os.getenv("REDIS_URL", ""))
 
@@ -196,10 +281,16 @@ class KrakenWSConfig(BaseModel):
         return "events:bus"
 
     # UPDATED: Redis Cloud optimized connection settings (PRD-001 compliant)
+    # PRD-001 Section 4.2: Exponential backoff starts at 1s, doubles each time, max 60s
     reconnect_delay: int = Field(
-        default=int(os.getenv("WEBSOCKET_RECONNECT_DELAY", "1")), ge=1, le=60
+        default=int(os.getenv("WEBSOCKET_RECONNECT_DELAY", "1")), ge=1, le=60,
+        description="Initial reconnection delay in seconds (PRD-001: 1s, doubles to max 60s)"
     )
-    max_retries: int = Field(default=int(os.getenv("WEBSOCKET_MAX_RETRIES", "10")), ge=1, le=100)
+    # PRD-001 Section 4.2: Max 10 reconnection attempts
+    max_retries: int = Field(
+        default=int(os.getenv("WEBSOCKET_MAX_RETRIES", "10")), ge=1, le=100,
+        description="Maximum reconnection attempts (PRD-001: 10)"
+    )
     ping_interval: int = Field(default=int(os.getenv("WEBSOCKET_PING_INTERVAL", "30")), ge=5, le=60)
     ping_timeout: int = Field(default=int(os.getenv("WEBSOCKET_PING_TIMEOUT", "60")), ge=10, le=120)
     close_timeout: int = Field(default=int(os.getenv("WEBSOCKET_CLOSE_TIMEOUT", "5")), ge=1, le=30)
@@ -263,14 +354,16 @@ class KrakenWSConfig(BaseModel):
         if not v:
             raise ValueError("Pairs list cannot be empty")
         
-        # Validate Kraken pair format
-        valid_pairs = {
-            "BTC/USD", "ETH/USD", "SOL/USD", "ADA/USD", "XBT/USD",
-            "XXBT/ZUSD", "XETH/ZUSD", "SOL/ZUSD", "ADA/ZUSD"
+        # PRD-001: Validate against expected pairs from kraken_ohlcv.yaml
+        # Allow any pair format, but log if not in expected set
+        # NOTE: MATIC/USD is supported via REST API, not WebSocket
+        expected_pairs = {
+            "BTC/USD", "ETH/USD", "BTC/EUR", "ADA/USD", "SOL/USD",
+            "AVAX/USD", "LINK/USD", "MATIC/USD", "DOT/USD"
         }
         for pair in v:
-            if pair not in valid_pairs:
-                logging.warning(f"Pair {pair} not in validated list, proceed with caution")
+            if pair not in expected_pairs:
+                logger.warning(f"Pair {pair} not in expected set from kraken_ohlcv.yaml")
         return v
     
     @field_validator("timeframes")
@@ -841,6 +934,16 @@ class RedisConnectionManager:
                     else:
                         # Other Redis errors - retry with backoff
                         if attempt < max_retries - 1:
+                            retry_delay = backoff_delays[attempt]
+                            # Explicit retry log helps correlate transient Redis errors
+                            self.logger.warning(
+                                "Redis publish error (%s) on %s attempt %d/%d; retrying in %.1fs",
+                                e.__class__.__name__,
+                                stream_name,
+                                attempt + 1,
+                                max_retries,
+                                retry_delay,
+                            )
                             await asyncio.sleep(backoff_delays[attempt])
                             continue
                         else:
@@ -864,6 +967,15 @@ class RedisConnectionManager:
                 except asyncio.TimeoutError:
                     # PRD-001 Section 2.3: Timeout handling
                     if attempt < max_retries - 1:
+                        retry_delay = backoff_delays[attempt]
+                        self.logger.warning(
+                            "Redis publish timeout (>%ss) for %s attempt %d/%d; retrying in %.1fs",
+                            timeout,
+                            stream_name,
+                            attempt + 1,
+                            max_retries,
+                            retry_delay,
+                        )
                         await asyncio.sleep(backoff_delays[attempt])
                         continue
                     else:
@@ -884,6 +996,15 @@ class RedisConnectionManager:
                 except Exception as e:
                     # Generic error handling
                     if attempt < max_retries - 1:
+                        retry_delay = backoff_delays[attempt]
+                        self.logger.warning(
+                            "Redis publish unexpected error (%s) for %s attempt %d/%d; retrying in %.1fs",
+                            e.__class__.__name__,
+                            stream_name,
+                            attempt + 1,
+                            max_retries,
+                            retry_delay,
+                        )
                         await asyncio.sleep(backoff_delays[attempt])
                         continue
                     else:
@@ -983,7 +1104,12 @@ class KrakenWebSocketClient:
             "circuit_breaker_trips": 0,
             "errors": 0,
             "trades_per_minute": 0,
-            "last_trade_count_reset": time.time()
+            "last_trade_count_reset": time.time(),
+            # PRD-001: Health metrics per pair
+            "last_message_timestamp_by_pair": {},  # pair -> timestamp
+            "reconnect_count_by_pair": {},  # pair -> count
+            "subscription_errors": [],  # List of (pair, channel, error) tuples
+            "dropped_messages": 0,  # Count of dropped messages
         }
 
         # Sequence number tracking per channel (PRD-001 Section 1.3)
@@ -1166,23 +1292,47 @@ class KrakenWebSocketClient:
             )
         )
         
-        # OHLC data for configured timeframes
-        for timeframe in self.config.timeframes:
-            if timeframe in ["15s", "1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"]:
-                # Convert timeframe to Kraken format
-                kraken_interval = {
-                    "15s": 15, "1m": 1, "3m": 3, "5m": 5, "15m": 15,
-                    "30m": 30, "1h": 60, "4h": 240, "1d": 1440
-                }.get(timeframe)
-                
-                if kraken_interval:
-                    subscriptions.append(
-                        self.create_subscription(
-                            "ohlc", 
-                            self.config.pairs, 
-                            interval=kraken_interval
-                        )
+        # PRD-001: OHLC data for all native timeframes from kraken_ohlcv.yaml
+        # Only subscribe to native timeframes (Kraken API supports these)
+        # Synthetic timeframes (5s, 15s, 30s) are generated from trades, not subscribed
+        native_timeframes = []
+        if CONFIG_LOADER_AVAILABLE:
+            try:
+                config_loader = get_kraken_config_loader()
+                native_timeframes = config_loader.get_native_timeframes()
+                intervals = config_loader.get_kraken_ohlc_intervals()
+            except Exception as e:
+                logger.warning(f"Failed to load native timeframes from config: {e}, using fallback")
+                # Fallback: extract native timeframes from config.timeframes
+                native_timeframes = [tf for tf in self.config.timeframes if tf not in ["5s", "15s", "30s", "2m", "3m"]]
+                intervals = {tf: {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}.get(tf) 
+                            for tf in native_timeframes}
+                intervals = [v for v in intervals.values() if v]
+        else:
+            # Fallback: use config.timeframes and filter out synthetic
+            native_timeframes = [tf for tf in self.config.timeframes if tf not in ["5s", "15s", "30s", "2m", "3m"]]
+            intervals = []
+            tf_to_interval = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+            for tf in native_timeframes:
+                if tf in tf_to_interval:
+                    intervals.append(tf_to_interval[tf])
+        
+        # Subscribe to each native timeframe
+        for interval in sorted(set(intervals)):
+            try:
+                subscriptions.append(
+                    self.create_subscription(
+                        "ohlc", 
+                        self.config.pairs, 
+                        interval=interval
                     )
+                )
+                self.logger.debug(f"Added OHLC subscription: interval={interval} minutes for {len(self.config.pairs)} pairs")
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to create OHLC subscription for interval {interval}: {e}",
+                    extra={"interval": interval, "pairs": self.config.pairs}
+                )
         
         # Send all subscriptions with circuit breaker protection
         sent_count = 0
@@ -1195,7 +1345,30 @@ class KrakenWebSocketClient:
                 sent_count += 1
                 await asyncio.sleep(0.1)  # Rate limiting
             except Exception as e:
-                self.logger.error(f"Failed to send subscription {sub}: {e}")  # PRD-001 Section 1.4
+                # PRD-001: Enhanced subscription error logging with context
+                channel = sub.get("subscription", {}).get("name", "unknown")
+                pairs = sub.get("pair", [])
+                error_msg = f"Failed to send subscription: channel={channel}, pairs={pairs}, error={e}"
+                
+                # Track subscription errors per pair/channel
+                for pair in pairs:
+                    self.stats["subscription_errors"].append({
+                        "pair": pair,
+                        "channel": channel,
+                        "error": str(e),
+                        "timestamp": time.time(),
+                        "subscription": sub
+                    })
+                
+                self.logger.error(
+                    error_msg,
+                    extra={
+                        "channel": channel,
+                        "pairs": pairs,
+                        "error": str(e),
+                        "subscription": sub
+                    }
+                )
                 # Emit Prometheus counter (PRD-001 Section 1.4)
                 if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
                     KRAKEN_WS_ERRORS_TOTAL.labels(error_type='subscription').inc()
@@ -1380,6 +1553,8 @@ class KrakenWebSocketClient:
             
             # Update statistics
             self.stats["messages_received"] += 1
+            # PRD-001: Track last message timestamp per pair
+            self.stats["last_message_timestamp_by_pair"][pair] = time.time()
             self.logger.debug(f"📈 Processed {len(trades)} trades for {pair}")
             
         except Exception as e:
@@ -1528,11 +1703,8 @@ class KrakenWebSocketClient:
                     await callback(pair, book_data)
                 except Exception as e:
                     self.logger.error(f"Error in book callback: {e}")
-            
-        except Exception as e:
-            self.stats["errors"] += 1
-            self.logger.error(f"Error handling book data: {e}")
-            # Don't raise - continue processing
+                    self.stats["errors"] += 1
+                    self.stats["dropped_messages"] += 1
         finally:
             if self.latency_tracker:
                 latency_ms = self.latency_tracker.end_timing(operation_id, channel='book')
@@ -1568,6 +1740,9 @@ class KrakenWebSocketClient:
                 "received_at": time.time()
             }
 
+            # PRD-001: Track last message timestamp per pair
+            self.stats["last_message_timestamp_by_pair"][pair] = time.time()
+            
             # Cache data for graceful degradation (PRD-001 Section 1.4)
             self.cache_data(channel, pair, ohlc)
 
@@ -1647,7 +1822,7 @@ class KrakenWebSocketClient:
         channel_id = data[0]
         payload = data[1]
         channel = data[2]
-        pair = data[3]
+        pair = normalize_kraken_pair(data[3])  # PRD-001: Normalize XBT -> BTC
 
         # Validate channel_id is numeric
         if not isinstance(channel_id, (int, float)):
@@ -2040,7 +2215,7 @@ class KrakenWebSocketClient:
                 channel_id = data[0]
                 payload = data[1]
                 channel = data[2]
-                pair = data[3]
+                pair = normalize_kraken_pair(data[3])  # PRD-001: Normalize XBT -> BTC
 
                 # Extract and validate sequence numbers (PRD-001 Section 1.3)
                 self.extract_and_validate_sequence(data, channel, pair)
@@ -2159,6 +2334,64 @@ class KrakenWebSocketClient:
         
         return health
     
+    def get_health_metrics(self) -> Dict[str, Any]:
+        """
+        Get comprehensive health metrics (PRD-001 Section 4.1).
+
+        Returns:
+            Dict with health metrics including:
+            - last_message_timestamp_by_pair: Dict[pair, timestamp]
+            - reconnect_count_by_pair: Dict[pair, count]
+            - overall connection health
+            - subscription errors
+            - dropped messages count
+        """
+        current_time = time.time()
+        
+        # Calculate time since last message for each pair
+        pair_freshness = {}
+        for pair, timestamp in self.stats["last_message_timestamp_by_pair"].items():
+            age_seconds = current_time - timestamp
+            pair_freshness[pair] = {
+                "last_message_timestamp": timestamp,
+                "age_seconds": age_seconds,
+                "is_fresh": age_seconds < 120,  # Fresh if < 2 minutes old
+            }
+        
+        return {
+            "connection_state": self.connection_state.value,
+            "is_healthy": self.is_healthy,
+            "reconnection_attempt": self.reconnection_attempt,
+            "total_reconnects": self.stats["reconnects"],
+            "last_message_timestamp_by_pair": pair_freshness,
+            "reconnect_count_by_pair": dict(self.stats["reconnect_count_by_pair"]),
+            "subscription_errors": self.stats["subscription_errors"][-10:],  # Last 10 errors
+            "dropped_messages": self.stats["dropped_messages"],
+            "total_messages_received": self.stats["messages_received"],
+            "total_errors": self.stats["errors"],
+            "circuit_breaker_trips": self.stats["circuit_breaker_trips"],
+        }
+    
+    def get_last_message_age_summary(self) -> Dict[str, float]:
+        """
+        Get last message age per pair in seconds (PRD-001 Task B requirement).
+        
+        Returns:
+            Dict mapping pair -> age_seconds (None if no messages received)
+        """
+        current_time = time.time()
+        summary = {}
+        
+        for pair, timestamp in self.stats["last_message_timestamp_by_pair"].items():
+            summary[pair] = current_time - timestamp
+            
+        # Include all configured pairs, even if no messages received
+        for pair in self.config.pairs:
+            if pair not in summary:
+                summary[pair] = None
+                
+        return summary
+    
     async def monitor_health(self):
         """Enhanced health monitoring with Redis Cloud specific metrics"""
         while self.running:
@@ -2170,6 +2403,15 @@ class KrakenWebSocketClient:
 
                 # PRD-001 Section 2.2: Update stream length metrics
                 await self.redis_manager.update_stream_metrics()
+
+                # PRD-001 Task B: Log last message age per pair (every 60 seconds)
+                if int(current_time) % 60 == 0:  # Log every minute
+                    age_summary = self.get_last_message_age_summary()
+                    age_str = ", ".join([
+                        f"{pair}: {age:.1f}s" if age is not None else f"{pair}: NO_MSG"
+                        for pair, age in sorted(age_summary.items())
+                    ])
+                    self.logger.info(f"Last message age per pair: {age_str}")
 
                 # Check overall health status (PRD-001 Section 4.1)
                 if not self.is_healthy:
@@ -2374,6 +2616,14 @@ class KrakenWebSocketClient:
             except Exception as e:
                 self.reconnection_attempt += 1
                 self.stats["reconnects"] += 1  # Keep historical total
+                downtime = time.time() - self.connection_state_changed_at
+                # Surface downtime + state so operators can correlate reconnect storms
+                self.logger.warning(
+                    "Kraken WS reconnect triggered after %.1fs in state=%s: %s",
+                    downtime,
+                    self.connection_state.value,
+                    e,
+                )
 
                 # Emit Prometheus counter for reconnection attempts (PRD-001 Section 4.2)
                 if PROMETHEUS_AVAILABLE and KRAKEN_WS_RECONNECTS_TOTAL:
@@ -2389,6 +2639,12 @@ class KrakenWebSocketClient:
                     f"Kraken WS connection failed (attempt {self.reconnection_attempt}/{self.config.max_retries}): {e}"
                 )
 
+                # PRD-001: Track reconnect count per pair (increment for all pairs on reconnect)
+                for pair in self.config.pairs:
+                    if pair not in self.stats["reconnect_count_by_pair"]:
+                        self.stats["reconnect_count_by_pair"][pair] = 0
+                    self.stats["reconnect_count_by_pair"][pair] += 1
+                
                 if self.reconnection_attempt >= self.config.max_retries:
                     self.logger.error("Kraken WS max reconnection attempts reached")
                     # Set state to DISCONNECTED after max retries

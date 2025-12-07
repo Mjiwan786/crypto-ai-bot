@@ -1,0 +1,227 @@
+name: Monthly Model Retraining
+
+on:
+  schedule:
+    # Run on 1st of every month at 00:00 UTC
+    - cron: '0 0 1 * *'
+
+  workflow_dispatch:
+    # Allow manual trigger
+    inputs:
+      months:
+        description: 'Months of training data'
+        required: false
+        default: '12'
+      deploy:
+        description: 'Deploy if improved (true/false)'
+        required: false
+        default: 'false'
+
+env:
+  PYTHON_VERSION: '3.10'
+  CONDA_ENV: 'crypto-bot'
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480  # 8 hours max
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          lfs: true  # Enable Git LFS for model files
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install pandas numpy scikit-learn scipy redis boto3 tqdm
+          pip install pytest pytest-cov  # For testing
+
+      - name: Create directories
+        run: |
+          mkdir -p logs
+          mkdir -p models/ensemble
+          mkdir -p data/ohlcv
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Run retraining pipeline
+        id: retrain
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          S3_BUCKET: ${{ secrets.S3_MODEL_BUCKET }}
+        run: |
+          MONTHS=${{ github.event.inputs.months || '12' }}
+          DEPLOY=${{ github.event.inputs.deploy || 'false' }}
+
+          if [ "$DEPLOY" = "true" ]; then
+            DEPLOY_FLAG="--deploy"
+          else
+            DEPLOY_FLAG=""
+          fi
+
+          python scripts/retrain_monthly.py \
+            --symbol "BTC/USDT" \
+            --months $MONTHS \
+            --s3-bucket $S3_BUCKET \
+            $DEPLOY_FLAG \
+            2>&1 | tee logs/retraining_output.log
+
+          # Capture exit code
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Upload retraining logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: retraining-logs
+          path: logs/
+          retention-days: 30
+
+      - name: Upload model artifacts
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: trained-models
+          path: models/ensemble/
+          retention-days: 90
+
+      - name: Commit and push model version (Git LFS)
+        if: success() && github.event.inputs.deploy == 'true'
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+          # Track model files with Git LFS
+          git lfs track "models/ensemble/**/*.pt"
+          git add .gitattributes
+
+          # Get version from latest model directory
+          NEW_VERSION=$(ls -t models/ensemble | grep -E '^v[0-9]{8}$' | head -1)
+
+          # Add and commit
+          git add models/ensemble/$NEW_VERSION/
+          git commit -m "chore: add trained models $NEW_VERSION" || echo "No changes to commit"
+
+          # Create tag
+          git tag -a $NEW_VERSION -m "Model version $NEW_VERSION"
+
+          # Push
+          git push origin main
+          git push origin $NEW_VERSION
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send notification on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Monthly model retraining failed!'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+
+      - name: Send notification on success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Monthly model retraining completed successfully!'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+
+  test-new-models:
+    needs: retrain
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install pandas numpy scikit-learn scipy redis pytest pytest-cov
+
+      - name: Download model artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: trained-models
+          path: models/ensemble/
+
+      - name: Run model tests
+        run: |
+          pytest tests/ml/ -v --cov=ml --cov-report=xml
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: ml-models
+          name: ml-coverage
+
+  deploy-to-production:
+    needs: test-new-models
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deploy == 'true' && success()
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download model artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: trained-models
+          path: models/ensemble/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy to production S3
+        env:
+          S3_BUCKET: ${{ secrets.S3_MODEL_BUCKET }}
+        run: |
+          NEW_VERSION=$(ls -t models/ensemble | grep -E '^v[0-9]{8}$' | head -1)
+
+          echo "Deploying version: $NEW_VERSION"
+
+          # Upload to S3 production path
+          aws s3 sync models/ensemble/$NEW_VERSION/ s3://$S3_BUCKET/production/$NEW_VERSION/
+
+          # Update latest pointer
+          echo $NEW_VERSION > latest_version.txt
+          aws s3 cp latest_version.txt s3://$S3_BUCKET/production/latest_version.txt
+
+          echo "Deployment completed: $NEW_VERSION"
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'success'
+          text: 'New model version deployed to production!'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}

@@ -80,7 +80,7 @@ class RedisCloudConfig(BaseModel):
     """
 
     # Connection settings
-    url: str = Field(default_factory=lambda: os.getenv("REDIS_URL", "rediss://localhost:6380"))
+    url: str = Field(default_factory=lambda: os.getenv("REDIS_URL", ""))
     ca_cert_path: str | None = Field(default_factory=lambda: os.getenv("REDIS_CA_CERT"))
     client_cert_path: str | None = Field(default_factory=lambda: os.getenv("REDIS_CLIENT_CERT"))
     client_key_path: str | None = Field(default_factory=lambda: os.getenv("REDIS_CLIENT_KEY"))
@@ -117,6 +117,8 @@ class RedisCloudConfig(BaseModel):
         Raises:
             ValueError: If URL does not use rediss:// protocol
         """
+        if not v:
+            raise ValueError("Redis URL must be provided via config or REDIS_URL")
         if not v.startswith("rediss://"):
             raise ValueError("Redis Cloud requires TLS connection (rediss://)")
         return v
@@ -263,8 +265,15 @@ class RedisCloudClient:
             "max_connections": self.config.max_connections,
         }
 
-        # For redis-py 6.x, use ssl_context instead of ssl parameter
-        params["ssl_context"] = self._build_ssl_context()
+        # PRD-001 Section B.1: For redis-py async, use ssl_ca_certs parameter
+        # Based on working code in prd_publisher.py (line 376-377)
+        # For rediss:// URLs, redis-py automatically enables SSL/TLS
+        if self.config.url.startswith("rediss://"):
+            if self.config.ca_cert_path and os.path.exists(self.config.ca_cert_path):
+                # Use string format for ssl_cert_reqs (not ssl.CERT_REQUIRED constant)
+                params["ssl_ca_certs"] = self.config.ca_cert_path
+                params["ssl_cert_reqs"] = "required"  # String, not ssl.CERT_REQUIRED
+            # If no CA cert, redis-py will use system certs (acceptable fallback)
 
         return params
 
@@ -291,19 +300,17 @@ class RedisCloudClient:
             Exception: If connection fails after all retry attempts
             RuntimeError: If retry logic encounters an unexpected state
         """
+        # Get connection parameters (includes SSL context for TLS)
+        conn_params = self._get_connection_params()
+        
         # For redis-py 6.x, use the simplified approach like the working TLS check
         for attempt in range(self.config.max_retries):
             try:
-                # Use the same approach as the working check_redis_tls.py script
+                # PRD-001 Section B.1: Use SSL context with CA certificate for TLS
+                # conn_params already includes ssl_context from _get_connection_params()
                 client = redis.from_url(
                     self.config.url,
-                    socket_timeout=self.config.socket_timeout,
-                    socket_connect_timeout=self.config.connect_timeout,
-                    retry_on_timeout=self.config.retry_on_timeout,
-                    health_check_interval=self.config.health_check_interval,
-                    decode_responses=self.config.decode_responses,
-                    client_name=self.config.client_name,
-                    max_connections=self.config.max_connections,
+                    **conn_params
                 )
 
                 # Test connection

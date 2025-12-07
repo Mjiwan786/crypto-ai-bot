@@ -67,79 +67,83 @@ async def run_command(args) -> None:
     _logger.info(f"Config: {args.config}")
     _logger.info(f"Dry run: {args.dry_run}")
 
-    # Start health endpoint immediately for Fly.io
-    # Use shared state to allow health handler to access orchestrator
-    health_state = {"orchestrator": None, "start_time": time.time()}
+    # Start metrics exporter (Task D)
+    from monitoring.prd_metrics_exporter import PRDMetricsExporter
+    metrics_exporter = PRDMetricsExporter(port=int(os.getenv("METRICS_PORT", "9108")))
+    metrics_exporter.start()
+    metrics_exporter.update_engine_info({
+        "version": "2.0.0",
+        "mode": args.mode,
+        "prd_compliant": "true",
+    })
+    _logger.info("✅ Prometheus metrics exporter started on port 9108")
+
+    # Start health endpoint with PRD-001 compliant health checks
+    health_state = {
+        "orchestrator": None,
+        "start_time": time.time(),
+        "metrics_exporter": metrics_exporter,
+    }
 
     from aiohttp import web
     import json as json_lib
 
     async def health_handler(request):
-        """Health check with degraded status detection"""
-        orchestrator = health_state.get("orchestrator")
+        """PRD-001 compliant health check endpoint"""
+        from monitoring.prd_health_checker import PRDHealthChecker
+
         current_time = time.time()
         uptime = current_time - health_state["start_time"]
 
-        response = {
-            "status": "healthy",
-            "mode": args.mode,
-            "uptime_seconds": round(uptime, 2)
-        }
+        # Run PRD health checks
+        checker = PRDHealthChecker(
+            mode=args.mode,
+            start_time=health_state["start_time"],
+        )
+        health_status = await checker.check_all()
 
-        # Grace period: don't check publisher health during first 5 minutes
-        startup_grace_period = 300  # 5 minutes
-        publish_threshold = 300  # Allow 5 minutes between publishes (not 30s)
+        # Update metrics
+        metrics_exporter.update_uptime()
+        metrics_exporter.update_health(health_status.healthy)
 
-        # Check publisher health if orchestrator is available
-        if orchestrator and hasattr(orchestrator, 'signal_processor'):
-            signal_processor = orchestrator.signal_processor
-            if signal_processor and hasattr(signal_processor, 'resilient_publisher'):
-                publisher = signal_processor.resilient_publisher
-                if publisher:
-                    stats = publisher.get_health_stats()
-                    response["publisher"] = stats
+        response = health_status.to_dict()
+        response["mode"] = args.mode
 
-                    # Only check publish threshold after startup grace period
-                    if uptime > startup_grace_period:
-                        # Degraded if no publish in >5min (but still return 200 OK)
-                        if stats["last_publish_seconds_ago"] > publish_threshold:
-                            response["status"] = "degraded"
-                            response["reason"] = f"No publish in {stats['last_publish_seconds_ago']:.1f}s (>{publish_threshold}s threshold)"
-                    else:
-                        response["startup_grace"] = f"Startup grace period ({int(startup_grace_period - uptime)}s remaining)"
+        # Add orchestrator-specific info if available
+        orchestrator = health_state.get("orchestrator")
+        if orchestrator:
+            response["orchestrator"] = {
+                "initialized": True,
+            }
 
-        # Add performance metrics if available
-        metrics_publisher = health_state.get("metrics_publisher")
-        if metrics_publisher:
-            try:
-                metrics_summary = metrics_publisher.get_latest_summary()
-                if metrics_summary and metrics_summary.get("available"):
-                    response["performance_metrics"] = {
-                        "aggressive_mode_score": round(metrics_summary["aggressive_mode_score"]["value"], 2),
-                        "velocity_to_target_pct": round(metrics_summary["velocity_to_target"]["percent"], 1),
-                        "days_remaining": metrics_summary["days_remaining_estimate"]["value"],
-                        "daily_rate_usd": round(metrics_summary["days_remaining_estimate"]["daily_rate"], 2),
-                        "win_rate_pct": round(metrics_summary["trading_stats"]["win_rate"] * 100, 1),
-                        "total_trades": metrics_summary["trading_stats"]["total_trades"],
-                    }
-            except Exception as e:
-                _logger.debug(f"Could not fetch performance metrics: {e}")
-
-        # Always return 200 OK - degraded is informational only
+        # Always return 200 OK (Fly.io expects 200 for healthy/degraded)
         status_code = 200
         return web.Response(
-            text=json_lib.dumps(response),
+            text=json_lib.dumps(response, indent=2),
             content_type='application/json',
             status=status_code
         )
 
+    async def metrics_handler(request):
+        """Prometheus metrics endpoint (redirects to metrics exporter)"""
+        # Metrics are served by Prometheus HTTP server on port 9108
+        # This endpoint provides a redirect or info
+        return web.Response(
+            text="Metrics available at http://localhost:9108/metrics",
+            content_type='text/plain',
+            status=200
+        )
+
     app = web.Application()
     app.router.add_get('/health', health_handler)
+    app.router.add_get('/metrics', metrics_handler)
+    app.router.add_get('/readiness', health_handler)  # Same as health
+    app.router.add_get('/liveness', health_handler)  # Same as health
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
-    _logger.info("✅ Health endpoint started on 0.0.0.0:8080 (always returns 200 OK, 5min grace period)")
+    _logger.info("✅ Health endpoint started on 0.0.0.0:8080 (PRD-001 compliant)")
 
     # ===========================================
     # SECURITY & SAFETY CHECKS
@@ -167,13 +171,28 @@ async def run_command(args) -> None:
     from protections.kill_switches import GlobalKillSwitch
     kill_switch = GlobalKillSwitch()
 
-    # Load configuration
+    # Load configuration using OptimizedConfigLoader + AgentConfigIntegrator (Task D)
     try:
-        from config.unified_config_loader import load_system_config
-        config = load_system_config(environment=args.mode)
-        _logger.info("Configuration loaded successfully")
+        from config.optimized_config_loader import OptimizedConfigManager
+        from config.agent_integration import AgentConfigIntegrator
+
+        # Get optimized config manager
+        config_manager = OptimizedConfigManager.get_instance(config_path=args.config)
+        config = config_manager.get_config()
+
+        # Get agent integrator for merged configs
+        agent_integrator = AgentConfigIntegrator(main_config_path=args.config)
+        merged_config = agent_integrator.get_merged_config(
+            strategy=args.strategy,
+            environment=args.mode,
+        )
+
+        _logger.info("Configuration loaded successfully (OptimizedConfigLoader + AgentConfigIntegrator)")
+        _logger.info(f"Strategy: {args.strategy}, Mode: {args.mode}")
     except Exception as e:
         _logger.error(f"Failed to load configuration: {e}")
+        import traceback
+        _logger.error(traceback.format_exc())
         sys.exit(1)
 
     # Initialize trading system

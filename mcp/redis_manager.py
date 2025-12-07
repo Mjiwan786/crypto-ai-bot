@@ -416,41 +416,40 @@ class RedisManager(BaseRedisManager):
 
         for attempt in range(1, max_retries + 1):
             try:
-                # Redis Cloud direct host form
-                if "redis-cloud.com" in self.config.url:
-                    parsed = urlparse(self.config.url)
-                    redis_kwargs.update({
-                        "host": parsed.hostname,
-                        "port": parsed.port or 6379,
-                        "username": parsed.username or "default",
-                        "password": parsed.password,
-                        "ssl": self.config.ssl,
-                        "ssl_cert_reqs": ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE,
-                    })
-                    if self.config.ca_cert:
-                        redis_kwargs["ssl_ca_certs"] = self.config.ca_cert
-                    self.client = redis.Redis(**redis_kwargs)
+                # For rediss:// URLs (Redis Cloud, TLS connections), let redis-py handle SSL automatically
+                # Don't pass SSL parameters - they cause compatibility issues with redis-py 5.x
+                if "redis-cloud.com" in self.config.url or self.config.url.startswith("rediss://"):
+                    # Use from_url and let redis-py handle SSL for rediss:// URLs
+                    self.client = redis.from_url(
+                        self.config.url,
+                        decode_responses=redis_kwargs["decode_responses"],
+                        socket_timeout=redis_kwargs["socket_timeout"],
+                        socket_connect_timeout=redis_kwargs["socket_connect_timeout"],
+                        socket_keepalive=redis_kwargs["socket_keepalive"],
+                        health_check_interval=redis_kwargs["health_check_interval"],
+                        client_name=redis_kwargs["client_name"],
+                        retry_on_timeout=redis_kwargs["retry_on_timeout"],
+                        max_connections=redis_kwargs["max_connections"],
+                    )
                 else:
-                    # Standard URL; normalize to rediss if SSL requested
+                    # Standard redis:// URL (non-TLS)
                     url = self.config.url
                     if self.config.ssl and url.startswith("redis://"):
                         url = url.replace("redis://", "rediss://", 1)
 
-                    extra_ssl = {}
-                    if self.config.ssl:
-                        extra_ssl["ssl_cert_reqs"] = ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE
-                        if self.config.ca_cert:
-                            extra_ssl["ssl_ca_certs"] = self.config.ca_cert
-
-                    self.client = redis.from_url(url, **redis_kwargs, **extra_ssl)
+                    # Let redis-py handle SSL automatically for rediss:// URLs
+                    self.client = redis.from_url(url, **redis_kwargs)
 
                 # Test connection
                 self.client.ping()
-                safe_url = (
-                    f"{parsed.scheme}://{parsed.hostname}:{parsed.port or 6379}"
-                    if "redis-cloud.com" in self.config.url
-                    else (self.config.url.split("@")[-1] if "@" in self.config.url else self.config.url)
-                )
+
+                # Create safe URL for logging (hide password)
+                parsed = urlparse(self.config.url)
+                if parsed.password:
+                    safe_url = f"{parsed.scheme}://{parsed.username or 'default'}:***@{parsed.hostname}:{parsed.port or 6379}"
+                else:
+                    safe_url = self.config.url.split("@")[-1] if "@" in self.config.url else self.config.url
+
                 self.logger.info(f"✅ Connected to Redis on attempt {attempt}/{max_retries}: {safe_url}")
                 self.circuit_breaker.on_success()
                 return True
@@ -791,14 +790,8 @@ class AsyncRedisManager(BaseRedisManager):
         for attempt in range(1, max_retries + 1):
             try:
                 if "redis-cloud.com" in self.config.url or self.config.url.startswith("rediss://"):
-                    # Use from_url with SSL parameters (avoid RedisSSLContext)
-                    extra_kwargs = {}
-                    if self.config.ssl:
-                        extra_kwargs["ssl_cert_reqs"] = ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE
-                        if self.config.ca_cert and os.path.exists(self.config.ca_cert):
-                            extra_kwargs["ssl_ca_certs"] = self.config.ca_cert
-                            self.logger.debug(f"Using CA certificate from {self.config.ca_cert}")
-
+                    # For rediss:// URL, let redis-py handle SSL automatically
+                    # Don't pass SSL parameters - they cause issues with redis-py 5.x asyncio
                     self.client = redis.asyncio.from_url(
                         self.config.url,
                         decode_responses=redis_kwargs["decode_responses"],
@@ -809,7 +802,6 @@ class AsyncRedisManager(BaseRedisManager):
                         client_name=redis_kwargs["client_name"],
                         retry_on_timeout=redis_kwargs["retry_on_timeout"],
                         max_connections=redis_kwargs["max_connections"],
-                        **extra_kwargs,
                     )
                 else:
                     # Normalize to rediss if SSL requested
@@ -817,13 +809,8 @@ class AsyncRedisManager(BaseRedisManager):
                     if self.config.ssl and url.startswith("redis://"):
                         url = url.replace("redis://", "rediss://", 1)
 
-                    extra_ssl = {}
-                    if self.config.ssl:
-                        extra_ssl["ssl_cert_reqs"] = ssl.CERT_REQUIRED if self.config.ssl_verify else ssl.CERT_NONE
-                        if self.config.ca_cert:
-                            extra_ssl["ssl_ca_certs"] = self.config.ca_cert
-
-                    self.client = redis.asyncio.from_url(url, **redis_kwargs, **extra_ssl)
+                    # Let redis-py handle SSL automatically for rediss:// URLs
+                    self.client = redis.asyncio.from_url(url, **redis_kwargs)
 
                 # Test connection with timeout
                 await asyncio.wait_for(self.client.ping(), timeout=3.0)

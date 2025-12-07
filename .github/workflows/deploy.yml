@@ -1,0 +1,220 @@
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============================================================================
+  # Test Job
+  # ============================================================================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Run unit tests
+        run: |
+          pytest tests/unit/ -v --cov=agents --cov=ml --cov=models \
+            --cov-report=term-missing --cov-report=xml
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration/ -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-crypto-ai-bot
+
+  # ============================================================================
+  # Deploy to Staging
+  # ============================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: https://crypto-ai-bot-staging.fly.dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Staging
+        run: |
+          flyctl deploy \
+            --config fly.staging.toml \
+            --dockerfile Dockerfile.production \
+            --remote-only \
+            --strategy rolling \
+            --wait-timeout 600
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Health Check Staging
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          curl -f https://crypto-ai-bot-staging.fly.dev/health || exit 1
+
+      - name: Notify Slack (Staging)
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Staging deployment ${{ job.status }}'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ============================================================================
+  # Deploy to Production
+  # ============================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      (startsWith(github.ref, 'refs/tags/v'))
+    environment:
+      name: production
+      url: https://crypto-ai-bot.fly.dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Pre-deployment validation
+        run: |
+          echo "Running pre-deployment checks..."
+          python scripts/preflight_production.py || exit 1
+
+      - name: Deploy to Production
+        run: |
+          flyctl deploy \
+            --config fly.toml \
+            --dockerfile Dockerfile.production \
+            --remote-only \
+            --strategy rolling \
+            --wait-timeout 600
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Health Check Production
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 60
+
+          # Check health endpoint
+          for i in {1..10}; do
+            if curl -f https://crypto-ai-bot.fly.dev/health; then
+              echo "Health check passed!"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "Health check failed after 10 attempts"
+              exit 1
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+
+      - name: Verify metrics endpoint
+        run: |
+          curl -f https://crypto-ai-bot.fly.dev/metrics || exit 1
+
+      - name: Create deployment tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git tag -a "deploy-$(date +%Y%m%d-%H%M%S)" \
+            -m "Production deployment from commit ${{ github.sha }}"
+          git push origin --tags || true
+
+      - name: Notify Discord (Production)
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "crypto-ai-bot Production Deployment"
+          description: |
+            Deployment ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+          url: https://crypto-ai-bot.fly.dev
+
+      - name: Notify Slack (Production)
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Production deployment ${{ job.status }} - 99.8% uptime SLA active'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ============================================================================
+  # Rollback on Failure
+  # ============================================================================
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: failure() && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Rollback to previous version
+        run: |
+          echo "Deployment failed, rolling back..."
+          flyctl releases rollback -y
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Notify of rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'warning'
+          text: '⚠️ Production deployment failed - ROLLBACK executed'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

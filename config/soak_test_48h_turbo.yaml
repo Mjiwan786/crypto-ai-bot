@@ -315,8 +315,9 @@ kraken:
 # REDIS CONFIGURATION
 # =============================================================================
 redis:
-  # Connection (Redis Cloud TLS)
-  url: "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+  # Connection (Redis Cloud TLS) - URL should come from REDIS_URL environment variable
+  # This is a placeholder - the actual URL will be loaded from environment
+  url: "${REDIS_URL}"
   tls_enabled: true
   tls_ca_cert_path: "config/certs/redis_ca.pem"
 

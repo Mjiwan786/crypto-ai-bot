@@ -94,10 +94,7 @@ class EngineConfig:
         default_factory=lambda: os.getenv("REDIS_URL", "")
     )
     redis_ca_cert: str = field(
-        default_factory=lambda: os.getenv(
-            "REDIS_CA_CERT",
-            "C:\\Users\\Maith\\OneDrive\\Desktop\\crypto_ai_bot\\config\\certs\\redis_ca.pem"
-        )
+        default_factory=lambda: os.getenv("REDIS_CA_CERT") or os.getenv("REDIS_CA_CERT_PATH") or ""
     )
 
     # Logging

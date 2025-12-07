@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt ./
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ==============================================================================
 # Stage 2: Production - Minimal runtime image
@@ -51,15 +51,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 
-# Copy Python packages from builder
-COPY --from=builder /root/.local /root/.local
+# Copy Python packages from builder (system-wide installation)
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy TA-Lib shared libraries from builder
 COPY --from=builder /usr/lib/libta_lib.* /usr/lib/
 COPY --from=builder /usr/include/ta-lib/ /usr/include/ta-lib/
-
-# Make sure scripts in .local are usable
-ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
 COPY . .
@@ -85,6 +83,7 @@ ENV HEALTH_PORT=8080
 ENV METRICS_PORT=9108
 ENV LOG_LEVEL=INFO
 ENV TRADING_MODE=paper
+ENV ENGINE_MODE=paper
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

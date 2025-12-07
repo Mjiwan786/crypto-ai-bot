@@ -2,7 +2,7 @@
 # Production-ready configuration for 99.8% uptime SLA
 # Health checks every 15s, auto-restart, multi-instance deployment
 
-app = 'crypto-ai-bot'
+app = 'crypto-ai-bot-engine'
 primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
 
 [build]
@@ -17,11 +17,16 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   LOG_FORMAT = "json"
   PYTHONUNBUFFERED = "1"
 
+  # CRITICAL: Engine mode controls Redis stream separation
+  # - "paper" = signals:paper, pnl:paper (for backtests/marketing)
+  # - "live"  = signals:live, pnl:live (for real trading)
+  ENGINE_MODE = "paper"
+
   # Trading Configuration
   TRADING_MODE = "paper"  # Change to "live" for real trading
   BOT_MODE = "PAPER"
   ENABLE_TRADING = "false"
-  TRADING_PAIRS = "BTC/USD,ETH/USD,SOL/USD,MATIC/USD,LINK/USD"
+  TRADING_PAIRS = "BTC/USD,ETH/USD,SOL/USD"
 
   # Kraken WebSocket
   KRAKEN_WS_URL = "wss://ws.kraken.com"
@@ -39,9 +44,11 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   REDIS_DECODE_RESPONSES = "true"
   REDIS_CLIENT_NAME = "crypto-ai-bot-flyio"
 
-  # Stream Configuration
+  # Stream Configuration (mode-aware via ENGINE_MODE)
   STREAM_SIGNALS_PAPER = "signals:paper"
   STREAM_SIGNALS_LIVE = "signals:live"
+  PNL_STREAM_PAPER = "pnl:paper"
+  PNL_STREAM_LIVE = "pnl:live"
   ACTIVE_SIGNALS_STREAM = "signals:paper"
 
   # ML Models
@@ -81,9 +88,9 @@ kill_timeout = "30s"  # Allow 30s for graceful shutdown
   processes = ["app"]
   protocol = "tcp"
   internal_port = 8080
-  auto_stop_machines = false  # Never auto-stop (24/7 operation)
+  auto_stop_machines = "off"  # Never auto-stop (24/7 operation) - explicit "off" per Fly.io docs
   auto_start_machines = true
-  min_machines_running = 2    # High availability: minimum 2 instances
+  min_machines_running = 1    # Keep at least 1 instance running always
 
   # Concurrency Settings
   [services.concurrency]
@@ -127,8 +134,9 @@ kill_timeout = "30s"  # Allow 30s for graceful shutdown
   processes = ["app"]
   protocol = "tcp"
   internal_port = 9108
-  auto_stop_machines = false
+  auto_stop_machines = "off"
   auto_start_machines = true
+  min_machines_running = 1
 
   [[services.ports]]
     port = 9108

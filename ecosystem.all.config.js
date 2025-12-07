@@ -18,7 +18,7 @@ module.exports = {
       restart_delay: 5000,
       watch: false,
       env: {
-        REDIS_URL: 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
+        REDIS_URL: process.env.REDIS_URL || '',
         REDIS_CA_CERT: 'C:\\Users\\Maith\\OneDrive\\Desktop\\crypto_ai_bot\\config\\certs\\redis_ca.pem',
         MODE: 'PAPER',
         LOG_LEVEL: 'INFO'
@@ -37,7 +37,7 @@ module.exports = {
       watch: false,
       max_memory_restart: '800M',
       env: {
-        REDIS_URL: 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
+        REDIS_URL: process.env.REDIS_URL || '',
         REDIS_CA_CERT: 'C:\\Users\\Maith\\OneDrive\\Desktop\\crypto_ai_bot\\config\\certs\\redis_ca.pem',
         CONFIG_FILE: 'config/turbo_mode.yaml',
         LOG_LEVEL: 'INFO'
@@ -55,7 +55,7 @@ module.exports = {
       restart_delay: 10000,
       watch: false,
       env: {
-        REDIS_URL: 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
+        REDIS_URL: process.env.REDIS_URL || '',
         REDIS_CA_CERT: 'C:\\Users\\Maith\\OneDrive\\Desktop\\crypto_ai_bot\\config\\certs\\redis_ca.pem',
         MODE: 'PAPER',
         KRAKEN_API_KEY: process.env.KRAKEN_API_KEY || '',
@@ -75,7 +75,7 @@ module.exports = {
       restart_delay: 5000,
       watch: false,
       env: {
-        REDIS_URL: 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
+        REDIS_URL: process.env.REDIS_URL || '',
         REDIS_CA_CERT: 'C:\\Users\\Maith\\OneDrive\\Desktop\\crypto_ai_bot\\config\\certs\\redis_ca.pem',
         START_EQUITY: '10000.0',
         USE_PANDAS: 'true',
@@ -103,7 +103,7 @@ module.exports = {
         APP_ENV: 'prod',
         APP_HOST: '0.0.0.0',
         APP_PORT: '8000',
-        REDIS_URL: 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
+        REDIS_URL: process.env.REDIS_URL || '',
         REDIS_SSL: 'true',
         SIGNALS_STREAM_ACTIVE: 'signals:paper',
         CORS_ALLOW_ORIGINS: 'https://aipredictedsignals.cloud,https://www.aipredictedsignals.cloud,http://localhost:3000',
@@ -129,7 +129,7 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: '3000',
         NEXT_PUBLIC_API_URL: 'http://localhost:8000',
-        REDIS_URL: 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818'
+        REDIS_URL: process.env.REDIS_URL || ''
       }
     }
   ]

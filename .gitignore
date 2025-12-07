@@ -121,6 +121,9 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.*.example
+!.env.example
 .venv
 env/
 venv/
@@ -210,3 +213,24 @@ temp/
 tmp/
 .temp/
 .tmp/
+
+# Security - Certificates and Keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+config/certs/redis_ca.pem
+!config/certs/__init__.py
+!config/certs/README.md
+
+# Security - Secrets and credentials
+secrets/
+redis_ca*/
+*.docx
+
+# Additional environment protection
+env.*.secret
+*.secret
+credentials.json
+service-account*.json

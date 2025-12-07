@@ -1,10 +1,16 @@
 ---
 # Single source of truth for Redis stream names
 # This file centralizes all stream naming to prevent drift across configs
+#
+# MODE-AWARE STREAMS:
+# - Paper/backtest streams use "signals:paper" and "pnl:paper" prefixes
+# - Live trading streams use "signals:live" and "pnl:live" prefixes
+# - Set ENGINE_MODE env var to "paper" or "live" to control which streams are used
 streams:
   prefix: "kraken"
   sep: ":"
   publish:
+    # Market data streams (Kraken WebSocket feeds)
     trades:   "kraken:trades:{symbol}"
     orderbook: "kraken:orderbook:{symbol}"
     ticker:   "kraken:ticker:{symbol}"
@@ -17,6 +23,21 @@ streams:
     status:   "kraken:status"
     errors:   "kraken:errors"
     metrics:  "kraken:metrics"
+
+    # Signal streams - MODE AWARE (paper vs live)
+    # Use get_signal_stream(mode) to get the correct stream based on ENGINE_MODE
+    signals_paper: "signals:paper"
+    signals_live:  "signals:live"
+
+    # PnL streams - MODE AWARE (paper vs live)
+    # Use get_pnl_stream(mode) to get the correct stream based on ENGINE_MODE
+    pnl_paper: "pnl:paper"
+    pnl_live:  "pnl:live"
+
+    # Equity curve tracking (for charts/dashboards)
+    equity_paper: "pnl:paper:equity_curve"
+    equity_live:  "pnl:live:equity_curve"
+
   subscribe:
     signals:           "signals:kraken:{symbol}"
     risk_alerts:       "risk:alerts:kraken"

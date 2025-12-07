@@ -138,17 +138,22 @@ class Signal(BaseModel):
         """
         Get Redis stream key for this signal.
 
-        Uses UNIFIED stream pattern for signals-api compatibility:
-        - signals:paper (all paper signals)
-        - signals:live (all live signals)
+        Uses PER-PAIR stream pattern for data separation:
+        - signals:paper:<PAIR> (e.g., signals:paper:BTC-USD)
+        - signals:live:<PAIR> (e.g., signals:live:BTC-USD)
 
-        This replaces the old per-pair sharding pattern (signals:live:BTC-USD)
-        to ensure compatibility with signals-api which reads from unified streams.
+        This ensures proper data isolation and scalability across trading pairs.
+        Each pair gets its own stream for independent consumption.
+
+        Note: Replaces "/" with "-" in pair name for consistent stream naming
+        across crypto-ai-bot and signals-api.
 
         Returns:
-            Unified stream key (e.g., "signals:paper" or "signals:live")
+            Per-pair stream key (e.g., "signals:paper:BTC-USD")
         """
-        return f"signals:{self.mode}"
+        # Convert pair format from BTC/USD to BTC-USD for stream keys
+        pair_normalized = self.pair.replace("/", "-")
+        return f"signals:{self.mode}:{pair_normalized}"
 
 
 def generate_signal_id(ts: int, pair: str, strategy: str) -> str:
