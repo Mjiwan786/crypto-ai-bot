@@ -15,7 +15,7 @@ def test_redis_connection():
     """Test Redis Cloud SSL connection with your credentials"""
     
     # Your Redis Cloud URL
-    REDIS_URL = "rediss://default:Salam78614**%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+    REDIS_URL = "rediss://default:&lt;REDIS_PASSWORD&gt;**%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
     
     print("🔗 Testing Redis Cloud SSL connection...")
     print("=" * 50)
@@ -142,7 +142,7 @@ def test_redis_connection():
 def test_backtest_context_operations():
     """Test specific operations used by the backtest system"""
     
-    REDIS_URL = "rediss://default:Salam78614**%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+    REDIS_URL = "rediss://default:&lt;REDIS_PASSWORD&gt;**%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
     
     print("\n🧪 Testing backtest-specific context operations...")
     print("=" * 50)

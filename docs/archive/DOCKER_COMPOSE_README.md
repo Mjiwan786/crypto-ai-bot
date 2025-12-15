@@ -160,11 +160,11 @@ The example includes Redis Cloud connection details:
 - **Host**: redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com
 - **Port**: 19818
 - **TLS**: Enabled (rediss://)
-- **Connection String**: `rediss://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0`
+- **Connection String**: `rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0`
 
 To test the connection:
 ```bash
-redis-cli -u redis://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert <path_to_ca_certfile>
+redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert <path_to_ca_certfile>
 ```
 
 ## 🚨 Troubleshooting
