@@ -43,7 +43,7 @@ REM Set environment variables
 echo.
 echo [2/5] Setting environment variables...
 
-set REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+set REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 set REDIS_SSL=true
 set REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
 set ENABLE_5S_BARS=false

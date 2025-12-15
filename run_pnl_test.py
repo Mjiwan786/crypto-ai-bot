@@ -9,7 +9,7 @@ import sys
 import time
 
 # Set environment variables
-os.environ["REDIS_URL"] = "rediss://default:Salam78614**%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0"
+os.environ["REDIS_URL"] = "rediss://default:&lt;REDIS_PASSWORD&gt;**%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0"
 os.environ["EMIT_PNL_EVENTS"] = "true"
 os.environ["START_EQUITY"] = "10000"
 

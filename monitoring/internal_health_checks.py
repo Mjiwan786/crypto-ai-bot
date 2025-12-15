@@ -34,6 +34,14 @@ from typing import Any, Dict, List, Optional, Callable, Awaitable
 
 import redis.asyncio as redis
 
+# Import canonical trading pairs (single source of truth)
+try:
+    from config.trading_pairs import DEFAULT_TRADING_PAIRS_CSV
+    CANONICAL_PAIRS_AVAILABLE = True
+except ImportError:
+    CANONICAL_PAIRS_AVAILABLE = False
+    DEFAULT_TRADING_PAIRS_CSV = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"
+
 logger = logging.getLogger(__name__)
 
 
@@ -134,8 +142,8 @@ class HealthChecker:
         self.signal_stale_threshold_sec = int(os.getenv("SIGNAL_STALE_THRESHOLD_SEC", "300"))
         self.pnl_stale_threshold_sec = int(os.getenv("PNL_STALE_THRESHOLD_SEC", "600"))
 
-        # Trading pairs to check
-        self.trading_pairs = os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD").split(",")
+        # Trading pairs to check - uses canonical config/trading_pairs.py
+        self.trading_pairs = os.getenv("TRADING_PAIRS", DEFAULT_TRADING_PAIRS_CSV).split(",")
 
     async def _get_redis_client(self) -> redis.Redis:
         """Create Redis client for health checks."""

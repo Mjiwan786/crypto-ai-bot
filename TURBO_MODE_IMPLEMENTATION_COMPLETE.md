@@ -281,21 +281,21 @@ python start_pnl_aggregator.py
 
 ### crypto_ai_bot
 ```bash
-URL: rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+URL: rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 Cert: C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem
 Env: crypto-bot
 ```
 
 ### signals-api
 ```bash
-URL: rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+URL: rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 Cert: <path_to_ca_certfile>
 Env: signals-api
 ```
 
 ### signals-site
 ```bash
-URL: rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+URL: rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 Cert: C:\Users\Maith\OneDrive\Desktop\signals-site\redis-ca.crt
 Env: (Node.js)
 ```

@@ -5,7 +5,7 @@
 **Deployment Time:** 2025-11-09 06:55 UTC (Initial) → 07:00 UTC (Fix Applied)
 **Components Deployed:** crypto-ai-bot, signals-api, signals-site
 **Infrastructure:** Fly.io + Vercel + Redis Cloud
-**API Endpoint:** https://crypto-signals-api.fly.dev/metrics/profitability ✅ WORKING
+**API Endpoint:** https://signals-api-gateway.fly.dev/metrics/profitability ✅ WORKING
 
 ---
 
@@ -22,7 +22,7 @@
 2. **signals-api** - Backend API (Fly.io)
    - Image: `registry.fly.io/crypto-signals-api:deployment-01K9KPQBPA8CM7FHZ3SM49V5X9` (JSONResponse fix)
    - Status: Running (2 machines) ✅ OPERATIONAL
-   - URL: https://crypto-signals-api.fly.dev
+   - URL: https://signals-api-gateway.fly.dev
    - Features: SSE streaming, PnL tracking, profitability metrics
    - Fix Applied: Added explicit JSONResponse for /metrics/profitability endpoint
 
@@ -86,7 +86,7 @@
 ### Vercel
 - Project: signals-site
 - Auto-deployment: Enabled
-- Environment: `NEXT_PUBLIC_API_BASE=https://crypto-signals-api.fly.dev`
+- Environment: `NEXT_PUBLIC_API_BASE=https://signals-api-gateway.fly.dev`
 
 ---
 
@@ -113,7 +113,7 @@
 
 **Live Test:**
 ```bash
-curl https://crypto-signals-api.fly.dev/metrics/profitability
+curl https://signals-api-gateway.fly.dev/metrics/profitability
 # Returns: Monthly ROI: 8.7%, PF: 1.52, Sharpe: 1.41, Status: active
 ```
 
@@ -170,8 +170,8 @@ feat: add profitability dashboard metrics
 | Service | URL | Status |
 |---------|-----|--------|
 | Trading Bot Health | https://crypto-ai-bot.fly.dev/health | ✅ |
-| Signals API Health | https://crypto-signals-api.fly.dev/healthz | ✅ |
-| Profitability Metrics | https://crypto-signals-api.fly.dev/metrics/profitability | 🔧 Debug |
+| Signals API Health | https://signals-api-gateway.fly.dev/healthz | ✅ |
+| Profitability Metrics | https://signals-api-gateway.fly.dev/metrics/profitability | 🔧 Debug |
 | Investor Dashboard | (Pending Vercel URL) | ⏳ |
 
 ### Expected Profitability Response
@@ -230,19 +230,19 @@ flyctl logs --no-tail | tail -100
 ### Test API Endpoints
 ```bash
 # Health check
-curl https://crypto-signals-api.fly.dev/healthz
+curl https://signals-api-gateway.fly.dev/healthz
 
 # Profitability metrics (currently 500)
-curl https://crypto-signals-api.fly.dev/metrics/profitability
+curl https://signals-api-gateway.fly.dev/metrics/profitability
 
 # Test with error details
-curl -v https://crypto-signals-api.fly.dev/metrics/profitability
+curl -v https://signals-api-gateway.fly.dev/metrics/profitability
 ```
 
 ### Redis Access
 ```bash
 # Connect to Redis
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem
 
 # Check keys
 GET bot:performance:current

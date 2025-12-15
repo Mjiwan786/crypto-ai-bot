@@ -88,7 +88,7 @@ npm install
 MODE=PAPER  # Start with PAPER, switch to LIVE after testing
 
 # Redis Cloud
-REDIS_URL=rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 REDIS_CA_CERT=C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem
 
 # Kraken API (for live trading only)
@@ -112,7 +112,7 @@ APP_HOST=0.0.0.0
 APP_PORT=8000
 
 # Redis Cloud
-REDIS_URL=rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 REDIS_SSL=true
 REDIS_CA_CERT=/path/to/ca.crt
 
@@ -138,11 +138,11 @@ PROMETHEUS_ENABLED=true
 #### signals-site (.env.production)
 ```bash
 # API
-NEXT_PUBLIC_API_URL=https://api.aipredictedsignals.cloud
-NEXT_PUBLIC_WS_URL=wss://api.aipredictedsignals.cloud
+NEXT_PUBLIC_API_URL=https://signals-api-gateway.fly.dev
+NEXT_PUBLIC_WS_URL=wss://signals-api-gateway.fly.dev
 
 # Redis (if direct access needed)
-REDIS_URL=rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 
 # Analytics
 NEXT_PUBLIC_GOOGLE_ANALYTICS=your_ga_id_here
@@ -257,7 +257,7 @@ module.exports = {
       max_restarts: 10,
       min_uptime: '10s',
       env: {
-        REDIS_URL: 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818'
+        REDIS_URL: 'rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818'
       }
     },
     {
@@ -440,7 +440,7 @@ module.exports = {
       min_uptime: '10s',
       restart_delay: 5000,
       env: {
-        REDIS_URL: 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
+        REDIS_URL: 'rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
         MODE: 'PAPER'
       }
     },
@@ -584,7 +584,7 @@ import redis
 import json
 
 # Configuration
-REDIS_URL = "rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+REDIS_URL = "rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 REDIS_CERT = r"C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem"
 API_URL = "http://localhost:8000"
 SITE_URL = "http://localhost:3000"

@@ -11,9 +11,12 @@ import json
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
 
-# Redis connection with proper URL encoding
-REDIS_URL = "rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
-CERT_PATH = r"C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem"
+# Redis connection from environment
+REDIS_URL = os.getenv("REDIS_URL")
+if not REDIS_URL:
+    print("ERROR: REDIS_URL environment variable not set!")
+    sys.exit(1)
+CERT_PATH = os.getenv("REDIS_CA_CERT", r"C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem")
 
 print("=" * 70)
 print("PNL DATA DIAGNOSTIC")

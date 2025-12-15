@@ -165,7 +165,7 @@ consumer_groups:
 
 ```bash
 # Redis Connection (REQUIRED)
-REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 REDIS_SSL=true
 REDIS_SSL_CA_CERT="config/certs/redis_ca.pem"
 
@@ -216,7 +216,7 @@ conda activate crypto-bot
 pip install -r requirements.txt
 
 # 2. Verify Redis connection
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   PING
 # Expected: PONG
@@ -231,7 +231,7 @@ ls config/certs/redis_ca.pem
 # 1. Set environment variables
 export ENABLE_5S_BARS=false                    # Keep 5s disabled
 export SCALPER_MAX_TRADES_PER_MINUTE=4         # Conservative limit
-export REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+export REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 
 # 2. Test synthetic bar builder
 python -m pytest tests/test_synthetic_bars.py -v
@@ -243,7 +243,7 @@ python -m pytest tests/test_rate_limiter.py -v
 python -m utils.kraken_ws &
 
 # 5. Monitor Redis streams
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XINFO STREAM kraken:ohlc:15s:BTC-USD
 ```
@@ -259,7 +259,7 @@ pkill -f kraken_ws
 python -m utils.kraken_ws &
 
 # 3. Monitor 5s stream lag
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XINFO GROUPS kraken:ohlc:5s:BTC-USD
 ```

@@ -6,15 +6,19 @@ alongside BTC/USD and ETH/USD from Fly.io
 import requests
 import sys
 
+from config.signals_api_config import get_signals_api_url, SIGNALS_API_BASE_URL
+
+
 def check_health():
     print("=" * 70, flush=True)
     print("CANARY HEALTH CHECK", flush=True)
+    print(f"API Base: {SIGNALS_API_BASE_URL}", flush=True)
     print("=" * 70, flush=True)
     print("", flush=True)
 
     # Check 1: Production API reachable
     try:
-        response = requests.get("https://crypto-signals-api.fly.dev/v1/signals?limit=50", timeout=10)
+        response = requests.get(get_signals_api_url("/v1/signals?limit=50"), timeout=10)
         print(f"[PASS] API HTTP Status: {response.status_code}", flush=True)
 
         if response.status_code != 200:

@@ -9,7 +9,7 @@ import redis.asyncio as redis
 from datetime import datetime
 
 # Set Redis URL
-os.environ['REDIS_URL'] = 'rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818'
+os.environ['REDIS_URL'] = 'rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818'
 
 
 async def check_redis_health():

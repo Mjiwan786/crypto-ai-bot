@@ -20,7 +20,7 @@ A three-tier crypto trading signals platform: a Python bot generates ML-powered 
 
 **signals-api** (Node.js 20.x)
 - REST API + SSE streaming gateway
-- Hosted: Fly.io (`crypto-signals-api`, https://crypto-signals-api.fly.dev)
+- Hosted: Fly.io (`crypto-signals-api`, https://signals-api-gateway.fly.dev)
 - Conda env: `signals-api` (local dev)
 - Key libraries: Express, ioredis, helmet, prom-client
 

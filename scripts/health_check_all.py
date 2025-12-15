@@ -26,7 +26,7 @@ except ImportError:
     sys.exit(1)
 
 # Configuration
-REDIS_URL = "rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+REDIS_URL = "rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 REDIS_CERT = r"C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem"
 API_URL = "http://localhost:8000"
 SITE_URL = "http://localhost:3000"

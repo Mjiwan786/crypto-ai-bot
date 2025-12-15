@@ -10,7 +10,7 @@ echo ML Gate: ENABLED (threshold 0.60)
 echo.
 
 REM Set environment variables from .env.paper
-set REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+set REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 set REDIS_CA_CERT=C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem
 set MODE=paper
 set TRADING_PAIRS=BTC/USD,ETH/USD

@@ -11,6 +11,7 @@ from pathlib import Path
 # Add project root
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from config.signals_api_config import get_signals_api_url
 from dotenv import load_dotenv
 load_dotenv('.env.paper.local')
 
@@ -67,7 +68,7 @@ async def verify_api():
     try:
         import aiohttp
 
-        url = "https://crypto-signals-api.fly.dev/signals"
+        url = get_signals_api_url("/signals")
 
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as resp:

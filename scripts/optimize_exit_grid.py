@@ -434,7 +434,7 @@ def main():
     parser.add_argument(
         "--redis-url",
         type=str,
-        default="rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818",
+        default="rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818",
         help="Redis connection URL",
     )
     parser.add_argument(

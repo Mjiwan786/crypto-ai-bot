@@ -28,7 +28,7 @@ python main.py run --config config/soak_test_48h_turbo.yaml --mode paper
 curl http://localhost:9108/metrics | Select-String -Pattern "current_equity"
 
 # Check Redis streams
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem `
   XLEN signals:paper
 ```
@@ -60,7 +60,7 @@ redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redn
 ### Dashboards
 - **Bot metrics**: http://localhost:9108/metrics
 - **Soak metrics**: http://localhost:9109/metrics
-- **Live API**: https://crypto-signals-api.fly.dev/metrics/performance
+- **Live API**: https://signals-api-gateway.fly.dev/metrics/performance
 - **Web dashboard**: https://aipredictedsignals.cloud
 
 ---

@@ -119,7 +119,7 @@ For the live_signal_publisher.py, we're using Signal directly, so this mapper is
    cd C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot
 
    # Set environment variables
-   export REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+   export REDIS_URL="rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
    export TRADING_MODE=paper
 
    # Run publisher
@@ -146,7 +146,7 @@ For the live_signal_publisher.py, we're using Signal directly, so this mapper is
 3. **Test signals-api**:
    ```bash
    # Call API to verify it can read signals
-   curl "https://crypto-signals-api.fly.dev/v1/signals/latest?limit=1" | jq
+   curl "https://signals-api-gateway.fly.dev/v1/signals/latest?limit=1" | jq
 
    # Should return signals with recent timestamps
    ```
@@ -170,7 +170,7 @@ For the live_signal_publisher.py, we're using Signal directly, so this mapper is
    - Signal schema matches SignalDTO (fields: `ts`, `pair`, `side`, `entry`, `sl`, `tp`, `strategy`, `confidence`, `mode`)
 
 2. **API Check**:
-   - `curl https://crypto-signals-api.fly.dev/v1/signals/latest` returns fresh signals
+   - `curl https://signals-api-gateway.fly.dev/v1/signals/latest` returns fresh signals
    - Timestamps are within 60 seconds of current time
    - Field names match exactly (no `ts_ms`, no `long`/`short`)
 

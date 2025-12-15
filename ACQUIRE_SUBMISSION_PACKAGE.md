@@ -253,7 +253,7 @@ For questions or due diligence:
 
 1. **Code Review**: Full source available in 3 repos
 2. **Live Demo**: Signals dashboard at [signals-site URL]
-3. **API Access**: Test API at https://crypto-signals-api.fly.dev
+3. **API Access**: Test API at https://signals-api-gateway.fly.dev
 4. **Documentation**: [PRD-001](docs/PRD-001-CRYPTO-AI-BOT.md) in this repo; PRD-002 in signals_api repo; PRD-003 in signals-site repo
 
 ---

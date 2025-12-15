@@ -257,7 +257,7 @@ conda activate crypto-bot
 pip install lightgbm redis pydantic scikit-optimize ccxt
 
 # Test Redis connection
-redis-cli -u "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
+redis-cli -u "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
   --tls --cacert config/certs/redis_ca.pem PING
 ```
 
@@ -416,7 +416,7 @@ See deployment checklist below.
 - [ ] Update `main.py` with all components
 - [ ] Configure environment variables:
   ```bash
-  export REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+  export REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
   export REDIS_SSL_CA_CERT="config/certs/redis_ca.pem"
   export TRADING_MODE="paper"  # Start in paper mode
   export NEWS_TRADE_MODE="false"  # Disable initially

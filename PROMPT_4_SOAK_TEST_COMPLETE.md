@@ -205,7 +205,7 @@ python main.py run --config config/soak_test_48h_turbo.yaml --mode paper
 curl http://localhost:9108/metrics | Select-String -Pattern "equity"
 
 # Check Redis
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem `
   XLEN signals:paper
 ```
@@ -399,7 +399,7 @@ The soak test publishes to the same Redis streams used by:
 - **Prometheus**: Grafana dashboards
 
 **No additional integration needed** - metrics will automatically appear in:
-- https://crypto-signals-api.fly.dev/metrics/performance
+- https://signals-api-gateway.fly.dev/metrics/performance
 - https://aipredictedsignals.cloud (live dashboard)
 - http://localhost:9108/metrics (Prometheus)
 

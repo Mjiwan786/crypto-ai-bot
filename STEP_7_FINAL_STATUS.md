@@ -67,7 +67,7 @@ cd C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot
 conda activate crypto-bot
 
 # Set environment
-$env:REDIS_URL = "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+$env:REDIS_URL = "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 $env:REDIS_CA_CERT = "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem"
 $env:MODE = "paper"
 $env:TRADING_PAIRS = "BTC/USD,ETH/USD"
@@ -124,7 +124,7 @@ Get-Content logs\paper_trial_*.log -Wait -Tail 50
 
 **Redis Streams** (see signals in real-time):
 ```bash
-redis-cli -u "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem"
+redis-cli -u "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert "C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem"
 
 # Once connected:
 XREVRANGE signals:paper + - COUNT 5

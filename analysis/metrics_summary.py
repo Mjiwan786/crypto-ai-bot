@@ -1,22 +1,47 @@
 #!/usr/bin/env python
 """
-Metrics Summary Calculator for Week 3 - Signal Frequency & Performance Aggregation
+Metrics Summary Calculator - Investor Performance Metrics
 
-Reads signals and PnL entries from Redis, aggregates:
-- Signals per day/week/month (per pair and overall)
-- Mean ROI and CAGR (annualized) over 30/90/365 days
-- Win rate, profit factor, Sharpe ratio, and max drawdown
+This module computes and publishes performance metrics for the investor dashboard
+on aipredictedsignals.cloud. Metrics are consumed by signals-api /v1/metrics/summary endpoint.
 
-Stores results in Redis under `engine:summary_metrics` key.
+PRIMARY FUNCTION:
+    Calculates investor-facing performance metrics from trading signals and PnL data:
+    - ROI (30-day, 90-day, 365-day rolling periods)
+    - Win rate, profit factor, Sharpe ratio, max drawdown
+    - Signal frequency per trading pair
+    - Compound Annual Growth Rate (CAGR)
 
-PRD-001 Compliant Trading Assumptions:
-- Slippage: 0.1% (10 bps)
-- Maker fee: 0.075%
-- Taker fee: 0.15%
+PUBLISHES TO:
+    - engine:summary_metrics (Redis Hash) - consumed by signals-api /v1/metrics/summary
+
+METRIC DEFINITIONS:
+    - roi_30d: 30-day Return on Investment, percentage (e.g., 5.5 = 5.5%)
+    - win_rate_pct: Win rate, percentage (0-100, e.g., 55.5 = 55.5% win rate)
+    - sharpe_ratio: Annualized Sharpe ratio (risk-adjusted return, typically 0-3)
+    - profit_factor: Gross profit / gross loss ratio (e.g., 1.5 = 50% more profit than loss)
+    - max_drawdown_pct: Maximum drawdown, percentage (e.g., -15.2 = 15.2% drawdown)
+    - cagr_pct: Compound Annual Growth Rate, percentage (annualized return)
+    - signals_per_day: Average signals per day (rolling 30-day average)
+
+TIME WINDOWS:
+    All periods are rolling windows from current time:
+    - 30d = last 30 days from now
+    - 90d = last 90 days from now
+    - 365d = last 365 days from now
+
+PRD-001 COMPLIANT TRADING ASSUMPTIONS:
+    - Slippage: 0.1% (10 bps)
+    - Maker fee: 0.075%
+    - Taker fee: 0.15%
+    - Initial capital: $10,000
+    - Risk-free rate: 5% annual (for Sharpe calculation)
+    - Trading days per year: 365 (crypto markets trade 24/7)
 
 Usage:
-    python -m analysis.metrics_summary
-    python -m analysis.metrics_summary --mode paper --output json
+    python -m analysis.metrics_summary                    # Paper mode (default)
+    python -m analysis.metrics_summary --mode live        # Live mode
+    python -m analysis.metrics_summary --output json       # JSON output
 
 Author: Crypto AI Bot Team
 Date: 2025-12-03
@@ -37,6 +62,19 @@ from typing import Any, Dict, List, Literal, Optional
 
 import redis.asyncio as aioredis
 import orjson
+
+# Import canonical trading pairs (single source of truth)
+try:
+    from config.trading_pairs import (
+        ALL_PAIR_SYMBOLS,
+        ENABLED_PAIR_SYMBOLS,
+        get_kraken_symbols,
+    )
+    _CANONICAL_PAIRS_AVAILABLE = True
+except ImportError:
+    _CANONICAL_PAIRS_AVAILABLE = False
+    ALL_PAIR_SYMBOLS = ["BTC/USD", "ETH/USD", "SOL/USD", "MATIC/USD", "LINK/USD"]
+    ENABLED_PAIR_SYMBOLS = ["BTC/USD", "ETH/USD", "SOL/USD", "LINK/USD"]
 
 # Configure logging
 logging.basicConfig(
@@ -62,11 +100,11 @@ class TradingAssumptions:
     trading_days_per_year: int = 365  # Crypto markets trade 24/7
 
 
-# Canonical trading pairs per PRD-001 and site (aipredictedsignals.cloud)
-# NOTE: MATIC/USD is NOT supported by Kraken WebSocket API
-# Using DOT/USD as alternative per kraken_ohlcv.yaml
-CANONICAL_PAIRS = ["BTC/USD", "ETH/USD", "SOL/USD", "MATIC/USD", "LINK/USD"]
-KRAKEN_SUPPORTED_PAIRS = ["BTC/USD", "ETH/USD", "SOL/USD", "LINK/USD", "DOT/USD"]
+# Canonical trading pairs - uses config/trading_pairs.py as single source of truth
+# ALL_PAIR_SYMBOLS includes all configured pairs (incl. disabled like MATIC/USD)
+# ENABLED_PAIR_SYMBOLS includes only Kraken WS supported pairs
+CANONICAL_PAIRS = ALL_PAIR_SYMBOLS.copy() if _CANONICAL_PAIRS_AVAILABLE else ["BTC/USD", "ETH/USD", "SOL/USD", "MATIC/USD", "LINK/USD"]
+KRAKEN_SUPPORTED_PAIRS = ENABLED_PAIR_SYMBOLS.copy() if _CANONICAL_PAIRS_AVAILABLE else ["BTC/USD", "ETH/USD", "SOL/USD", "LINK/USD"]
 
 # Redis keys
 KEY_ENGINE_SUMMARY = "engine:summary_metrics"
@@ -79,17 +117,22 @@ METRICS_TTL_SECONDS = 3600  # 1 hour
 
 @dataclass
 class SignalFrequencyMetrics:
-    """Signal frequency statistics per pair and overall."""
-    pair: str
-    signals_today: int = 0
-    signals_7d: int = 0
-    signals_30d: int = 0
-    signals_90d: int = 0
-    signals_365d: int = 0
-    avg_signals_per_day: float = 0.0
-    avg_signals_per_week: float = 0.0
-    avg_signals_per_month: float = 0.0
-    last_signal_ts: Optional[str] = None
+    """
+    Signal frequency statistics per trading pair.
+    
+    These metrics track how many signals are generated for a specific pair
+    over different time windows. Used for dashboard display and API responses.
+    """
+    pair: str  # Trading pair (e.g., "BTC/USD")
+    signals_today: int = 0  # Signals generated today (last 24 hours)
+    signals_7d: int = 0  # Signals generated in last 7 days
+    signals_30d: int = 0  # Signals generated in last 30 days
+    signals_90d: int = 0  # Signals generated in last 90 days
+    signals_365d: int = 0  # Signals generated in last 365 days
+    avg_signals_per_day: float = 0.0  # Average signals per day (calculated from 30d data)
+    avg_signals_per_week: float = 0.0  # Average signals per week (calculated from 30d data)
+    avg_signals_per_month: float = 0.0  # Average signals per month (calculated from 90d data)
+    last_signal_ts: Optional[str] = None  # ISO8601 timestamp of most recent signal (or None if no signals)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -97,37 +140,45 @@ class SignalFrequencyMetrics:
 
 @dataclass
 class PerformanceMetrics:
-    """Comprehensive performance metrics matching PRD definitions."""
-    # Time period
-    period_days: int
-    period_label: str  # "30d", "90d", "365d"
+    """
+    Comprehensive performance metrics for investor dashboard.
+    
+    These metrics are published to engine:summary_metrics and consumed by
+    signals-api /v1/metrics/summary endpoint for display on aipredictedsignals.cloud.
+    
+    All percentage values are in percentage points (e.g., 5.5 means 5.5%).
+    All time windows are rolling periods from current time (e.g., 30d = last 30 days).
+    """
+    # Time period metadata
+    period_days: int  # Number of days in the period (e.g., 30, 90, 365)
+    period_label: str  # Human-readable label: "30d", "90d", "365d"
 
-    # Core metrics
-    total_return_pct: float = 0.0
-    roi_pct: float = 0.0
-    cagr_pct: float = 0.0
+    # Core return metrics (investor-facing)
+    total_return_pct: float = 0.0  # Total return over period, percentage (e.g., 5.5 = 5.5%)
+    roi_pct: float = 0.0  # Return on Investment, percentage (alias for total_return_pct, matches API)
+    cagr_pct: float = 0.0  # Compound Annual Growth Rate, percentage (annualized return)
 
-    # Win/Loss stats
-    total_trades: int = 0
-    winning_trades: int = 0
-    losing_trades: int = 0
-    win_rate_pct: float = 0.0
+    # Trade statistics (investor-facing)
+    total_trades: int = 0  # Total number of trades executed in period
+    winning_trades: int = 0  # Number of profitable trades
+    losing_trades: int = 0  # Number of losing trades
+    win_rate_pct: float = 0.0  # Win rate as percentage (0-100, e.g., 55.5 = 55.5% win rate)
 
-    # Risk-adjusted metrics
-    profit_factor: float = 0.0
-    sharpe_ratio: float = 0.0
-    max_drawdown_pct: float = 0.0
+    # Risk-adjusted metrics (investor-facing)
+    profit_factor: float = 0.0  # Gross profit / gross loss ratio (e.g., 1.5 = 50% more profit than loss)
+    sharpe_ratio: float = 0.0  # Annualized Sharpe ratio (risk-adjusted return, typically 0-3)
+    max_drawdown_pct: float = 0.0  # Maximum drawdown percentage (peak-to-trough decline, e.g., -15.2 = 15.2% drawdown)
 
-    # Equity
-    starting_equity: float = 10000.0
-    ending_equity: float = 10000.0
-    gross_profit: float = 0.0
-    gross_loss: float = 0.0
+    # Equity tracking (internal calculation, also exposed to API)
+    starting_equity: float = 10000.0  # Starting equity in USD at period start
+    ending_equity: float = 10000.0  # Ending equity in USD at period end
+    gross_profit: float = 0.0  # Total gross profit in USD (sum of all winning trades)
+    gross_loss: float = 0.0  # Total gross loss in USD (absolute value, sum of all losing trades)
 
-    # Averages
-    avg_win_pct: float = 0.0
-    avg_loss_pct: float = 0.0
-    avg_trade_duration_hours: float = 0.0
+    # Average metrics (internal, not directly exposed to API)
+    avg_win_pct: float = 0.0  # Average winning trade return, percentage
+    avg_loss_pct: float = 0.0  # Average losing trade return, percentage (negative)
+    avg_trade_duration_hours: float = 0.0  # Average trade duration in hours
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -135,40 +186,52 @@ class PerformanceMetrics:
 
 @dataclass
 class SummaryMetrics:
-    """Complete summary metrics for engine:summary_metrics Redis key."""
-    # Metadata
-    mode: str
-    timestamp: str
-    update_frequency: str = "hourly"
+    """
+    Complete summary metrics for engine:summary_metrics Redis key.
+    
+    This is the primary data structure consumed by signals-api /v1/metrics/summary endpoint
+    and displayed on aipredictedsignals.cloud investor dashboard.
+    
+    Published to: engine:summary_metrics (Redis Hash)
+    Update frequency: Hourly
+    TTL: 1 hour (auto-refreshed on each update)
+    """
+    # Metadata (API: included in response)
+    mode: str  # Trading mode: "paper" or "live"
+    timestamp: str  # ISO8601 UTC timestamp of last update (e.g., "2025-01-27T12:34:56.789Z")
+    update_frequency: str = "hourly"  # How often metrics are recalculated
 
-    # Signal frequency (overall)
-    signals_per_day: float = 0.0
-    signals_per_week: float = 0.0
-    signals_per_month: float = 0.0
-    signals_total_30d: int = 0
+    # Signal frequency metrics (API: signals_per_day, signals_per_week, signals_per_month)
+    signals_per_day: float = 0.0  # Average signals per day (rolling 30-day average)
+    signals_per_week: float = 0.0  # Average signals per week (rolling 30-day average)
+    signals_per_month: float = 0.0  # Average signals per month (rolling 90-day average)
+    signals_total_30d: int = 0  # Total signals generated in last 30 days
 
-    # Per-pair signal frequency
+    # Per-pair signal frequency (API: signal_frequency_by_pair_json)
     signal_frequency_by_pair: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Structure: {"BTC/USD": {"signals_30d": 150, "avg_signals_per_day": 5.0, ...}, ...}
 
-    # Performance over different periods
-    performance_30d: Optional[Dict[str, Any]] = None
-    performance_90d: Optional[Dict[str, Any]] = None
-    performance_365d: Optional[Dict[str, Any]] = None
+    # Performance over different periods (API: performance_30d_json, performance_90d_json, performance_365d_json)
+    performance_30d: Optional[Dict[str, Any]] = None  # 30-day performance metrics (rolling)
+    performance_90d: Optional[Dict[str, Any]] = None  # 90-day performance metrics (rolling)
+    performance_365d: Optional[Dict[str, Any]] = None  # 365-day performance metrics (rolling)
 
-    # Current key metrics (most recent period)
-    roi_30d: float = 0.0
-    cagr_pct: float = 0.0
-    win_rate_pct: float = 0.0
-    profit_factor: float = 0.0
-    sharpe_ratio: float = 0.0
-    max_drawdown_pct: float = 0.0
-    total_trades: int = 0
+    # Current key metrics (API: primary fields for dashboard display)
+    # These are the "headline" metrics shown prominently on investor dashboard
+    roi_30d: float = 0.0  # 30-day ROI, percentage (e.g., 5.5 = 5.5% return)
+    cagr_pct: float = 0.0  # Compound Annual Growth Rate, percentage (annualized, based on 365d period)
+    win_rate_pct: float = 0.0  # Win rate, percentage (0-100, e.g., 55.5 = 55.5% win rate)
+    profit_factor: float = 0.0  # Gross profit / gross loss ratio (e.g., 1.5 = 50% more profit than loss)
+    sharpe_ratio: float = 0.0  # Annualized Sharpe ratio (risk-adjusted return, typically 0-3)
+    max_drawdown_pct: float = 0.0  # Maximum drawdown, percentage (e.g., -15.2 = 15.2% drawdown)
+    total_trades: int = 0  # Total trades in 30-day period
 
-    # Trading pairs
-    trading_pairs: List[str] = field(default_factory=list)
-    active_pairs: List[str] = field(default_factory=list)
+    # Trading pairs (API: trading_pairs, active_pairs)
+    trading_pairs: List[str] = field(default_factory=list)  # All configured pairs (e.g., ["BTC/USD", "ETH/USD"])
+    active_pairs: List[str] = field(default_factory=list)  # Pairs with signals in last 30 days
 
-    # Assumptions
+    # Trading assumptions (API: assumptions_json)
+    # PRD-001 compliant assumptions used for calculations (slippage, fees, etc.)
     assumptions: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -185,14 +248,33 @@ class SummaryMetrics:
 class MetricsSummaryCalculator:
     """
     Calculates signal frequency and performance metrics from Redis data.
-
-    Reads from:
-        - signals:paper:<PAIR> or signals:live:<PAIR> streams
-        - pnl:paper:summary or pnl:live:summary keys
-        - pnl:paper:equity_curve or pnl:live:equity_curve streams
-
-    Writes to:
-        - engine:summary_metrics (Redis Hash)
+    
+    This is the primary module for computing investor-facing metrics that are
+    displayed on aipredictedsignals.cloud dashboard.
+    
+    DATA SOURCES (Redis):
+        Reads from:
+        - signals:paper:<PAIR> or signals:live:<PAIR> streams (signal frequency)
+        - pnl:paper:summary or pnl:live:summary keys (trade statistics)
+        - pnl:paper:equity_curve or pnl:live:equity_curve streams (equity tracking)
+    
+    OUTPUT (Redis):
+        Writes to:
+        - engine:summary_metrics (Redis Hash) - consumed by signals-api /v1/metrics/summary
+        
+    UPDATE FREQUENCY:
+        Metrics are recalculated hourly (via scheduled task or manual execution).
+        Each update overwrites the previous engine:summary_metrics hash.
+        
+    METRIC CALCULATION:
+        - Signal frequency: Counts signals in Redis streams over time windows
+        - Performance metrics: Computed from equity curve (ROI, Sharpe, drawdown)
+        - Trade statistics: Aggregated from PnL summary (win rate, profit factor)
+        
+    MODE SEPARATION:
+        - Paper mode: Reads from signals:paper:* and pnl:paper:*
+        - Live mode: Reads from signals:live:* and pnl:live:*
+        - Mode is set at initialization and cannot be changed
     """
 
     def __init__(
@@ -236,7 +318,7 @@ class MetricsSummaryCalculator:
             self.redis_client = aioredis.from_url(self.redis_url, **conn_params)
             await self.redis_client.ping()
 
-            logger.info(f"MetricsSummaryCalculator connected to Redis (mode={self.mode})")
+            logger.info("Connected to Redis for metrics calculation (mode=%s)", self.mode)
             return True
 
         except Exception as e:
@@ -248,7 +330,7 @@ class MetricsSummaryCalculator:
         if self.redis_client:
             await self.redis_client.aclose()
             self.redis_client = None
-            logger.info("MetricsSummaryCalculator disconnected from Redis")
+            logger.info("Disconnected from Redis")
 
     # =========================================================================
     # SIGNAL FREQUENCY CALCULATIONS
@@ -273,7 +355,7 @@ class MetricsSummaryCalculator:
             messages = await self.redis_client.xrange(stream_key, start_id, end_id)
             return len(messages)
         except Exception as e:
-            logger.warning(f"Error counting signals for {pair}: {e}")
+            logger.warning("Unable to count signals for %s: %s", pair, e)
             return 0
 
     async def get_last_signal_timestamp(self, pair: str) -> Optional[str]:
@@ -296,14 +378,29 @@ class MetricsSummaryCalculator:
                     return datetime.fromtimestamp(msg_ts / 1000, tz=timezone.utc).isoformat()
             return None
         except Exception as e:
-            logger.warning(f"Error getting last signal for {pair}: {e}")
+            logger.warning("Unable to get last signal timestamp for %s: %s", pair, e)
             return None
 
     async def calculate_signal_frequency_for_pair(
         self,
         pair: str,
     ) -> SignalFrequencyMetrics:
-        """Calculate signal frequency metrics for a single pair."""
+        """
+        Calculate signal frequency metrics for a single trading pair.
+        
+        This computes how many signals were generated for a specific pair
+        over different time windows (today, 7d, 30d, 90d, 365d).
+        
+        Args:
+            pair: Trading pair (e.g., "BTC/USD")
+            
+        Returns:
+            SignalFrequencyMetrics with counts and averages
+            
+        Note:
+            Averages are calculated from 30-day data for consistency.
+            For example, avg_signals_per_day = signals_30d / 30.0
+        """
         now = datetime.now(timezone.utc)
         now_ms = int(now.timestamp() * 1000)
 
@@ -368,7 +465,7 @@ class MetricsSummaryCalculator:
                 return orjson.loads(data)
             return None
         except Exception as e:
-            logger.warning(f"Error getting PnL summary: {e}")
+            logger.warning("Unable to retrieve PnL summary: %s", e)
             return None
 
     async def get_equity_curve(self, limit: int = 10000) -> List[Dict[str, Any]]:
@@ -421,11 +518,26 @@ class MetricsSummaryCalculator:
             return curve
 
         except Exception as e:
-            logger.warning(f"Error getting equity curve: {e}")
+            logger.warning("Unable to retrieve equity curve: %s", e)
             return []
 
     def calculate_max_drawdown(self, equity_curve: List[Dict[str, Any]]) -> float:
-        """Calculate maximum drawdown from equity curve."""
+        """
+        Calculate maximum drawdown from equity curve.
+        
+        Maximum drawdown is the largest peak-to-trough decline in equity.
+        This is a key risk metric for investors.
+        
+        Args:
+            equity_curve: List of equity points over time (sorted chronologically)
+            
+        Returns:
+            Maximum drawdown as percentage (e.g., -15.2 means 15.2% drawdown)
+            Returns 0.0 if no drawdown or insufficient data
+            
+        Example:
+            If equity peaks at $10,000 and drops to $8,500, max drawdown = -15.0%
+        """
         if not equity_curve:
             return 0.0
 
@@ -447,7 +559,27 @@ class MetricsSummaryCalculator:
         self,
         equity_curve: List[Dict[str, Any]],
     ) -> float:
-        """Calculate annualized Sharpe ratio."""
+        """
+        Calculate annualized Sharpe ratio from equity curve.
+        
+        Sharpe ratio measures risk-adjusted return:
+        Sharpe = (Annualized Return - Risk-Free Rate) / Annualized Volatility
+        
+        This is a key metric for investors to compare strategies.
+        Higher Sharpe = better risk-adjusted returns.
+        
+        Args:
+            equity_curve: List of equity points over time (sorted chronologically)
+            
+        Returns:
+            Annualized Sharpe ratio (typically 0-3, higher is better)
+            Returns 0.0 if insufficient data (< 2 points)
+            
+        Assumptions:
+            - Risk-free rate: 5% annual (from TradingAssumptions)
+            - Trading days per year: 365 (crypto markets trade 24/7)
+            - Daily returns are calculated from equity changes
+        """
         if len(equity_curve) < 2:
             return 0.0
 
@@ -484,7 +616,27 @@ class MetricsSummaryCalculator:
         ending_equity: float,
         days: int,
     ) -> float:
-        """Calculate Compound Annual Growth Rate."""
+        """
+        Calculate Compound Annual Growth Rate (CAGR).
+        
+        CAGR is the annualized return assuming compounding:
+        CAGR = ((Ending Equity / Starting Equity) ^ (1 / Years) - 1) * 100
+        
+        This allows investors to compare returns across different time periods.
+        
+        Args:
+            starting_equity: Starting equity in USD
+            ending_equity: Ending equity in USD
+            days: Number of days in the period
+            
+        Returns:
+            CAGR as percentage (e.g., 12.5 = 12.5% annualized return)
+            Returns 0.0 if invalid inputs (starting_equity <= 0 or days <= 0)
+            
+        Example:
+            Starting: $10,000, Ending: $11,000, Days: 365
+            CAGR = ((11000/10000)^(1/1) - 1) * 100 = 10.0%
+        """
         if starting_equity <= 0 or days <= 0:
             return 0.0
 
@@ -503,10 +655,25 @@ class MetricsSummaryCalculator:
         period_label: str,
     ) -> PerformanceMetrics:
         """
-        Calculate performance metrics for a given period.
+        Calculate performance metrics for a given rolling period.
         
-        Uses time-windowed equity curve data to ensure period-specific calculations.
-        Time windows: 30d, 90d, 365d rolling periods from current time.
+        This computes investor-facing metrics from equity curve data:
+        - ROI: Total return over the period
+        - CAGR: Annualized return (if period < 365 days, extrapolated)
+        - Win rate: Percentage of profitable trades
+        - Sharpe ratio: Risk-adjusted return (annualized)
+        - Max drawdown: Largest peak-to-trough decline
+        
+        Args:
+            period_days: Number of days in the period (30, 90, or 365)
+            period_label: Human-readable label ("30d", "90d", "365d")
+            
+        Returns:
+            PerformanceMetrics with all calculated metrics for the period
+            
+        Note:
+            Time windows are rolling periods from current time (not calendar periods).
+            For example, 30d = last 30 days from now, not calendar month.
         """
         # Get equity curve with sufficient limit for the period
         # Use period_days * 144 (assuming ~10 updates per day = 1440/day, but we use 144 for safety)
@@ -598,7 +765,17 @@ class MetricsSummaryCalculator:
     # =========================================================================
 
     async def calculate_summary(self) -> SummaryMetrics:
-        """Calculate complete summary metrics."""
+        """
+        Calculate complete summary metrics for investor dashboard.
+        
+        This is the main entry point that:
+        1. Calculates signal frequency per pair and overall
+        2. Computes performance metrics for 30d, 90d, and 365d periods
+        3. Aggregates key metrics for dashboard display
+        4. Identifies active trading pairs
+        
+        Returns SummaryMetrics object ready for publishing to engine:summary_metrics.
+        """
         now = datetime.now(timezone.utc)
 
         # Calculate signal frequencies
@@ -616,9 +793,15 @@ class MetricsSummaryCalculator:
             if freq.signals_30d > 0
         ]
 
-        # Calculate performance for different periods
+        # Calculate performance for different periods (rolling windows)
+        # These are the primary metrics displayed on investor dashboard
+        logger.info("Calculating 30-day performance metrics...")
         perf_30d = await self.calculate_performance(30, "30d")
+        
+        logger.info("Calculating 90-day performance metrics...")
         perf_90d = await self.calculate_performance(90, "90d")
+        
+        logger.info("Calculating 365-day performance metrics...")
         perf_365d = await self.calculate_performance(365, "365d")
 
         # Build summary
@@ -651,7 +834,21 @@ class MetricsSummaryCalculator:
         return summary
 
     async def publish_to_redis(self, summary: SummaryMetrics) -> bool:
-        """Publish summary metrics to Redis hash."""
+        """
+        Publish summary metrics to Redis hash for signals-api consumption.
+        
+        Publishes to: engine:summary_metrics (Redis Hash)
+        Consumed by: signals-api /v1/metrics/summary endpoint
+        
+        All values are stored as strings in Redis hash (Redis limitation).
+        Complex nested structures are stored as JSON strings.
+        
+        Args:
+            summary: SummaryMetrics object to publish
+            
+        Returns:
+            True if published successfully, False otherwise
+        """
         if not self.redis_client:
             return False
 
@@ -693,22 +890,49 @@ class MetricsSummaryCalculator:
             await self.redis_client.hset(KEY_ENGINE_SUMMARY, mapping=data)
             await self.redis_client.expire(KEY_ENGINE_SUMMARY, METRICS_TTL_SECONDS)
 
+            # Investor-friendly log message (no internal implementation details)
             logger.info(
-                f"Published to {KEY_ENGINE_SUMMARY}: "
-                f"signals={summary.signals_per_day}/day, "
-                f"ROI={summary.roi_30d}%, "
-                f"WinRate={summary.win_rate_pct}%"
+                "Updated 30-day performance summary: "
+                "%.1f signals/day, %.1f%% ROI, %.1f%% win rate, %.2f Sharpe ratio",
+                summary.signals_per_day,
+                summary.roi_30d,
+                summary.win_rate_pct,
+                summary.sharpe_ratio,
+                extra={
+                    "component": "metrics_summary",
+                    "mode": summary.mode,
+                    "signals_per_day": summary.signals_per_day,
+                    "roi_30d_pct": summary.roi_30d,
+                    "win_rate_pct": summary.win_rate_pct,
+                    "sharpe_ratio": summary.sharpe_ratio,
+                    "total_trades": summary.total_trades,
+                }
             )
             return True
 
         except Exception as e:
-            logger.error(f"Error publishing to Redis: {e}")
+            logger.error("Failed to publish metrics summary to Redis: %s", e)
             return False
 
     async def run(self) -> SummaryMetrics:
-        """Run full calculation and publish to Redis."""
+        """
+        Run full calculation and publish to Redis.
+        
+        This is the main entry point for hourly metrics updates.
+        Called by scheduled task or manual execution.
+        
+        Returns:
+            SummaryMetrics object (also published to Redis)
+        """
+        logger.info("Starting metrics calculation for %s mode", self.mode)
         summary = await self.calculate_summary()
-        await self.publish_to_redis(summary)
+        
+        published = await self.publish_to_redis(summary)
+        if published:
+            logger.info("Successfully published metrics summary to Redis")
+        else:
+            logger.warning("Failed to publish metrics summary to Redis")
+        
         return summary
 
 

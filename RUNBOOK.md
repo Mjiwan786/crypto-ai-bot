@@ -177,8 +177,8 @@ nano .env.prod
 #   @ -> %40
 #   : -> %3A
 
-# Example password: Salam78614**$$
-# Encoded: Salam78614%2A%2A%24%24
+# Example password: &lt;REDIS_PASSWORD&gt;**$$
+# Encoded: &lt;REDIS_PASSWORD&gt;%2A%2A%24%24
 
 # 4. Restart publisher
 pkill -f publisher_with_health
@@ -239,12 +239,12 @@ nc -zv redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com 19818
 ```bash
 # Password not URL-encoded correctly
 # Use Python to encode:
-python -c "from urllib.parse import quote; print(quote('Salam78614**\$\$', safe=''))"
+python -c "from urllib.parse import quote; print(quote('&lt;REDIS_PASSWORD&gt;**\$\$', safe=''))"
 
-# Output: Salam78614%2A%2A%24%24
+# Output: &lt;REDIS_PASSWORD&gt;%2A%2A%24%24
 
 # Update REDIS_URL:
-# rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+# rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 ```
 
 ### Test Redis Connection
@@ -592,7 +592,7 @@ curl -s http://localhost:8080/health | jq '.total_errors'
 curl -s http://localhost:8080/health | jq '.status'
 
 # Stream lag (from signals-api)
-curl -s https://crypto-signals-api.fly.dev/health | jq '.stream_lag_ms'
+curl -s https://signals-api-gateway.fly.dev/health | jq '.stream_lag_ms'
 ```
 
 ### Alert Thresholds
@@ -610,7 +610,7 @@ curl -s https://crypto-signals-api.fly.dev/health | jq '.stream_lag_ms'
 
 - **PRD**: `PRD-001 – Crypto-AI-Bot Core Intelligence Engine`
 - **Redis Cloud Dashboard**: https://app.redislabs.com/
-- **Signals-API Health**: https://crypto-signals-api.fly.dev/health
+- **Signals-API Health**: https://signals-api-gateway.fly.dev/health
 - **Conda Environment**: `crypto-bot`
 
 ---

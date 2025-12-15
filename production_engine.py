@@ -33,7 +33,7 @@ ENVIRONMENT VARIABLES:
     LIVE_TRADING_CONFIRMATION       - Required for live mode
     HEALTH_PORT                     - Health endpoint port (default: 8080)
     METRICS_PORT                    - Metrics endpoint port (default: 9108)
-    TRADING_PAIRS                   - Comma-separated pairs (default: BTC/USD,ETH/USD,SOL/USD,MATIC/USD,LINK/USD)
+    TRADING_PAIRS                   - Comma-separated pairs (uses config/trading_pairs.py canonical config)
     KRAKEN_WS_URL                   - Kraken WebSocket URL (default: wss://ws.kraken.com)
 """
 
@@ -84,6 +84,13 @@ from agents.infrastructure.prd_publisher import (
 )
 from agents.infrastructure.redis_client import RedisCloudClient, RedisCloudConfig
 
+# Import canonical trading pairs (single source of truth)
+from config.trading_pairs import (
+    ENABLED_PAIR_SYMBOLS,
+    DEFAULT_TRADING_PAIRS_CSV,
+    is_enabled_pair,
+)
+
 # For real strategy analysis
 import numpy as np
 import pandas as pd
@@ -112,11 +119,11 @@ class EngineConfig:
     # Trading mode
     mode: str = "paper"  # "paper" or "live"
 
-    # Trading pairs (internal format: BTC/USD)
+    # Trading pairs (internal format: BTC/USD) - uses canonical config/trading_pairs.py
     trading_pairs: List[str] = field(
         default_factory=lambda: os.getenv(
             "TRADING_PAIRS",
-            "BTC/USD,ETH/USD,SOL/USD,MATIC/USD,LINK/USD"
+            DEFAULT_TRADING_PAIRS_CSV
         ).split(",")
     )
 

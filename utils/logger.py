@@ -30,13 +30,16 @@ Example Usage:
     ```
 """
 
+import json
 import logging
 import os
 import re
 import sys
 import threading
+import traceback
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 class SecretRedactionFilter(logging.Filter):
@@ -102,16 +105,21 @@ class LoggerFactory:
         # Get configuration from environment
         log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
         log_to_file = os.getenv('LOG_TO_FILE', 'true').lower() in ('true', '1', 'yes', 'on')
+        log_format = os.getenv('LOG_FORMAT', '').lower()
+        use_json = log_format == 'json'
         
         # Create logs directory if it doesn't exist
         logs_dir = Path('logs')
         logs_dir.mkdir(exist_ok=True)
         
-        # Set up formatter
-        formatter = logging.Formatter(
-            '%(asctime)s | %(levelname)s | %(name)s | %(message)s',
-            datefmt='%Y-%m-%dT%H:%M:%S'
-        )
+        # Set up formatter (JSON or text)
+        if use_json:
+            formatter = self._create_json_formatter()
+        else:
+            formatter = logging.Formatter(
+                '%(asctime)s | %(levelname)s | %(name)s | %(message)s',
+                datefmt='%Y-%m-%dT%H:%M:%S'
+            )
         
         # Create redaction filter
         redaction_filter = SecretRedactionFilter()
@@ -162,6 +170,61 @@ class LoggerFactory:
             
             # Ensure metrics file handler flushes immediately
             metrics_file_handler.flush()
+    
+    def _create_json_formatter(self) -> logging.Formatter:
+        """Create a JSON formatter for structured logging (PRD-001 Section 9.4)."""
+        class JSONFormatter(logging.Formatter):
+            """Structured JSON formatter for investor-ready logs."""
+            
+            def format(self, record: logging.LogRecord) -> str:
+                """Format log record as JSON."""
+                log_entry: Dict[str, Any] = {
+                    "timestamp": datetime.fromtimestamp(
+                        record.created, tz=timezone.utc
+                    ).isoformat(),
+                    "level": record.levelname,
+                    "component": record.name,
+                    "message": record.getMessage(),
+                }
+                
+                # Add context fields if present
+                if hasattr(record, 'pair'):
+                    log_entry['pair'] = record.pair
+                if hasattr(record, 'signal_id'):
+                    log_entry['signal_id'] = record.signal_id
+                if hasattr(record, 'strategy'):
+                    log_entry['strategy'] = record.strategy
+                if hasattr(record, 'context'):
+                    log_entry['context'] = record.context
+                
+                # Add exception info if present
+                if record.exc_info:
+                    try:
+                        etype = record.exc_info[0].__name__ if record.exc_info[0] else None
+                        emsg = str(record.exc_info[1]) if record.exc_info[1] else None
+                        etb = traceback.format_exception(*record.exc_info)
+                        log_entry['exception'] = {
+                            "type": etype,
+                            "message": emsg,
+                            "traceback": etb
+                        }
+                    except Exception:
+                        pass
+                
+                # Add any extra fields
+                for key, value in record.__dict__.items():
+                    if key not in {
+                        'name', 'msg', 'args', 'levelname', 'levelno', 'pathname',
+                        'filename', 'module', 'exc_info', 'exc_text', 'stack_info',
+                        'lineno', 'funcName', 'created', 'msecs', 'relativeCreated',
+                        'thread', 'threadName', 'processName', 'process', 'getMessage'
+                    }:
+                        if key not in log_entry:
+                            log_entry[key] = value
+                
+                return json.dumps(log_entry, default=str)
+        
+        return JSONFormatter()
     
     def get_logger(self, name: str, level: Optional[str] = None) -> logging.Logger:
         """Get a logger instance with the specified name and optional level override.

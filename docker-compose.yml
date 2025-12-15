@@ -30,10 +30,10 @@ services:
 #
 # 1. Comment out or remove the 'redis' service above
 # 2. Set REDIS_URL in your compose.env.example:
-#    REDIS_URL=rediss://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+#    REDIS_URL=rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 #
 # 3. The bot service will automatically use the Redis Cloud connection
 #    when REDIS_URL is set, and the healthcheck will ping the cloud instance
 #
 # 4. Make sure to have the CA certificate available for TLS connection:
-#    redis-cli -u redis://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert <path_to_ca_certfile>
+#    redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert <path_to_ca_certfile>

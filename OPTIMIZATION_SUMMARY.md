@@ -407,7 +407,7 @@ python scripts/monitor_paper_trial.py
 ### Redis Connection
 ```bash
 # Test Redis
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \\
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \\
   --tls --cacert config/certs/redis_ca.pem PING
 
 # Check signals stream
@@ -417,7 +417,7 @@ redis-cli -u $REDIS_URL --tls --cacert config/certs/redis_ca.pem \\
 
 ### Monitoring
 - crypto-ai-bot: https://crypto-ai-bot.fly.dev/health
-- signals-api: https://crypto-signals-api.fly.dev/health
+- signals-api: https://signals-api-gateway.fly.dev/health
 - signals-site: https://aipredictedsignals.cloud
 
 ---

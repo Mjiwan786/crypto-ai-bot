@@ -53,7 +53,7 @@ python << 'EOF'
 import redis
 try:
     r = redis.from_url(
-        'rediss://default:Salam78614**%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
+        'rediss://default:&lt;REDIS_PASSWORD&gt;**%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818',
         ssl_cert_reqs='required',
         decode_responses=True
     )

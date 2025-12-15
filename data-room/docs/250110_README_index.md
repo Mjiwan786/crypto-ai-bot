@@ -52,7 +52,7 @@ Frequently asked questions about the acquisition.
 
 ## Quick Links
 
-- **Live API:** https://crypto-signals-api.fly.dev
+- **Live API:** https://signals-api-gateway.fly.dev
 - **Infrastructure:** Redis Cloud (managed), Fly.io (compute)
 - **Source Code:** Delivered via Git repository transfer
 

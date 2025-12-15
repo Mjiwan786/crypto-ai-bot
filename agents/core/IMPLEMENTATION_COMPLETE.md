@@ -58,7 +58,7 @@ from agents.core.real_redis_client import create_redis_client
 
 # For production (Redis Cloud)
 client = create_redis_client(
-    url="rediss://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+    url="rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 )
 
 # For testing
@@ -212,7 +212,7 @@ KRAKEN_API_KEY=your_api_key_here
 KRAKEN_API_SECRET=your_api_secret_here
 
 # Redis Cloud
-REDIS_URL=rediss://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 
 # Testing mode (set to false for production)
 USE_FAKE_SERVICES=true

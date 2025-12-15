@@ -30,6 +30,19 @@ from dotenv import load_dotenv
 
 from agents.core.errors import ConfigError, RedisError
 
+# Import canonical trading pairs (single source of truth)
+try:
+    from config.trading_pairs import (
+        DEFAULT_TRADING_PAIRS_CSV,
+        ENABLED_PAIR_SYMBOLS,
+        is_enabled_pair,
+        validate_pairs_list,
+    )
+    CANONICAL_PAIRS_AVAILABLE = True
+except ImportError:
+    CANONICAL_PAIRS_AVAILABLE = False
+    logging.warning("canonical trading_pairs not available, using defaults")
+
 # Import your existing AI engine components
 try:
     from strategies.regime_based_router import MarketContext
@@ -495,14 +508,21 @@ class SignalProcessor:
         Load trading pairs with support for EXTRA_PAIRS.
 
         Priority:
-        1. TRADING_PAIRS (base pairs) - defaults to BTC/USD,ETH/USD
+        1. TRADING_PAIRS (base pairs) - defaults to canonical config/trading_pairs.py
         2. EXTRA_PAIRS (additive) - optional additional pairs
 
+        Only enabled pairs (per canonical config) are included.
+
         Returns:
-            List of unique trading pairs (deduplicated, order preserved)
+            List of unique enabled trading pairs (deduplicated, order preserved)
         """
-        # Load base pairs (default: BTC/USD,ETH/USD for backward compatibility)
-        base_pairs_str = os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD")
+        # Load base pairs - use canonical config as default
+        if CANONICAL_PAIRS_AVAILABLE:
+            default_pairs = DEFAULT_TRADING_PAIRS_CSV
+        else:
+            default_pairs = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"
+
+        base_pairs_str = os.getenv("TRADING_PAIRS", default_pairs)
         base_pairs = [p.strip() for p in base_pairs_str.split(",") if p.strip()]
 
         # Load extra pairs (additive)
@@ -512,6 +532,14 @@ class SignalProcessor:
         # Merge and deduplicate (preserves order)
         all_pairs = base_pairs + extra_pairs
         unique_pairs = list(dict.fromkeys(all_pairs))
+
+        # Filter to only enabled pairs using canonical config
+        if CANONICAL_PAIRS_AVAILABLE:
+            enabled_pairs = validate_pairs_list(unique_pairs)
+            disabled = [p for p in unique_pairs if p not in enabled_pairs]
+            if disabled:
+                self.logger.warning(f"Skipping disabled pairs: {', '.join(disabled)}")
+            unique_pairs = enabled_pairs
 
         self.logger.info(f"Trading pairs loaded: {', '.join(unique_pairs)}")
         if extra_pairs:

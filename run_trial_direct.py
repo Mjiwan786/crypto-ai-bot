@@ -11,7 +11,7 @@ os.chdir(r"C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot")
 sys.path.insert(0, str(Path.cwd()))
 
 # Set environment variables directly
-os.environ["REDIS_URL"] = "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+os.environ["REDIS_URL"] = "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 os.environ["REDIS_CA_CERT"] = r"C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem"
 os.environ["MODE"] = "paper"
 os.environ["TRADING_PAIRS"] = "BTC/USD,ETH/USD"

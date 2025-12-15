@@ -191,10 +191,10 @@ def main():
     Publishes mock metrics every 60 seconds.
     """
     # Get Redis connection from environment
-    redis_url = os.getenv(
-        "REDIS_URL",
-        "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
-    )
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        logger.error("REDIS_URL environment variable not set!")
+        sys.exit(1)
     redis_ca_cert = os.getenv(
         "REDIS_TLS_CERT_PATH",
         "config/certs/redis_ca.pem"

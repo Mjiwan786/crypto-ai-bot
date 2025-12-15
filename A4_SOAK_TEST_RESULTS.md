@@ -18,7 +18,7 @@ Successfully verified multi-pair functionality (BTC/USD, ETH/USD, SOL/USD, ADA/U
 PUBLISH_MODE=staging
 TRADING_PAIRS=BTC/USD,ETH/USD
 EXTRA_PAIRS=SOL/USD,ADA/USD,AVAX/USD
-REDIS_URL=rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 REDIS_SSL=true
 REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
 ```

@@ -197,7 +197,7 @@ TRADING_PAIRS=BTC/USD,ETH/USD           # Base pairs
 EXTRA_PAIRS=SOL/USD,ADA/USD,AVAX/USD    # Additive pairs
 
 # Redis Cloud TLS
-REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 REDIS_SSL=true
 REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
 
@@ -251,7 +251,7 @@ Staging stream data preserved for analysis
 ### Check Staging Stream Growth
 
 ```bash
-redis-cli -u "redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
+redis-cli -u "redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
   --tls --cacert config/certs/redis_ca.pem \
   XLEN signals:paper:staging
 ```
@@ -261,7 +261,7 @@ redis-cli -u "redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redn
 ### Check Production Stream (Should Be Unchanged)
 
 ```bash
-redis-cli -u "redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
+redis-cli -u "redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
   --tls --cacert config/certs/redis_ca.pem \
   XLEN signals:paper
 ```
@@ -271,7 +271,7 @@ redis-cli -u "redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redn
 ### View Recent Staging Signals
 
 ```bash
-redis-cli -u "redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
+redis-cli -u "redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
   --tls --cacert config/certs/redis_ca.pem \
   XRANGE signals:paper:staging - + COUNT 10
 ```

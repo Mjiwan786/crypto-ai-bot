@@ -99,7 +99,7 @@ Press Ctrl+C to stop
 
 ```bash
 # Terminal 2: Monitor staging stream growth
-redis-cli -u "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert config/certs/redis_ca.pem XLEN signals:paper:staging
+redis-cli -u "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert config/certs/redis_ca.pem XLEN signals:paper:staging
 
 # Should increase from ~6 to 100+ over 1 hour
 ```
@@ -110,7 +110,7 @@ redis-cli -u "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.red
 
 ```bash
 # Check production stream (should be unchanged)
-redis-cli -u "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert config/certs/redis_ca.pem XLEN signals:paper
+redis-cli -u "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert config/certs/redis_ca.pem XLEN signals:paper
 
 # Should remain at 10,016 messages (or whatever current count is)
 ```

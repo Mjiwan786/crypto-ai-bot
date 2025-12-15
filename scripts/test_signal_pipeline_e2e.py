@@ -7,8 +7,8 @@ Tests the complete signal flow: crypto-ai-bot → Redis → signals-api → sign
 
 USAGE:
     # Set environment variables first
-    export REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
-    export API_URL="https://crypto-signals-api.fly.dev"
+    export REDIS_URL="rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+    export API_URL="https://signals-api-gateway.fly.dev"
 
     # Run test
     python scripts/test_signal_pipeline_e2e.py
@@ -37,9 +37,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# Environment configuration
+from config.signals_api_config import SIGNALS_API_BASE_URL
+
+# Environment configuration (env vars can override centralized config)
 REDIS_URL = os.getenv("REDIS_URL")
-API_URL = os.getenv("API_URL", "https://crypto-signals-api.fly.dev")
+API_URL = os.getenv("API_URL", SIGNALS_API_BASE_URL)
 REDIS_CA_CERT = os.getenv(
     "REDIS_CA_CERT",
     str(project_root / "config" / "certs" / "redis_ca.pem")

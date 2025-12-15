@@ -11,6 +11,11 @@ import os
 import ssl
 import sys
 
+# Add project root to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config.signals_api_config import SIGNALS_API_HEALTH_URL
+
 # Fix Windows console encoding
 if sys.platform == "win32":
     try:
@@ -20,10 +25,10 @@ if sys.platform == "win32":
 
 # Configuration
 CRYPTO_AI_BOT_HEALTH = "https://crypto-ai-bot.fly.dev/health"
-SIGNALS_API_HEALTH = "https://crypto-signals-api.fly.dev/health"
+SIGNALS_API_HEALTH = SIGNALS_API_HEALTH_URL
 SIGNALS_SITE_URL = "https://aipredictedsignals.cloud"
 
-REDIS_URL = "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+REDIS_URL = "rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 REDIS_CA_CERT = r"C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem"
 
 def get_redis_client():

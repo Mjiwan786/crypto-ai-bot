@@ -33,7 +33,7 @@ pkill -f run_live_scalper.py
 - **Trading Mode**: LIVE_MODE, TRADING_MODE
 - **Redis TLS**: Full connection string with certificate path
   ```
-  REDIS_URL=rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+  REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
   REDIS_SSL=true
   REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
   ```
@@ -45,7 +45,7 @@ pkill -f run_live_scalper.py
 - **Monitoring**: Prometheus port, heartbeat interval, alert thresholds
 
 #### Redis TLS Setup
-- Connection string: `rediss://default:Salam78614%2A%2A%24%24@...`
+- Connection string: `rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@...`
 - Certificate path: `C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem`
 - Test commands provided
 - Stream verification commands
@@ -316,7 +316,7 @@ pkill -f run_live_scalper.py
 curl http://localhost:9108/metrics | grep -E "signals|heartbeat|pnl"
 
 # HEARTBEAT
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XREVRANGE metrics:live:heartbeat + - COUNT 1
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XREVRANGE metrics:live:heartbeat + - COUNT 1
 
 # P&L
 python scripts/generate_pnl_report.py --date today
@@ -338,7 +338,7 @@ conda activate crypto-bot
 - Host: `redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
 - Protocol: TLS (rediss://)
 - CA Cert: `C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem`
-- Encoded URL: `rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
+- Encoded URL: `rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
 
 **Exchange:**
 - Platform: Kraken

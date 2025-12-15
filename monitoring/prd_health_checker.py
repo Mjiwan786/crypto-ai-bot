@@ -34,6 +34,14 @@ from typing import Any, Dict, List, Optional
 
 import redis.asyncio as redis
 
+# Import canonical trading pairs (single source of truth)
+try:
+    from config.trading_pairs import DEFAULT_TRADING_PAIRS_CSV
+    CANONICAL_PAIRS_AVAILABLE = True
+except ImportError:
+    CANONICAL_PAIRS_AVAILABLE = False
+    DEFAULT_TRADING_PAIRS_CSV = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,8 +103,8 @@ class PRDHealthChecker:
         self.redis_timeout_sec = int(os.getenv("REDIS_HEALTH_TIMEOUT_SEC", "5"))
         self.kraken_ws_timeout_sec = int(os.getenv("KRAKEN_WS_HEALTH_TIMEOUT_SEC", "10"))
 
-        # Trading pairs to check
-        pairs_env = os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD")
+        # Trading pairs to check - uses canonical config/trading_pairs.py
+        pairs_env = os.getenv("TRADING_PAIRS", DEFAULT_TRADING_PAIRS_CSV)
         self.trading_pairs = [p.strip() for p in pairs_env.split(",")]
 
     async def _get_redis_client(self) -> Optional[redis.Redis]:

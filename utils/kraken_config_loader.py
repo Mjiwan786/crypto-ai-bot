@@ -4,10 +4,13 @@ PRD-001 Compliant Kraken Configuration Loader
 Loads trading pairs and timeframes from kraken_ohlcv.yaml and kraken.yaml
 to ensure all configured pairs/timeframes are actually subscribed.
 
-This module provides a single source of truth for:
+This module provides configuration loading for:
 - Trading pairs (tier_1, tier_2, tier_3 from kraken_ohlcv.yaml)
 - Timeframes (primary and synthetic from kraken_ohlcv.yaml)
 - Stream naming (matches kraken_ohlcv.yaml exactly)
+
+IMPORTANT: For the canonical trading pairs list, see config/trading_pairs.py
+which is the single source of truth for all supported pairs.
 """
 
 import logging
@@ -16,6 +19,15 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 import yaml
+
+# Import canonical trading pairs module
+from config.trading_pairs import (
+    get_pair_symbols,
+    get_kraken_symbols,
+    symbol_to_kraken,
+    get_enabled_pairs,
+    ENABLED_PAIR_SYMBOLS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,14 +130,17 @@ class KrakenConfigLoader:
             logger.warning(f"Kraken config not found at {self.kraken_path}")
             self.kraken_config = {}
 
-    def get_all_pairs(self) -> List[str]:
+    def get_all_pairs(self, include_disabled: bool = False) -> List[str]:
         """
         Get all trading pairs from kraken_ohlcv.yaml.
+
+        Args:
+            include_disabled: If True, include pairs marked as enabled=false
 
         Returns:
             List of pairs in format "BTC/USD", "ETH/USD", etc.
         """
-        if self._pairs is not None:
+        if self._pairs is not None and not include_disabled:
             return self._pairs
 
         pairs = []
@@ -137,20 +152,26 @@ class KrakenConfigLoader:
             for pair_data in tier_pairs:
                 if isinstance(pair_data, dict):
                     symbol = pair_data.get("symbol", "")
+                    # Check if pair is enabled (default to True if not specified)
+                    enabled = pair_data.get("enabled", True)
+                    if not include_disabled and not enabled:
+                        logger.debug(f"Skipping disabled pair: {symbol}")
+                        continue
                 else:
                     symbol = str(pair_data)
 
                 if symbol and symbol not in pairs:
                     pairs.append(symbol)
 
-        # Fallback to defaults if config not found
+        # Fallback to canonical trading pairs module if config not found
         if not pairs:
-            logger.warning("No pairs found in config, using defaults")
-            pairs = ["BTC/USD", "ETH/USD", "ADA/USD", "SOL/USD", "AVAX/USD", "LINK/USD"]
+            logger.warning("No pairs found in YAML config, using canonical trading_pairs module")
+            pairs = ENABLED_PAIR_SYMBOLS.copy()
 
-        self._pairs = sorted(pairs)
-        logger.info(f"Loaded {len(self._pairs)} trading pairs: {', '.join(self._pairs)}")
-        return self._pairs
+        if not include_disabled:
+            self._pairs = sorted(pairs)
+        logger.info(f"Loaded {len(pairs)} trading pairs: {', '.join(pairs)}")
+        return sorted(pairs)
 
     def get_kraken_pairs(self) -> List[str]:
         """
@@ -177,14 +198,11 @@ class KrakenConfigLoader:
                         kraken_pair = k
                         break
 
-            # Fallback: convert BTC/USD -> XBTUSD (common mapping)
+            # Fallback: use canonical trading_pairs module for mapping
             if not kraken_pair:
-                if pair == "BTC/USD":
-                    kraken_pair = "XBTUSD"
-                elif pair == "BTC/EUR":
-                    kraken_pair = "XBTEUR"
-                else:
-                    # Remove / and convert to uppercase
+                kraken_pair = symbol_to_kraken(pair)
+                if not kraken_pair:
+                    # Last resort: remove / and convert to uppercase
                     kraken_pair = pair.replace("/", "").upper()
 
             if kraken_pair and kraken_pair not in kraken_pairs:

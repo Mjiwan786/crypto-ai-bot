@@ -176,7 +176,7 @@ Last 10 signals:
 
 **API Verification:**
 ```bash
-curl https://crypto-signals-api.fly.dev/v1/signals | python -m json.tool | grep -E "pair.*SOL|pair.*ADA"
+curl https://signals-api-gateway.fly.dev/v1/signals | python -m json.tool | grep -E "pair.*SOL|pair.*ADA"
 ```
 
 **Expected:** SOL-USD and ADA-USD in API response ✓
@@ -269,7 +269,7 @@ client.close()
 
 **3. API Health:**
 ```bash
-curl https://crypto-signals-api.fly.dev/health
+curl https://signals-api-gateway.fly.dev/health
 ```
 
 **Expected:** `redis_ok: true`, `status: healthy`
@@ -333,7 +333,7 @@ grep REDIS_STREAM_NAME .env.paper.local
 **Solution:**
 ```bash
 # Check Redis connectivity
-curl https://crypto-signals-api.fly.dev/health
+curl https://signals-api-gateway.fly.dev/health
 # Check redis_ok field
 
 # Verify credentials in .env.paper.local
@@ -356,7 +356,7 @@ redis-cli -u "rediss://..." --tls --cacert config/certs/redis_ca.pem PING
 curl -sL https://aipredictedsignals.cloud | grep "crypto-signals-api"
 
 # Verify API endpoint returns SOL/ADA
-curl https://crypto-signals-api.fly.dev/v1/signals | python -m json.tool | grep pair | head -20
+curl https://signals-api-gateway.fly.dev/v1/signals | python -m json.tool | grep pair | head -20
 
 # Clear browser cache and reload
 # Site may have cached pair list

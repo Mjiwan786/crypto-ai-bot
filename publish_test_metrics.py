@@ -6,9 +6,11 @@ import ssl
 import time
 from datetime import datetime
 
+from config.signals_api_config import get_signals_api_url
+
 # Connect to Redis
 redis_client = redis.from_url(
-    "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818",
+    "rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818",
     decode_responses=True,
     ssl_cert_reqs=ssl.CERT_REQUIRED,
     ssl_ca_certs="config/certs/redis_ca.pem"
@@ -53,4 +55,4 @@ print(f"Published regime data: {json.dumps(regime_data, indent=2)}")
 redis_client.close()
 print("\nDone! Metrics published successfully.")
 print("\nTest the API endpoint:")
-print("curl https://crypto-signals-api.fly.dev/metrics/profitability")
+print(f"curl {get_signals_api_url('/metrics/profitability')}")

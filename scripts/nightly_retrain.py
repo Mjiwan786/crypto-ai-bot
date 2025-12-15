@@ -80,7 +80,7 @@ class RetrainConfig:
     REGISTRY_PATH = "models/registry.json"
 
     # Redis
-    REDIS_URL = os.getenv('REDIS_URL', 'rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818')
+    REDIS_URL = os.getenv('REDIS_URL', 'rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818')
     REDIS_SSL_CA_CERT = os.getenv('REDIS_SSL_CA_CERT', 'config/certs/redis_ca.pem')
 
 

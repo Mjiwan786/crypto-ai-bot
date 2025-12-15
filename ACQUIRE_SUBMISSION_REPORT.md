@@ -181,7 +181,7 @@ We present a **production-ready, AI-powered cryptocurrency trading bot** that ac
 
 ### Infrastructure
 - **Trading Bot:** Fly.io (24/7 uptime)
-- **Signals API:** Fly.io (https://crypto-signals-api.fly.dev)
+- **Signals API:** Fly.io (https://signals-api-gateway.fly.dev)
 - **Database:** Redis Cloud (TLS encrypted)
 - **Frontend:** Signals Site (real-time dashboard)
 
@@ -276,7 +276,7 @@ We present a **production-ready, AI-powered cryptocurrency trading bot** that ac
 **Project:** Crypto AI Trading Bot
 **Repository:** https://github.com/[your-repo]
 **Documentation:** See COMPLETE_SYSTEM_IMPLEMENTATION_PROMPTS_0-9.md
-**API:** https://crypto-signals-api.fly.dev
+**API:** https://signals-api-gateway.fly.dev
 **Dashboard:** [Signals Site URL]
 
 **Technical Contact:**

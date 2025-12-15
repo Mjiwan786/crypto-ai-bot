@@ -29,8 +29,8 @@ The complete crypto AI bot pipeline is now **LIVE** and **fully operational** ac
 
 ### signals-api
 - **Status:** ✅ HEALTHY
-- **URL:** https://crypto-signals-api.fly.dev
-- **Health Endpoint:** https://crypto-signals-api.fly.dev/health
+- **URL:** https://signals-api-gateway.fly.dev
+- **Health Endpoint:** https://signals-api-gateway.fly.dev/health
 - **Response Time:** 86.24ms
 - **Uptime:** 28.05 hours
 - **Redis Ping:** 1.69ms
@@ -162,7 +162,7 @@ The complete crypto AI bot pipeline is now **LIVE** and **fully operational** ac
 
 ### Health Endpoints
 - crypto-ai-bot: https://crypto-ai-bot.fly.dev/health
-- signals-api: https://crypto-signals-api.fly.dev/health
+- signals-api: https://signals-api-gateway.fly.dev/health
 - signals-site: https://aipredictedsignals.cloud
 
 ---
@@ -223,7 +223,7 @@ fly logs -a crypto-signals-api
 ### Check health endpoints
 ```bash
 curl https://crypto-ai-bot.fly.dev/health | jq
-curl https://crypto-signals-api.fly.dev/health | jq
+curl https://signals-api-gateway.fly.dev/health | jq
 ```
 
 ### Redeploy crypto-ai-bot

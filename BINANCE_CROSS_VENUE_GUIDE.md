@@ -88,7 +88,7 @@ export BINANCE_API_SECRET=your_secret_here
 The system uses the existing Redis Cloud connection:
 
 ```bash
-export REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+export REDIS_URL="rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 ```
 
 Certificate path:

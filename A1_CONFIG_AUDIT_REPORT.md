@@ -96,7 +96,7 @@ STREAM_SIGNALS_PAPER="signals:live"
 
 ```bash
 # Redis Cloud with TLS
-REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+REDIS_URL="rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 ```
 
 **TLS Certificate**:
@@ -152,7 +152,7 @@ def _load_env():
 
 ```bash
 # .env.staging
-REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+REDIS_URL="rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 REDIS_SSL=true
 REDIS_SSL_CA_CERT="config/certs/redis_ca.pem"
 
@@ -302,7 +302,7 @@ TRADING_PAIRS="BTC/USD,ETH/USD,SOL/USD,ADA/USD,AVAX/USD"
 ### For Redis Connection
 
 ```bash
-REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+REDIS_URL="rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 REDIS_SSL_CA_CERT="config/certs/redis_ca.pem"
 ```
 

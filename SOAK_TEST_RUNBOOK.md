@@ -24,7 +24,7 @@
 
 - [ ] **Redis Cloud**: Connection verified and healthy
   ```powershell
-  redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+  redis-cli -u rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
     --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem `
     PING
   ```
@@ -217,8 +217,8 @@ news_overrides:
    - Soak test metrics: `http://localhost:9109/metrics`
 
 3. **signals-api Dashboards**
-   - Visit: `https://crypto-signals-api.fly.dev/metrics/performance`
-   - Live SSE stream: `https://crypto-signals-api.fly.dev/metrics/performance/stream`
+   - Visit: `https://signals-api-gateway.fly.dev/metrics/performance`
+   - Live SSE stream: `https://signals-api-gateway.fly.dev/metrics/performance/stream`
 
 4. **signals-site Dashboard** (if deployed)
    - Visit: `https://aipredictedsignals.cloud`
@@ -595,7 +595,7 @@ redis-cli -u rediss://... --tls --cacert ... XREVRANGE metrics:alerts + - COUNT 
 
 ### Redis Health Check
 ```powershell
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem `
   PING
 ```

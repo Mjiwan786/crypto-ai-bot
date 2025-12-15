@@ -133,7 +133,7 @@ def test_end_to_end_with_fakes():
 
 ```bash
 # Connection string (injected, not hardcoded)
-redis-cli -u redis://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls
+redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls
 ```
 
 ## Conda Environment

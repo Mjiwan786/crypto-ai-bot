@@ -300,10 +300,10 @@ fly deploy
 **Validation**:
 ```bash
 # Test staging endpoint
-curl "https://crypto-signals-api.fly.dev/v1/signals?mode=staging&pair=SOL/USD&limit=5"
+curl "https://signals-api-gateway.fly.dev/v1/signals?mode=staging&pair=SOL/USD&limit=5"
 
 # Verify production unchanged
-curl "https://crypto-signals-api.fly.dev/v1/signals?mode=paper&pair=BTC/USD&limit=5"
+curl "https://signals-api-gateway.fly.dev/v1/signals?mode=paper&pair=BTC/USD&limit=5"
 ```
 
 ---
@@ -472,7 +472,7 @@ tail -f logs/staging_publisher.log
 **After Deployment**:
 ```bash
 # Verify all endpoints
-curl "https://crypto-signals-api.fly.dev/v1/status/health"
+curl "https://signals-api-gateway.fly.dev/v1/status/health"
 curl "https://www.aipredictedsignals.cloud/api/health"
 ```
 

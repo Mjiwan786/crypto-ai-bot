@@ -190,7 +190,7 @@ run_smoke_test.bat
 
 ```bash
 # 1. Set environment variables
-export REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+export REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 export REDIS_SSL=true
 export REDIS_SSL_CA_CERT="config/certs/redis_ca.pem"
 export ENABLE_5S_BARS=false

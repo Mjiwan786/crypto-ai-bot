@@ -269,26 +269,26 @@ redis-cli -u rediss://... --tls --cacert ... DEL protection:mode:override
 
 **Enable protection mode**:
 ```powershell
-curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
   -H "Content-Type: application/json" `
   -d '{"action": "enable", "reason": "Locking in gains before weekend"}'
 ```
 
 **Disable protection mode**:
 ```powershell
-curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
   -H "Content-Type: application/json" `
   -d '{"action": "disable", "reason": "Re-enabling aggression after dip"}'
 ```
 
 **Clear override**:
 ```powershell
-curl -X DELETE https://crypto-signals-api.fly.dev/protection-mode/override
+curl -X DELETE https://signals-api-gateway.fly.dev/protection-mode/override
 ```
 
 **Check status**:
 ```powershell
-curl https://crypto-signals-api.fly.dev/protection-mode/status
+curl https://signals-api-gateway.fly.dev/protection-mode/status
 ```
 
 **Restart required**: No (immediate effect)
@@ -337,12 +337,12 @@ redis-cli -u rediss://... --tls --cacert ... XREVRANGE protection:mode:events + 
 
 **Get current status**:
 ```powershell
-curl https://crypto-signals-api.fly.dev/protection-mode/status
+curl https://signals-api-gateway.fly.dev/protection-mode/status
 ```
 
 **Get recent events**:
 ```powershell
-curl https://crypto-signals-api.fly.dev/protection-mode/events?limit=20
+curl https://signals-api-gateway.fly.dev/protection-mode/events?limit=20
 ```
 
 ### Prometheus Metrics
@@ -462,7 +462,7 @@ TEST SUMMARY
 
 3. **Check current state**:
    ```powershell
-   curl https://crypto-signals-api.fly.dev/protection-mode/status
+   curl https://signals-api-gateway.fly.dev/protection-mode/status
    ```
 
 4. **Check bot logs**:
@@ -491,7 +491,7 @@ TEST SUMMARY
 
 3. **Manually disable**:
    ```powershell
-   curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+   curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
      -H "Content-Type: application/json" `
      -d '{"action": "disable"}'
    ```
@@ -526,7 +526,7 @@ TEST SUMMARY
 
 1. **Check if signals-api is running**:
    ```powershell
-   curl https://crypto-signals-api.fly.dev/health
+   curl https://signals-api-gateway.fly.dev/health
    ```
 
 2. **Check if router is registered**:
@@ -591,7 +591,7 @@ protection_mode:
 
 **A**: Set `enabled: false` in config and restart bot. Or use API:
 ```powershell
-curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
   -d '{"action": "disable"}'
 ```
 
@@ -603,10 +603,10 @@ curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
 
 | Action | Command |
 |--------|---------|
-| Force enable (API) | `curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override -d '{"action":"enable"}'` |
-| Force disable (API) | `curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override -d '{"action":"disable"}'` |
-| Clear override (API) | `curl -X DELETE https://crypto-signals-api.fly.dev/protection-mode/override` |
-| Check status (API) | `curl https://crypto-signals-api.fly.dev/protection-mode/status` |
+| Force enable (API) | `curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override -d '{"action":"enable"}'` |
+| Force disable (API) | `curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override -d '{"action":"disable"}'` |
+| Clear override (API) | `curl -X DELETE https://signals-api-gateway.fly.dev/protection-mode/override` |
+| Check status (API) | `curl https://signals-api-gateway.fly.dev/protection-mode/status` |
 | Force enable (Redis) | `redis-cli -u rediss://... SET protection:mode:override "force_enabled"` |
 | Force disable (Redis) | `redis-cli -u rediss://... SET protection:mode:override "force_disabled"` |
 | Clear override (Redis) | `redis-cli -u rediss://... DEL protection:mode:override` |
@@ -617,7 +617,7 @@ curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
 |-------|---------|
 | Current state | `redis-cli -u rediss://... HGETALL protection:mode:state` |
 | Recent events | `redis-cli -u rediss://... XREVRANGE protection:mode:events + - COUNT 10` |
-| Status via API | `curl https://crypto-signals-api.fly.dev/protection-mode/status` |
+| Status via API | `curl https://signals-api-gateway.fly.dev/protection-mode/status` |
 | Bot logs | `cat logs/*.log \| Select-String -Pattern "Protection Mode"` |
 
 ---

@@ -46,7 +46,7 @@ conda activate crypto-bot
 # Set environment
 $env:BOT_MODE="PAPER"
 $env:CONFIG_PATH="config/bar_reaction_5m_aggressive.yaml"
-$env:REDIS_URL="rediss://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+$env:REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 
 # Run paper trial
 python scripts/run_paper_trial.py
@@ -76,7 +76,7 @@ fly deploy --ha=false
 
 ```powershell
 # Check signal count
-redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   XLEN signals:paper
 ```
@@ -85,7 +85,7 @@ redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.red
 
 ```powershell
 # Get last 5 signals
-redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   XREVRANGE signals:paper + - COUNT 5
 ```
@@ -93,7 +93,7 @@ redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.red
 ### 3. Check API Metrics
 
 ```bash
-curl https://crypto-signals-api.fly.dev/metrics/live
+curl https://signals-api-gateway.fly.dev/metrics/live
 ```
 
 ### 4. Dashboard
@@ -124,13 +124,13 @@ Visit: https://aipredictedsignals.cloud/dashboard
 
 **Check 1**: Verify Redis connection
 ```powershell
-redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem PING
 ```
 
 **Check 2**: Verify Kraken data feed
 ```powershell
-redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   XLEN kraken:ohlcv:BTC/USD:5m
 ```
@@ -173,7 +173,7 @@ ping redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com
 ### Kill Switch (Fastest)
 
 ```powershell
-redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   SET kraken:emergency:kill_switch true
 ```
@@ -262,13 +262,13 @@ safety:
 
 **Deployment URLs**:
 - crypto-ai-bot: https://crypto-ai-bot.fly.dev/health
-- signals-api: https://crypto-signals-api.fly.dev/health
+- signals-api: https://signals-api-gateway.fly.dev/health
 - signals-site: https://aipredictedsignals.cloud
 
 **Redis Cloud**:
 - Host: redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 - Cert: config/certs/redis_ca.pem
-- URL: rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+- URL: rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 
 ---
 

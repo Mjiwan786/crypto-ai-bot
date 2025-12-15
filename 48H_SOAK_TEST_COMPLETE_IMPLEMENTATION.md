@@ -333,7 +333,7 @@ export function useSoakTestMetrics() {
   const [metrics, setMetrics] = useState(null);
 
   useEffect(() => {
-    const socket = io('https://crypto-signals-api.fly.dev');
+    const socket = io('https://signals-api-gateway.fly.dev');
 
     socket.on('soak:metrics', (data) => {
       setMetrics(data);
@@ -593,7 +593,7 @@ grep "FAIL" out/soak_test/soak_test_report.md
 
 ### Related Systems
 
-- **Signals API:** https://crypto-signals-api.fly.dev
+- **Signals API:** https://signals-api-gateway.fly.dev
 - **Signals Site:** https://crypto-signals-site.fly.dev
 - **Redis Cloud:** rediss://redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 

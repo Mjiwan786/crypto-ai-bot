@@ -246,7 +246,7 @@ fly deploy
 
 **Verify deployment**:
 ```powershell
-curl https://crypto-signals-api.fly.dev/protection-mode/status
+curl https://signals-api-gateway.fly.dev/protection-mode/status
 ```
 
 ### 3. Enable in Bot Config
@@ -262,7 +262,7 @@ No changes needed!
 
 **Check status**:
 ```powershell
-curl https://crypto-signals-api.fly.dev/protection-mode/status
+curl https://signals-api-gateway.fly.dev/protection-mode/status
 ```
 
 **Watch bot logs**:
@@ -272,7 +272,7 @@ curl https://crypto-signals-api.fly.dev/protection-mode/status
 
 **Check Redis state**:
 ```powershell
-redis-cli -u rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem `
   HGETALL protection:mode:state
 ```
@@ -284,7 +284,7 @@ redis-cli -u rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.
 ### Base URL
 
 ```
-https://crypto-signals-api.fly.dev
+https://signals-api-gateway.fly.dev
 ```
 
 ### Endpoints
@@ -295,7 +295,7 @@ Get current protection mode status.
 
 **Request**:
 ```powershell
-curl https://crypto-signals-api.fly.dev/protection-mode/status
+curl https://signals-api-gateway.fly.dev/protection-mode/status
 ```
 
 **Response**:
@@ -322,7 +322,7 @@ Set manual override (force enable/disable).
 
 **Request** (enable):
 ```powershell
-curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
   -H "Content-Type: application/json" `
   -d '{"action": "enable", "reason": "Locking in gains before weekend"}'
 ```
@@ -343,7 +343,7 @@ Clear manual override (return to automatic).
 
 **Request**:
 ```powershell
-curl -X DELETE https://crypto-signals-api.fly.dev/protection-mode/override
+curl -X DELETE https://signals-api-gateway.fly.dev/protection-mode/override
 ```
 
 **Response**:
@@ -362,7 +362,7 @@ Get recent protection mode events.
 
 **Request**:
 ```powershell
-curl "https://crypto-signals-api.fly.dev/protection-mode/events?limit=10"
+curl "https://signals-api-gateway.fly.dev/protection-mode/events?limit=10"
 ```
 
 **Response**:
@@ -592,7 +592,7 @@ Protection Mode is working correctly if:
 
 1. **Read the runbook**: `PROTECTION_MODE_RUNBOOK.md`
 2. **Run tests**: `python scripts/test_protection_mode.py --test all`
-3. **Check status**: `curl https://crypto-signals-api.fly.dev/protection-mode/status`
+3. **Check status**: `curl https://signals-api-gateway.fly.dev/protection-mode/status`
 4. **Check Redis**: `redis-cli -u rediss://... HGETALL protection:mode:state`
 5. **Check logs**: `cat logs/*.log | Select-String -Pattern "Protection Mode"`
 

@@ -43,7 +43,7 @@ if ($env:CONDA_DEFAULT_ENV -ne "crypto-bot") {
 Write-Host ""
 Write-Host "[2/5] Setting environment variables..." -ForegroundColor Yellow
 
-$env:REDIS_URL = "rediss://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+$env:REDIS_URL = "rediss://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 $env:REDIS_SSL = "true"
 $env:REDIS_SSL_CA_CERT = "config/certs/redis_ca.pem"
 $env:ENABLE_5S_BARS = "false"

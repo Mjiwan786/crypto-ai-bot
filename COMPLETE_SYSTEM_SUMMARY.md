@@ -180,7 +180,7 @@ Successfully built and integrated a **complete 3-tier real-time trading signals 
 | Service | Status | URL | Health Check |
 |---------|--------|-----|--------------|
 | crypto-ai-bot | ✅ Running | Fly.io worker | http://localhost:8080/health |
-| signals-api | ✅ Running | https://crypto-signals-api.fly.dev | https://crypto-signals-api.fly.dev/health |
+| signals-api | ✅ Running | https://signals-api-gateway.fly.dev | https://signals-api-gateway.fly.dev/health |
 | Redis Cloud | ✅ Running | rediss://redis-19818... | PING via redis-cli |
 
 ### Frontend
@@ -259,12 +259,12 @@ XREVRANGE kraken:health + - COUNT 1
 
 ```bash
 # Test health endpoint
-curl https://crypto-signals-api.fly.dev/health
+curl https://signals-api-gateway.fly.dev/health
 
 # Test SSE endpoints
-curl -N https://crypto-signals-api.fly.dev/streams/sse?type=signals&mode=paper
-curl -N https://crypto-signals-api.fly.dev/streams/sse?type=pnl
-curl -N https://crypto-signals-api.fly.dev/streams/sse/health
+curl -N https://signals-api-gateway.fly.dev/streams/sse?type=signals&mode=paper
+curl -N https://signals-api-gateway.fly.dev/streams/sse?type=pnl
+curl -N https://signals-api-gateway.fly.dev/streams/sse/health
 ```
 
 ### 3. Test Frontend (signals-site)
@@ -447,7 +447,7 @@ redis-cli -u redis://default:****@redis-19818.c9.us-east-1-4.ec2.redns.redis-clo
 curl http://localhost:8080/health
 
 # 2. API
-curl https://crypto-signals-api.fly.dev/health
+curl https://signals-api-gateway.fly.dev/health
 
 # 3. Redis
 redis-cli ... PING

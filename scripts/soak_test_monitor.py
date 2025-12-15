@@ -143,7 +143,7 @@ class SoakTestMonitor:
         return redis.Redis(
             host='redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com',
             port=19818,
-            password='Salam78614**$$',
+            password='&lt;REDIS_PASSWORD&gt;**$$',
             ssl=True,
             ssl_ca_certs=redis_config['tls_ca_cert_path'],
             decode_responses=True,

@@ -173,7 +173,7 @@ export default function SignalFeed({ mode = 'paper' }: { mode?: 'paper' | 'live'
 
   useEffect(() => {
     const eventSource = new EventSource(
-      `https://crypto-signals-api.fly.dev/streams/sse?type=signals&mode=${mode}`
+      `https://signals-api-gateway.fly.dev/streams/sse?type=signals&mode=${mode}`
     );
 
     eventSource.addEventListener('connected', (e) => {
@@ -247,7 +247,7 @@ export default function HealthDashboard() {
 
   useEffect(() => {
     const eventSource = new EventSource(
-      'https://crypto-signals-api.fly.dev/streams/sse/health'
+      'https://signals-api-gateway.fly.dev/streams/sse/health'
     );
 
     eventSource.addEventListener('connected', () => {
@@ -330,7 +330,7 @@ export default function PnLChart() {
 
   useEffect(() => {
     const eventSource = new EventSource(
-      'https://crypto-signals-api.fly.dev/streams/sse?type=pnl'
+      'https://signals-api-gateway.fly.dev/streams/sse?type=pnl'
     );
 
     eventSource.addEventListener('connected', () => {
@@ -448,19 +448,19 @@ XREVRANGE ops:heartbeat + - COUNT 1
 
 ```bash
 # Test signals SSE
-curl -N https://crypto-signals-api.fly.dev/streams/sse?type=signals&mode=paper
+curl -N https://signals-api-gateway.fly.dev/streams/sse?type=signals&mode=paper
 
 # Test PnL SSE
-curl -N https://crypto-signals-api.fly.dev/streams/sse?type=pnl
+curl -N https://signals-api-gateway.fly.dev/streams/sse?type=pnl
 
 # Test health metrics SSE (NEW)
-curl -N https://crypto-signals-api.fly.dev/streams/sse/health
+curl -N https://signals-api-gateway.fly.dev/streams/sse/health
 
 # Test health endpoint
-curl https://crypto-signals-api.fly.dev/health
+curl https://signals-api-gateway.fly.dev/health
 
 # Test Prometheus metrics
-curl https://crypto-signals-api.fly.dev/metrics
+curl https://signals-api-gateway.fly.dev/metrics
 ```
 
 ---
@@ -514,7 +514,7 @@ curl https://crypto-signals-api.fly.dev/metrics
 ## 📚 Resources
 
 - **Redis Cloud Connection**: `rediss://default:****@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
-- **API URL**: `https://crypto-signals-api.fly.dev`
+- **API URL**: `https://signals-api-gateway.fly.dev`
 - **Site URL**: `https://aipredictedsignals.cloud`
 - **PRD References**:
   - PRD-001: crypto-ai-bot Core Intelligence Engine

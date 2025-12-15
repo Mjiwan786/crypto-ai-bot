@@ -71,7 +71,7 @@ def get_config() -> Dict:
     """Load configuration from environment."""
     redis_url = os.getenv(
         "REDIS_URL",
-        "rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+        "rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
     )
     redis_cert = os.getenv(
         "REDIS_TLS_CERT",

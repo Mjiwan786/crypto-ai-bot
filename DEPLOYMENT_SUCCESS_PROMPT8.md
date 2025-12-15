@@ -19,7 +19,7 @@ Successfully deployed the complete profitability dashboard system for investor t
 
 ## Live Metrics
 
-**API Endpoint:** https://crypto-signals-api.fly.dev/metrics/profitability
+**API Endpoint:** https://signals-api-gateway.fly.dev/metrics/profitability
 
 **Current Performance:**
 ```json
@@ -86,7 +86,7 @@ return JSONResponse({
 ### 2. signals-api (Fly.io)
 - **Image:** `registry.fly.io/crypto-signals-api:deployment-01K9KPQBPA8CM7FHZ3SM49V5X9`
 - **Status:** Running (2 machines) ✅ OPERATIONAL
-- **URL:** https://crypto-signals-api.fly.dev
+- **URL:** https://signals-api-gateway.fly.dev
 - **Fix:** JSONResponse added to /metrics/profitability
 
 ### 3. signals-site (Vercel)
@@ -137,7 +137,7 @@ Investor Dashboard (/investor)
 
 ### Backend API
 ```bash
-curl https://crypto-signals-api.fly.dev/metrics/profitability
+curl https://signals-api-gateway.fly.dev/metrics/profitability
 # ✅ Returns 200 OK with live metrics
 ```
 

@@ -30,6 +30,9 @@ import yaml
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Import centralized signals API config
+from config.signals_api_config import SIGNALS_API_BASE_URL
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -53,7 +56,7 @@ class SoakTestConfig:
     # Redis Cloud connection
     REDIS_URL = os.getenv(
         'REDIS_URL',
-        'rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818'
+        'rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818'
     )
     REDIS_CERT_PATH = 'C:\\Users\\Maith\\OneDrive\\Desktop\\crypto_ai_bot\\config\\certs\\redis_ca.pem'
 
@@ -85,7 +88,7 @@ class SoakTestConfig:
 
     # Metrics streaming
     METRICS_PUBLISH_INTERVAL_SECONDS = 15
-    SIGNALS_API_URL = "https://crypto-signals-api.fly.dev"
+    SIGNALS_API_URL = SIGNALS_API_BASE_URL
 
     # Redis streams
     STREAM_SOAK_METRICS = "soak:metrics"

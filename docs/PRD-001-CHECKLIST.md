@@ -9,7 +9,7 @@
 ## Environment Setup
 
 **Conda Environment:** `crypto-bot`
-**Redis Connection:** `rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
+**Redis Connection:** `rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
 **Redis CA Cert:** `C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem`
 
 ### Environment Configuration (5/5) ✅ COMPLETE
@@ -790,7 +790,7 @@
 - All identified problems are addressed (empty PnL, missing reconnection, schema drift, missing methodology, risk filters, dropped signals, sequence numbers, heartbeat, exception handling, backpressure)
 - Environment details included for quick reference
 - Conda env: `crypto-bot`
-- Redis URL: `rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
+- Redis URL: `rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
 - Redis cert: `C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem`
 
 ---

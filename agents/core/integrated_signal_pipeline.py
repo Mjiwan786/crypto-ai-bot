@@ -31,6 +31,14 @@ from ml.async_ensemble import AsyncEnsemblePredictor
 from models.prd_signal_schema import TradingSignal, Side, Strategy, Regime, Indicators, SignalMetadata
 from agents.core.real_redis_client import RealRedisClient
 
+# Import canonical trading pairs (single source of truth)
+try:
+    from config.trading_pairs import ENABLED_PAIR_SYMBOLS
+    CANONICAL_PAIRS_AVAILABLE = True
+except ImportError:
+    CANONICAL_PAIRS_AVAILABLE = False
+    ENABLED_PAIR_SYMBOLS = ["BTC/USD", "ETH/USD", "SOL/USD", "LINK/USD"]
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,9 +92,8 @@ class IntegratedSignalPipeline:
             min_confidence: Minimum confidence to publish signal
             trading_mode: 'paper' or 'live'
         """
-        self.trading_pairs = trading_pairs or [
-            "BTC/USD", "ETH/USD", "SOL/USD", "MATIC/USD", "LINK/USD"
-        ]
+        # Use canonical config/trading_pairs.py as default (enabled pairs only)
+        self.trading_pairs = trading_pairs or ENABLED_PAIR_SYMBOLS.copy()
         self.min_confidence = min_confidence
         self.trading_mode = trading_mode
 

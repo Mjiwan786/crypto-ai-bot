@@ -24,7 +24,7 @@ All components are live and operational on production infrastructure (Fly.io + V
 
 **File:** `signals_api/app/api/http/metrics.py`
 
-**Endpoint:** `GET https://crypto-signals-api.fly.dev/metrics/profitability`
+**Endpoint:** `GET https://signals-api-gateway.fly.dev/metrics/profitability`
 
 **Response Schema:**
 ```json
@@ -52,7 +52,7 @@ All components are live and operational on production infrastructure (Fly.io + V
 - Error handling with proper HTTP status codes
 
 **Deployment:**
-- Deployed to: `https://crypto-signals-api.fly.dev`
+- Deployed to: `https://signals-api-gateway.fly.dev`
 - Image: `registry.fly.io/crypto-signals-api:deployment-01K9KK53353W2FA0T7QWRD99A5`
 - Status: Running (2 machines, rolling deployment)
 
@@ -198,13 +198,13 @@ Investor Dashboard (/investor)
 
 **Production Endpoints:**
 - Crypto-AI-Bot: `https://crypto-ai-bot.fly.dev`
-- Signals API: `https://crypto-signals-api.fly.dev`
-- Metrics Endpoint: `https://crypto-signals-api.fly.dev/metrics/profitability`
+- Signals API: `https://signals-api-gateway.fly.dev`
+- Metrics Endpoint: `https://signals-api-gateway.fly.dev/metrics/profitability`
 - Investor Dashboard: (Vercel URL - check deployment)
 
 **API Health Check:**
 ```bash
-curl https://crypto-signals-api.fly.dev/metrics/profitability
+curl https://signals-api-gateway.fly.dev/metrics/profitability
 ```
 
 **Expected Response:**
@@ -226,14 +226,14 @@ curl https://crypto-signals-api.fly.dev/metrics/profitability
 
 Required in Vercel:
 ```bash
-NEXT_PUBLIC_API_BASE=https://crypto-signals-api.fly.dev
+NEXT_PUBLIC_API_BASE=https://signals-api-gateway.fly.dev
 ```
 
 ### Redis Connection
 
 All services use the same Redis instance:
 ```
-URL: rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+URL: rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 TLS: Required
 Cert: config/certs/redis_ca.pem
 ```
@@ -252,7 +252,7 @@ cd /c/Users/Maith/OneDrive/Desktop/signals-site
 vercel ls
 
 # Test API endpoint
-curl https://crypto-signals-api.fly.dev/metrics/profitability
+curl https://signals-api-gateway.fly.dev/metrics/profitability
 
 # Visit dashboard
 # Navigate to: https://<vercel-url>/investor
@@ -344,7 +344,7 @@ cd /c/Users/Maith/OneDrive/Desktop/signals_api
 flyctl logs
 
 # Monitor Redis
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem
 > GET bot:performance:current
 > GET bot:regime:current
 ```
@@ -393,8 +393,8 @@ The profitability dashboard provides:
 | Component | Status | URL |
 |-----------|--------|-----|
 | crypto-ai-bot | DEPLOYED | https://crypto-ai-bot.fly.dev |
-| signals-api | DEPLOYED | https://crypto-signals-api.fly.dev |
-| /metrics/profitability | LIVE | https://crypto-signals-api.fly.dev/metrics/profitability |
+| signals-api | DEPLOYED | https://signals-api-gateway.fly.dev |
+| /metrics/profitability | LIVE | https://signals-api-gateway.fly.dev/metrics/profitability |
 | ProfitabilityMetrics | DEPLOYED | In signals-site |
 | Investor Dashboard | DEPLOYED | (Vercel auto-deployment) |
 | Redis Integration | CONFIGURED | rediss://redis-19818... |

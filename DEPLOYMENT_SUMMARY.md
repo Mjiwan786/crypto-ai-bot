@@ -69,17 +69,17 @@ Complete deployment of crypto trading intelligence system for Acquire.com invest
 - Redis: TLS connection verified
 
 **Endpoints:**
-- Health: `GET https://crypto-signals-api.fly.dev/live`
-- Signals (REST): `GET https://crypto-signals-api.fly.dev/v1/signals?limit=100`
-- Stream (SSE): `GET https://crypto-signals-api.fly.dev/v1/stream/signals` (auth required)
-- Metrics: `GET https://crypto-signals-api.fly.dev/metrics`
+- Health: `GET https://signals-api-gateway.fly.dev/live`
+- Signals (REST): `GET https://signals-api-gateway.fly.dev/v1/signals?limit=100`
+- Stream (SSE): `GET https://signals-api-gateway.fly.dev/v1/stream/signals` (auth required)
+- Metrics: `GET https://signals-api-gateway.fly.dev/metrics`
 
 **Verified Working:**
 ```bash
-$ curl https://crypto-signals-api.fly.dev/live
+$ curl https://signals-api-gateway.fly.dev/live
 {"alive":true}
 
-$ curl https://crypto-signals-api.fly.dev/v1/signals?limit=3
+$ curl https://signals-api-gateway.fly.dev/v1/signals?limit=3
 [
   {"id":"test-realtime-1762004858500-1","ts":1762004858500,"pair":"ETH/USD","side":"sell",...},
   {"id":"test-realtime-1762004858640-2","ts":1762004858640,"pair":"ETH/USD","side":"buy",...},
@@ -98,7 +98,7 @@ $ curl https://crypto-signals-api.fly.dev/v1/signals?limit=3
 **Configuration:**
 - Framework: Next.js 14
 - Region: Global CDN
-- API Base: `NEXT_PUBLIC_API_URL=https://crypto-signals-api.fly.dev`
+- API Base: `NEXT_PUBLIC_API_URL=https://signals-api-gateway.fly.dev`
 
 **Features:**
 - ✅ Prominent LIVE indicator banner (animated, green gradient)
@@ -187,8 +187,8 @@ fly deploy
 
 # Verify
 fly status
-curl https://crypto-signals-api.fly.dev/live
-curl https://crypto-signals-api.fly.dev/v1/signals?limit=5
+curl https://signals-api-gateway.fly.dev/live
+curl https://signals-api-gateway.fly.dev/v1/signals?limit=5
 ```
 
 ### Deploy signals-site
@@ -199,7 +199,7 @@ cd signals-site
 # Set env vars
 vercel env rm NEXT_PUBLIC_API_URL production
 vercel env add NEXT_PUBLIC_API_URL production
-# Enter: https://crypto-signals-api.fly.dev
+# Enter: https://signals-api-gateway.fly.dev
 
 # Deploy
 vercel --prod
@@ -216,7 +216,7 @@ curl https://aipredictedsignals.cloud
 
 ```bash
 # API health
-curl https://crypto-signals-api.fly.dev/live
+curl https://signals-api-gateway.fly.dev/live
 # Expected: {"alive":true}
 
 # Bot health (when deployed)
@@ -228,7 +228,7 @@ curl -I https://aipredictedsignals.cloud
 # Expected: HTTP/2 200
 
 # Signals data
-curl https://crypto-signals-api.fly.dev/v1/signals?limit=10
+curl https://signals-api-gateway.fly.dev/v1/signals?limit=10
 # Expected: JSON array of signals
 ```
 
@@ -259,8 +259,8 @@ vercel logs https://aipredictedsignals.cloud --follow
 | Criterion | Status | Evidence |
 |-----------|--------|----------|
 | crypto-ai-bot runs 24/7, crash-safe | ⏳ Deploying | Fly.io config: `auto_stop_machines=false` |
-| signals-api reachable & public | ✅ PASS | https://crypto-signals-api.fly.dev/live returns `{"alive":true}` |
-| signals-site uses correct API base | ✅ PASS | `NEXT_PUBLIC_API_URL=https://crypto-signals-api.fly.dev` |
+| signals-api reachable & public | ✅ PASS | https://signals-api-gateway.fly.dev/live returns `{"alive":true}` |
+| signals-site uses correct API base | ✅ PASS | `NEXT_PUBLIC_API_URL=https://signals-api-gateway.fly.dev` |
 | LIVE banner visible on site | ✅ PASS | Animated green banner with "🔴 LIVE SYSTEM" |
 | Signals update without manual refresh | ✅ PASS | 10-second polling + SSE fallback |
 | Redis Cloud TLS verified | ✅ PASS | CA certificate verified, TLS handshake OK |
@@ -325,13 +325,13 @@ vercel logs https://aipredictedsignals.cloud --follow
 1. **30-Minute Uptime Validation**
    ```bash
    # Monitor for 30 minutes
-   watch -n 60 'curl -s https://crypto-signals-api.fly.dev/live && date'
+   watch -n 60 'curl -s https://signals-api-gateway.fly.dev/live && date'
    ```
 
 2. **Load Testing (Optional)**
    ```bash
    # Simulate 100 concurrent users
-   ab -n 1000 -c 100 https://crypto-signals-api.fly.dev/v1/signals
+   ab -n 1000 -c 100 https://signals-api-gateway.fly.dev/v1/signals
    ```
 
 3. **Investor Demo Checklist**

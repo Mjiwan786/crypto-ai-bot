@@ -151,7 +151,7 @@ import redis
 r = redis.Redis(
     host="redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com",
     port=19818,
-    password="Salam78614**$$",
+    password="&lt;REDIS_PASSWORD&gt;**$$",
     ssl=True,
     ssl_ca_certs="config/certs/redis_ca.pem"
 )
@@ -516,12 +516,12 @@ pytest tests/agents/test_dynamic_sizing.py::test_boost_capped_at_max -v
 pytest tests/agents/test_dynamic_sizing.py --cov=agents.scalper.risk.dynamic_sizing
 
 # Send Redis override (PowerShell)
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   PUBLISH "sizing:override:scalper" '{\"key\":\"size_multiplier\",\"value\":1.5,\"expiry_seconds\":3600}'
 
 # Monitor sizing metrics
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   SUBSCRIBE "sizing:metrics:scalper"
 ```

@@ -369,7 +369,7 @@ mv agents/core/signal_processor_v2.py agents/core/signal_processor.py
 - All v2 modules are backward compatible
 - Existing code continues to work
 - Gradual migration recommended
-- Redis Cloud connection string: `redis://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
+- Redis Cloud connection string: `redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
 
 ## ✅ Final Verification
 

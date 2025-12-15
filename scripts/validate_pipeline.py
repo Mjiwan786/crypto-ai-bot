@@ -13,7 +13,7 @@ Validates end-to-end signal delivery from Redis to SSE endpoint:
 
 Usage:
     # With API validation
-    API_BASE=https://crypto-signals-api.fly.dev python scripts/validate_pipeline.py
+    API_BASE=https://signals-api-gateway.fly.dev python scripts/validate_pipeline.py
 
     # Redis-only (skip SSE)
     python scripts/validate_pipeline.py

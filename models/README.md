@@ -471,7 +471,7 @@ pip install joblib>=1.3.0
 For distributed model serving:
 
 ```bash
-redis-cli -u redis://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls
+redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls
 ```
 
 ## References

@@ -57,7 +57,7 @@ fly logs --app crypto-ai-bot
 
 ### 3. Check Redis Signals
 ```powershell
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   XLEN signals:paper
 ```
@@ -66,7 +66,7 @@ redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redn
 
 ### 4. View Latest Signals
 ```powershell
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   XREVRANGE signals:paper + - COUNT 5
 ```
@@ -151,7 +151,7 @@ fly apps stop crypto-ai-bot
 
 ### Emergency Kill Switch
 ```powershell
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   SET kraken:emergency:kill_switch true
 ```
@@ -208,7 +208,7 @@ fly logs --app crypto-ai-bot -a 1000
 
 - **Health Endpoint**: https://crypto-ai-bot.fly.dev/health
 - **Fly.io Dashboard**: https://fly.io/apps/crypto-ai-bot/monitoring
-- **Signals API**: https://crypto-signals-api.fly.dev/metrics/live
+- **Signals API**: https://signals-api-gateway.fly.dev/metrics/live
 - **Frontend Dashboard**: https://aipredictedsignals.cloud/dashboard
 - **Redis Cloud**: redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 

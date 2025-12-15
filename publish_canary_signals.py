@@ -8,6 +8,9 @@ import ssl
 import json
 import time
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config.signals_api_config import get_signals_api_url
 from dotenv import load_dotenv
 
 # Load canary environment
@@ -89,7 +92,7 @@ print("=" * 70, flush=True)
 print("", flush=True)
 print("Next steps:", flush=True)
 print("1. Verify signals appear in production API:", flush=True)
-print("   curl https://crypto-signals-api.fly.dev/v1/signals?limit=50", flush=True)
+print(f"   curl {get_signals_api_url('/v1/signals?limit=50')}", flush=True)
 print("2. Check for SOL-USD and ADA-USD in response", flush=True)
 print("3. If successful, canary deployment is confirmed", flush=True)
 print("", flush=True)

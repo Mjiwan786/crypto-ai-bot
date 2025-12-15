@@ -39,6 +39,8 @@ import signal
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from config.signals_api_config import get_signals_api_url
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -173,7 +175,7 @@ async def main():
     print("   XREVRANGE signals:paper + - COUNT 5")
     print("")
     print("3. Check signals-api metrics:")
-    print("   curl https://crypto-signals-api.fly.dev/metrics/live")
+    print(f"   curl {get_signals_api_url('/metrics/live')}")
     print("")
     print("4. View dashboard:")
     print("   https://aipredictedsignals.cloud/dashboard")

@@ -12,6 +12,11 @@ from datetime import datetime
 import sys
 import os
 
+# Add project root to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config.signals_api_config import SIGNALS_API_HEALTH_URL
+
 # Fix Windows console encoding
 if sys.platform == "win32":
     try:
@@ -23,7 +28,7 @@ if sys.platform == "win32":
 # Component endpoints
 ENDPOINTS = {
     "crypto-ai-bot": "https://crypto-ai-bot.fly.dev/health",
-    "signals-api": "https://crypto-signals-api.fly.dev/health",
+    "signals-api": SIGNALS_API_HEALTH_URL,
     "signals-site": "https://aipredictedsignals.cloud"
 }
 

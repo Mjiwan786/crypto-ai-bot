@@ -178,28 +178,56 @@ except ImportError:
     CONFIG_LOADER_AVAILABLE = False
     logger.warning("kraken_config_loader not available, using environment variables")
 
+# Import canonical trading pairs (single source of truth)
+try:
+    from config.trading_pairs import (
+        get_enabled_pairs,
+        get_pair_symbols,
+        is_enabled_pair,
+        DEFAULT_TRADING_PAIRS_CSV,
+        ENABLED_PAIR_SYMBOLS,
+    )
+    CANONICAL_PAIRS_AVAILABLE = True
+except ImportError:
+    CANONICAL_PAIRS_AVAILABLE = False
+    logger.warning("canonical trading_pairs not available, using defaults")
+
 
 # Helper functions for loading config (must be defined before KrakenWSConfig uses them)
 def _load_pairs_from_config() -> List[str]:
     """
     Load trading pairs from kraken_ohlcv.yaml (PRD-001 compliance).
-    
-    Falls back to environment variable or defaults if config not available.
+
+    Falls back to canonical config/trading_pairs.py or environment variable.
+    Only returns ENABLED pairs (filters out disabled pairs like MATIC/USD).
     """
     if CONFIG_LOADER_AVAILABLE:
         try:
             config_loader = get_kraken_config_loader()
             pairs = config_loader.get_all_pairs()
             if pairs:
-                logger.info(f"Loaded {len(pairs)} pairs from kraken_ohlcv.yaml")
+                # Filter to only enabled pairs using canonical config
+                if CANONICAL_PAIRS_AVAILABLE:
+                    pairs = [p for p in pairs if is_enabled_pair(p)]
+                logger.info(f"Loaded {len(pairs)} enabled pairs from kraken_ohlcv.yaml")
                 return pairs
         except Exception as e:
-            logger.warning(f"Failed to load pairs from config: {e}, using env var fallback")
-    
-    # Fallback to environment variable (PRD-001 pairs)
-    env_pairs = os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD,SOL/USD,MATIC/USD,LINK/USD")
+            logger.warning(f"Failed to load pairs from config: {e}, using fallback")
+
+    # Fallback to canonical config or environment variable
+    if CANONICAL_PAIRS_AVAILABLE:
+        default_pairs = DEFAULT_TRADING_PAIRS_CSV
+    else:
+        default_pairs = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"  # Only Kraken-supported pairs
+
+    env_pairs = os.getenv("TRADING_PAIRS", default_pairs)
     pairs = [p.strip() for p in env_pairs.split(",") if p.strip()]
-    logger.info(f"Using pairs from environment variable: {pairs}")
+
+    # Filter to only enabled pairs
+    if CANONICAL_PAIRS_AVAILABLE:
+        pairs = [p for p in pairs if is_enabled_pair(p)]
+
+    logger.info(f"Using {len(pairs)} enabled pairs: {pairs}")
     return pairs
 
 
@@ -353,17 +381,22 @@ class KrakenWSConfig(BaseModel):
             v = [p.strip() for p in v.split(",")]
         if not v:
             raise ValueError("Pairs list cannot be empty")
-        
-        # PRD-001: Validate against expected pairs from kraken_ohlcv.yaml
-        # Allow any pair format, but log if not in expected set
-        # NOTE: MATIC/USD is supported via REST API, not WebSocket
-        expected_pairs = {
-            "BTC/USD", "ETH/USD", "BTC/EUR", "ADA/USD", "SOL/USD",
-            "AVAX/USD", "LINK/USD", "MATIC/USD", "DOT/USD"
-        }
-        for pair in v:
-            if pair not in expected_pairs:
-                logger.warning(f"Pair {pair} not in expected set from kraken_ohlcv.yaml")
+
+        # PRD-001: Validate against canonical trading pairs config
+        # Use config/trading_pairs.py as single source of truth
+        if CANONICAL_PAIRS_AVAILABLE:
+            from config.trading_pairs import ALL_PAIR_SYMBOLS, is_enabled_pair
+            for pair in v:
+                if pair not in ALL_PAIR_SYMBOLS:
+                    logger.warning(f"Pair {pair} not in canonical trading_pairs config")
+                elif not is_enabled_pair(pair):
+                    logger.warning(f"Pair {pair} is disabled in canonical config (not available on Kraken WS)")
+        else:
+            # Fallback: warn if pair not in known set
+            known_pairs = {"BTC/USD", "ETH/USD", "SOL/USD", "LINK/USD"}
+            for pair in v:
+                if pair not in known_pairs:
+                    logger.warning(f"Pair {pair} may not be supported on Kraken WebSocket")
         return v
     
     @field_validator("timeframes")
@@ -590,7 +623,7 @@ class RedisConnectionManager:
                 # PRD-001 Section 2.1: Connection pooling with max 10 connections
                 self.redis_client = redis.from_url(
                     self.config.redis_url,
-                    ssl=ssl_context,
+                    ssl_ca_certs=cert_path,
                     ssl_cert_reqs='required',
                     decode_responses=False,
                     socket_timeout=self.config.redis_socket_timeout,
@@ -633,14 +666,14 @@ class RedisConnectionManager:
             await self.redis_client.ping()
             self.last_health_check = time.time()
             self._set_connection_state(RedisConnectionState.CONNECTED)
-            self.logger.info("✅ Redis connection initialized successfully (max_connections=10)")
+            self.logger.info("[OK] Redis connection initialized successfully (max_connections=10)")
 
             # Test stream operations if configured
             if self.config.redis_cloud_optimized:
                 await self._test_redis_cloud_features()
 
         except Exception as e:
-            self.logger.error(f"❌ Redis initialization failed: {e}")
+            self.logger.error(f"[ERROR] Redis initialization failed: {e}")
             self.redis_client = None
             self._set_connection_state(RedisConnectionState.DISCONNECTED)
     
@@ -658,14 +691,14 @@ class RedisConnectionManager:
             used_memory_mb = int(info.get('used_memory', 0)) / (1024 * 1024)
             
             if used_memory_mb > self.config.redis_memory_threshold_mb:
-                self.logger.warning(f"⚠️ Redis Cloud memory usage high: {used_memory_mb:.1f}MB")
+                self.logger.warning(f"[WARN] Redis Cloud memory usage high: {used_memory_mb:.1f}MB")
             
             # Cleanup test data
             await self.redis_client.delete(test_stream)
-            self.logger.info("✅ Redis Cloud features test passed")
+            self.logger.info("[OK] Redis Cloud features test passed")
             
         except Exception as e:
-            self.logger.warning(f"⚠️ Redis Cloud features test failed: {e}")
+            self.logger.warning(f"[WARN] Redis Cloud features test failed: {e}")
     
     async def health_check(self):
         """Perform Redis PING health check (PRD-001 Section 2.1)
@@ -1163,7 +1196,7 @@ class KrakenWebSocketClient:
             timestamp = datetime.now().isoformat()
 
             # Log state change at INFO level with timestamp (PRD-001 Section 8.1)
-            log_msg = f"[{timestamp}] Connection state: {old_state.value} → {new_state.value}"
+            log_msg = f"[{timestamp}] Connection state: {old_state.value} -> {new_state.value}"
             if reason:
                 log_msg += f" ({reason})"
             self.logger.info(log_msg)
@@ -1200,7 +1233,7 @@ class KrakenWebSocketClient:
     async def trigger_circuit_breaker(self, breaker_name: str, reason: str):
         """Trigger a circuit breaker"""
         self.stats["circuit_breaker_trips"] += 1
-        self.logger.error(f"🚨 Circuit breaker {breaker_name} triggered: {reason}")
+        self.logger.error(f"[ALERT] Circuit breaker {breaker_name} triggered: {reason}")
         
         # Notify callbacks
         for callback in self.callbacks["circuit_breaker"]:
@@ -1424,7 +1457,7 @@ class KrakenWebSocketClient:
                             60,  # TTL: 60 seconds
                             orjson.dumps(ticker_info).decode('utf-8')
                         )
-                        self.logger.debug(f"✅ Stored ticker data to Redis key {redis_key}")
+                        self.logger.debug(f"[OK] Stored ticker data to Redis key {redis_key}")
 
                 except Exception as e:
                     if "MAXMEMORY" in str(e) or "OOM" in str(e):
@@ -1461,7 +1494,7 @@ class KrakenWebSocketClient:
             for i, trade_data in enumerate(data):
                 try:
                     if len(trade_data) < 5:
-                        self.logger.warning(f"⚠️ Incomplete trade data at index {i}: {trade_data}")
+                        self.logger.warning(f"[WARN] Incomplete trade data at index {i}: {trade_data}")
                         continue
                     
                     trade = {
@@ -1489,11 +1522,11 @@ class KrakenWebSocketClient:
                         self.trade_timestamps.append(trade["received_at"])
                         
                 except (ValueError, IndexError) as e:
-                    self.logger.warning(f"⚠️ Error parsing trade data at index {i}: {e}")
+                    self.logger.warning(f"[WARN] Error parsing trade data at index {i}: {e}")
                     continue
             
             if not trades:
-                self.logger.warning(f"⚠️ No valid trades parsed from {len(data)} records for {pair}")
+                self.logger.warning(f"[WARN] No valid trades parsed from {len(data)} records for {pair}")
                 return
 
             # Cache data for graceful degradation (PRD-001 Section 1.4)
@@ -1534,7 +1567,7 @@ class KrakenWebSocketClient:
                             maxlen=1000
                         )
                         self.logger.debug(
-                            f"✅ Stored {len(trades)} trades to Redis stream {stream_name}"
+                            f"[OK] Stored {len(trades)} trades to Redis stream {stream_name}"
                         )
                         
                 except Exception as e:
@@ -1795,10 +1828,10 @@ class KrakenWebSocketClient:
         channel = subscription.get("name")
         
         if status == "subscribed":
-            self.logger.info(f"✅ Subscribed to {channel}")
+            self.logger.info(f"[OK] Subscribed to {channel}")
         elif status == "error":
             error_msg = data.get("errorMessage", "Unknown error")
-            self.logger.error(f"❌ Subscription error for {channel}: {error_msg}")
+            self.logger.error(f"[ERROR] Subscription error for {channel}: {error_msg}")
     
     def validate_message_schema(self, data) -> tuple[bool, str]:
         """
@@ -2417,14 +2450,14 @@ class KrakenWebSocketClient:
                 if not self.is_healthy:
                     time_disconnected = current_time - self.connection_state_changed_at
                     self.logger.warning(
-                        f"⚠️ Bot unhealthy: WebSocket disconnected for {time_disconnected:.1f}s (> 2 minutes)"
+                        f"[WARN] Bot unhealthy: WebSocket disconnected for {time_disconnected:.1f}s (> 2 minutes)"
                     )
 
                 # Check heartbeat and PONG timeout (PRD-001 Section 4.1)
                 time_since_heartbeat = current_time - self.last_heartbeat
                 if time_since_heartbeat > 60:
                     self.logger.warning(
-                        f"⚠️ Connection timeout: No PONG/heartbeat for {time_since_heartbeat:.1f}s (> 60s)"
+                        f"[WARN] Connection timeout: No PONG/heartbeat for {time_since_heartbeat:.1f}s (> 60s)"
                     )
 
                     # Close WebSocket to trigger reconnection (PRD-001 Section 4.1)
@@ -2609,20 +2642,51 @@ class KrakenWebSocketClient:
                     break
 
                 # Reset backoff and reconnection attempt on successful connection (PRD-001 Section 4.2)
+                # For 24/7 operation, successful reconnection means engine is healthy again
                 backoff = self.config.reconnect_delay
+                previous_attempts = self.reconnection_attempt
                 self.reconnection_attempt = 0
-                self.logger.info("Connection successful - reconnection attempt counter reset to 0")
+                self.logger.info(
+                    "Connection successful - reconnection attempt counter reset to 0 "
+                    "(previous attempts=%d, pairs=%s)",
+                    previous_attempts,
+                    self.config.pairs,
+                    extra={
+                        "component": "kraken_ws",
+                        "event": "reconnection_success",
+                        "previous_attempts": previous_attempts,
+                        "pairs": self.config.pairs,
+                    }
+                )
 
             except Exception as e:
                 self.reconnection_attempt += 1
                 self.stats["reconnects"] += 1  # Keep historical total
                 downtime = time.time() - self.connection_state_changed_at
-                # Surface downtime + state so operators can correlate reconnect storms
+                
+                # Enhanced logging for 24/7 operation: include context for debugging
+                # This helps operators understand reconnect patterns and correlate with incidents
+                error_type = type(e).__name__
+                error_msg = str(e)[:200]  # Truncate long error messages
+                
                 self.logger.warning(
-                    "Kraken WS reconnect triggered after %.1fs in state=%s: %s",
+                    "Kraken WS reconnect triggered: attempt=%d/%d, downtime=%.1fs, "
+                    "state=%s, error_type=%s, error=%s",
+                    self.reconnection_attempt,
+                    self.config.max_retries,
                     downtime,
                     self.connection_state.value,
-                    e,
+                    error_type,
+                    error_msg,
+                    extra={
+                        "component": "kraken_ws",
+                        "reconnection_attempt": self.reconnection_attempt,
+                        "max_retries": self.config.max_retries,
+                        "downtime_seconds": round(downtime, 1),
+                        "connection_state": self.connection_state.value,
+                        "error_type": error_type,
+                        "pairs": self.config.pairs,
+                    }
                 )
 
                 # Emit Prometheus counter for reconnection attempts (PRD-001 Section 4.2)
@@ -2635,9 +2699,16 @@ class KrakenWebSocketClient:
                     f"Reconnection attempt {self.reconnection_attempt}/{self.config.max_retries}"
                 )
 
-                self.logger.error(
-                    f"Kraken WS connection failed (attempt {self.reconnection_attempt}/{self.config.max_retries}): {e}"
-                )
+                # Log error details for debugging (but don't log full traceback unless DEBUG)
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug(
+                        f"Kraken WS connection failure details (attempt {self.reconnection_attempt}/{self.config.max_retries}): {e}",
+                        exc_info=True
+                    )
+                else:
+                    self.logger.error(
+                        f"Kraken WS connection failed (attempt {self.reconnection_attempt}/{self.config.max_retries}): {error_type}: {error_msg}"
+                    )
 
                 # PRD-001: Track reconnect count per pair (increment for all pairs on reconnect)
                 for pair in self.config.pairs:
@@ -2646,7 +2717,27 @@ class KrakenWebSocketClient:
                     self.stats["reconnect_count_by_pair"][pair] += 1
                 
                 if self.reconnection_attempt >= self.config.max_retries:
-                    self.logger.error("Kraken WS max reconnection attempts reached")
+                    # Critical failure: max reconnection attempts exceeded
+                    # For 24/7 operation, this means the engine cannot maintain connection
+                    # and should be marked unhealthy (health check will fail)
+                    total_downtime = time.time() - self.connection_state_changed_at
+                    self.logger.error(
+                        "Kraken WS max reconnection attempts reached: "
+                        "attempts=%d/%d, total_downtime=%.1fs, pairs=%s. "
+                        "Engine marked UNHEALTHY - manual intervention required.",
+                        self.reconnection_attempt,
+                        self.config.max_retries,
+                        total_downtime,
+                        self.config.pairs,
+                        extra={
+                            "component": "kraken_ws",
+                            "severity": "critical",
+                            "reconnection_attempt": self.reconnection_attempt,
+                            "max_retries": self.config.max_retries,
+                            "total_downtime_seconds": round(total_downtime, 1),
+                            "pairs": self.config.pairs,
+                        }
+                    )
                     # Set state to DISCONNECTED after max retries
                     self._set_connection_state(ConnectionState.DISCONNECTED, "Max reconnection attempts reached")
 
@@ -2654,7 +2745,7 @@ class KrakenWebSocketClient:
                     if DISCORD_ALERTS_AVAILABLE and send_alert:
                         try:
                             send_alert(
-                                title="⚠️ Kraken WebSocket: Max Reconnection Attempts Reached",
+                                title="[WARN] Kraken WebSocket: Max Reconnection Attempts Reached",
                                 description=(
                                     f"Bot has failed to reconnect after {self.config.max_retries} attempts. "
                                     f"WebSocket connection to {self.config.url} is down. "
@@ -2679,10 +2770,25 @@ class KrakenWebSocketClient:
                 backoff_with_jitter = backoff * (1 + jitter)
 
                 # Log reconnection attempt with attempt number and wait time (PRD-001 Section 4.2 & 8.1)
+                # For 24/7 operation, this helps operators understand reconnect behavior
                 self.logger.info(
-                    f"Reconnection attempt {self.reconnection_attempt}/{self.config.max_retries}: "
-                    f"waiting {backoff_with_jitter:.1f}s before retry "
-                    f"(base: {backoff}s, jitter: {jitter_pct:+.0f}%)"
+                    "Reconnection attempt %d/%d: waiting %.1fs before retry "
+                    "(base=%.1fs, jitter=%+.0f%%, pairs=%s)",
+                    self.reconnection_attempt,
+                    self.config.max_retries,
+                    backoff_with_jitter,
+                    backoff,
+                    jitter_pct,
+                    self.config.pairs,
+                    extra={
+                        "component": "kraken_ws",
+                        "reconnection_attempt": self.reconnection_attempt,
+                        "max_retries": self.config.max_retries,
+                        "backoff_seconds": round(backoff_with_jitter, 1),
+                        "base_backoff_seconds": round(backoff, 1),
+                        "jitter_percent": round(jitter_pct, 1),
+                        "pairs": self.config.pairs,
+                    }
                 )
 
                 await asyncio.sleep(backoff_with_jitter)
@@ -2737,7 +2843,7 @@ async def production_scalping_callback(pair: str, trades: List[dict]):
             target_bps = int(os.getenv("SCALP_TARGET_BPS", "10"))
             
             print(
-                f"🎯 SCALP SIGNAL {pair}: {trade['side'].upper()} "
+                f"[TARGET] SCALP SIGNAL {pair}: {trade['side'].upper()} "
                 f"{trade['volume']:.4f} @ ${trade['price']:.2f}"
             )
             print(f"   Target: {target_bps} bps, Volume: {trade['volume']:.4f}")
@@ -2759,14 +2865,14 @@ async def production_spread_callback(pair: str, spread_data: dict):
     max_spread = float(os.getenv("SPREAD_BPS_MAX", "5.0"))
     
     if spread_bps <= 2.0:  # Very tight spread
-        print(f"💎 TIGHT SPREAD {pair}: {spread_bps:.2f} bps - excellent for scalping!")
+        print(f"[TIGHT] TIGHT SPREAD {pair}: {spread_bps:.2f} bps - excellent for scalping!")
     elif spread_bps > max_spread:
-        print(f"⚠️ WIDE SPREAD {pair}: {spread_bps:.2f} bps > {max_spread} bps limit")
+        print(f"[WARN] WIDE SPREAD {pair}: {spread_bps:.2f} bps > {max_spread} bps limit")
 
 
 async def production_circuit_breaker_callback(breaker_name: str, reason: str):
     """Production circuit breaker callback - Redis Cloud optimized"""
-    print(f"🚨 CIRCUIT BREAKER ALERT: {breaker_name}")
+    print(f"[ALERT] CIRCUIT BREAKER ALERT: {breaker_name}")
     print(f"   Reason: {reason}")
     print(f"   Time: {datetime.now().strftime('%H:%M:%S')}")
     
@@ -2796,7 +2902,7 @@ async def redis_cloud_monitoring_callback(breaker_name: str, reason: str):
             print("   💾 Check Redis Cloud dashboard for memory usage")
             print("   🔌 Check connection pool status")
         except Exception as e:
-            print(f"   ⚠️ Failed to get Redis Cloud metrics: {e}")
+            print(f"   [WARN] Failed to get Redis Cloud metrics: {e}")
 
 
 # Production deployment function - Redis Cloud optimized
@@ -2816,29 +2922,29 @@ async def production_main():
     required_env_vars = ["REDIS_URL", "TRADING_PAIRS"]
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
     if missing_vars:
-        logger.error(f"❌ Missing required environment variables: {missing_vars}")
+        logger.error(f"[ERROR] Missing required environment variables: {missing_vars}")
         return
     
     # Redis Cloud specific validation
     redis_url = os.getenv("REDIS_URL", "")
     if "redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com" not in redis_url:
-        logger.warning("⚠️ Not using verified Redis Cloud instance")
+        logger.warning("[WARN] Not using verified Redis Cloud instance")
     
     # Create production configuration
     try:
         config = KrakenWSConfig()
-        logger.info("✅ Redis Cloud optimized configuration loaded:")
+        logger.info("[OK] Redis Cloud optimized configuration loaded:")
         logger.info(f"   Pairs: {config.pairs}")
         logger.info(f"   Timeframes: {config.timeframes}")
-        logger.info(f"   Redis: {'✅ Redis Cloud' if config.redis_url else '❌ Not configured'}")
-        logger.info(f"   Scalping: {'✅ Enabled' if config.scalp_enabled else '❌ Disabled'}")
-        logger.info("   Circuit Breakers: ✅ Redis Cloud Optimized")
+        logger.info(f"   Redis: {'[OK] Redis Cloud' if config.redis_url else '[X] Not configured'}")
+        logger.info(f"   Scalping: {'[OK] Enabled' if config.scalp_enabled else '[X] Disabled'}")
+        logger.info("   Circuit Breakers: [OK] Redis Cloud Optimized")
         logger.info(f"   Pool Size: {config.redis_pool_size} (optimized for Redis Cloud)")
         logger.info(f"   Socket Timeout: {config.redis_socket_timeout}s (optimized)")
         logger.info(f"   Batch Size: {config.redis_batch_size} (optimized)")
         
     except Exception as e:
-        logger.error(f"❌ Configuration error: {e}")
+        logger.error(f"[ERROR] Configuration error: {e}")
         return
     
     # Create client with Redis Cloud optimizations
@@ -2851,16 +2957,16 @@ async def production_main():
     client.register_callback("circuit_breaker", redis_cloud_monitoring_callback)
     
     try:
-        logger.info("🎯 Starting production WebSocket with Redis Cloud streams...")
+        logger.info("[TARGET] Starting production WebSocket with Redis Cloud streams...")
         await client.start()
         
     except KeyboardInterrupt:
-        logger.info("\n⏹️ Graceful shutdown initiated...")
+        logger.info("\n[STOP] Graceful shutdown initiated...")
     except Exception as e:
-        logger.error(f"❌ Production error: {e}")
+        logger.error(f"[ERROR] Production error: {e}")
     finally:
         await client.stop()
-        logger.info("✅ Production shutdown complete")
+        logger.info("[OK] Production shutdown complete")
 
 
 # Test function for development - Redis Cloud optimized
@@ -2868,7 +2974,7 @@ async def test_redis_connection():
     """Test Redis connection separately - Redis Cloud optimized"""
     redis_url = os.getenv("REDIS_URL")
     if not redis_url:
-        print("❌ REDIS_URL not set in environment")
+        print("[ERROR] REDIS_URL not set in environment")
         return False
     
     try:
@@ -2884,29 +2990,29 @@ async def test_redis_connection():
         
         # Test basic connection
         await client.ping()
-        print("✅ Redis Cloud connection successful!")
+        print("[OK] Redis Cloud connection successful!")
         
         # Test stream operations
         test_data = {"test": "connection", "timestamp": str(time.time())}
         await client.xadd("test:stream", test_data, maxlen=100)
-        print("✅ Redis Cloud stream write successful!")
+        print("[OK] Redis Cloud stream write successful!")
         
         # Test memory info (Redis Cloud specific)
         try:
             info = await client.info('memory')
             memory_mb = int(info.get('used_memory', 0)) / (1024 * 1024)
-            print(f"✅ Redis Cloud memory usage: {memory_mb:.1f}MB")
+            print(f"[OK] Redis Cloud memory usage: {memory_mb:.1f}MB")
         except Exception as e:
-            print(f"⚠️ Could not get memory info: {e}")
+            print(f"[WARN] Could not get memory info: {e}")
         
         # Clean up test data
         await client.delete("test:stream")
         await client.aclose()
-        print("✅ Redis Cloud test completed successfully!")
+        print("[OK] Redis Cloud test completed successfully!")
         return True
         
     except Exception as e:
-        print(f"❌ Redis Cloud connection failed: {e}")
+        print(f"[ERROR] Redis Cloud connection failed: {e}")
         return False
 
 

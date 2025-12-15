@@ -135,7 +135,7 @@ python -m agents.core.signal_processor
 
 ```bash
 # Connect to Redis
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem
 
 # Check staging stream length
 XLEN signals:paper:staging

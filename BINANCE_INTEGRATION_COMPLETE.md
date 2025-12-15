@@ -139,7 +139,7 @@ BINANCE_API_KEY=your_api_key_here
 BINANCE_API_SECRET=your_api_secret_here
 
 # Redis connection (already configured)
-REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 ```
 
 ### Redis Streams Published

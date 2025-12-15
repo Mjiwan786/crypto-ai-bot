@@ -321,7 +321,7 @@ signal_clock_drift_warnings_total{symbol="ETH_USD"} 1.0
 
 ```bash
 # Redis connection (same as before)
-REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 REDIS_CA_CERT=config/certs/redis_ca.pem
 
 # Prometheus port (optional, defaults to 9108)

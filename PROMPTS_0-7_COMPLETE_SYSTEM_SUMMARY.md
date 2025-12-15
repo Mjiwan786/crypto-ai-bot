@@ -340,7 +340,7 @@ conda activate crypto-bot
 pip install lightgbm redis pydantic scikit-optimize
 
 # Test Redis connection
-redis-cli -u "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
+redis-cli -u "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" \
   --tls --cacert config/certs/redis_ca.pem PING
 ```
 

@@ -399,7 +399,7 @@ Parameters:
 
 ```bash
 # Test Redis connection
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem PING
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem PING
 
 # Should return: PONG
 ```
@@ -722,14 +722,14 @@ for bar in market_data:
 **Connection Details:**
 
 ```python
-REDIS_URL = "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+REDIS_URL = "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 REDIS_CERT = "config/certs/redis_ca.pem"
 ```
 
 **Test Connection:**
 
 ```bash
-redis-cli -u "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert config/certs/redis_ca.pem PING
+redis-cli -u "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818" --tls --cacert config/certs/redis_ca.pem PING
 ```
 
 **Python Usage:**
@@ -738,7 +738,7 @@ redis-cli -u "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.red
 import redis
 
 r = redis.from_url(
-    "rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818",
+    "rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818",
     decode_responses=True,
 )
 

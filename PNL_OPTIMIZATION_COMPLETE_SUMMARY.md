@@ -196,7 +196,7 @@ conda activate crypto-bot
 # 3. Set environment variables
 $env:BOT_MODE="PAPER"
 $env:CONFIG_PATH="config/bar_reaction_5m_aggressive.yaml"
-$env:REDIS_URL="rediss://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+$env:REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 
 # 4. Run paper trial
 python scripts/run_paper_trial.py
@@ -206,17 +206,17 @@ python scripts/run_paper_trial.py
 
 ```powershell
 # Check signal count
-redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   XLEN signals:paper
 
 # Get latest signals
-redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   XREVRANGE signals:paper + - COUNT 5
 
 # Check API metrics
-curl https://crypto-signals-api.fly.dev/metrics/live
+curl https://signals-api-gateway.fly.dev/metrics/live
 
 # View dashboard
 Start-Process https://aipredictedsignals.cloud/dashboard
@@ -292,7 +292,7 @@ Start-Process https://aipredictedsignals.cloud/dashboard
 
 ### Kill Switch (Fastest)
 ```powershell
-redis-cli -u redis://default:Salam78614**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**`$`$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   SET kraken:emergency:kill_switch true
 ```
@@ -412,10 +412,10 @@ python scripts/run_paper_trial.py  # Restart with baseline
   - PRD-003: Signals-Site Front-End SaaS Portal (see signals-site repository)
 
 ### Infrastructure
-- **Redis Cloud**: rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+- **Redis Cloud**: rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 - **CA Cert**: config/certs/redis_ca.pem
 - **crypto-ai-bot**: https://crypto-ai-bot.fly.dev/health
-- **signals-api**: https://crypto-signals-api.fly.dev/health
+- **signals-api**: https://signals-api-gateway.fly.dev/health
 - **signals-site**: https://aipredictedsignals.cloud
 
 ### Conda Environment

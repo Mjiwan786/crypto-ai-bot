@@ -188,7 +188,7 @@ metrics = calculator.calculate_metrics(
 
 ### Base URL
 ```
-Production: https://crypto-signals-api.fly.dev
+Production: https://signals-api-gateway.fly.dev
 Local: http://localhost:8000
 ```
 
@@ -338,7 +338,7 @@ data: {"error":"stream_error","message":"Redis connection lost"}
 ```javascript
 // Connect to SSE stream
 const eventSource = new EventSource(
-  'https://crypto-signals-api.fly.dev/metrics/performance/stream?heartbeat=30'
+  'https://signals-api-gateway.fly.dev/metrics/performance/stream?heartbeat=30'
 );
 
 // Handle full performance snapshot
@@ -446,7 +446,7 @@ export default function Dashboard() {
 Add to `.env.local`:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=https://crypto-signals-api.fly.dev
+NEXT_PUBLIC_API_BASE_URL=https://signals-api-gateway.fly.dev
 ```
 
 For local development:
@@ -497,17 +497,17 @@ python main.py run --mode paper
 
 ```powershell
 # Check Redis connection
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem `
   PING
 
 # Check metrics streams
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem `
   XLEN metrics:performance
 
 # Read latest metric
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem `
   XREVRANGE metrics:performance + - COUNT 1
 ```
@@ -516,10 +516,10 @@ redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redn
 
 ```powershell
 # Test REST endpoint
-curl https://crypto-signals-api.fly.dev/metrics/performance
+curl https://signals-api-gateway.fly.dev/metrics/performance
 
 # Test SSE stream (PowerShell)
-$url = "https://crypto-signals-api.fly.dev/metrics/performance/stream?heartbeat=30"
+$url = "https://signals-api-gateway.fly.dev/metrics/performance/stream?heartbeat=30"
 Invoke-WebRequest -Uri $url -Method Get
 ```
 
@@ -640,17 +640,17 @@ print(f"Days Remaining: {metrics.days_remaining_estimate:.1f}")
 
 ```powershell
 # View all streams
-redis-cli -u rediss://default:Salam78614**$$@... `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@... `
   --tls --cacert ... `
   KEYS "metrics:*"
 
 # Count messages in performance stream
-redis-cli -u rediss://default:Salam78614**$$@... `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@... `
   --tls --cacert ... `
   XLEN metrics:performance
 
 # Read last 5 messages
-redis-cli -u rediss://default:Salam78614**$$@... `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@... `
   --tls --cacert ... `
   XREVRANGE metrics:performance + - COUNT 5
 ```
@@ -659,13 +659,13 @@ redis-cli -u rediss://default:Salam78614**$$@... `
 
 ```bash
 # Health check
-curl https://crypto-signals-api.fly.dev/health
+curl https://signals-api-gateway.fly.dev/health
 
 # Check if performance endpoint works
-curl https://crypto-signals-api.fly.dev/metrics/performance
+curl https://signals-api-gateway.fly.dev/metrics/performance
 
 # Check SSE stream
-curl -N https://crypto-signals-api.fly.dev/metrics/performance/stream
+curl -N https://signals-api-gateway.fly.dev/metrics/performance/stream
 ```
 
 ### Logs
@@ -745,13 +745,13 @@ API endpoints will return 404 when no data available.
 2. Are metrics enabled? `grep ENABLE_PERFORMANCE_METRICS .env`
 3. Any trades yet? Metrics need ≥1 closed trade
 4. Redis connected? Check bot logs for connection errors
-5. API accessible? `curl https://crypto-signals-api.fly.dev/metrics/performance`
+5. API accessible? `curl https://signals-api-gateway.fly.dev/metrics/performance`
 6. Environment variable set? Check `NEXT_PUBLIC_API_BASE_URL` in signals-site
 
 ### SSE Connection Fails
 
 **Check**:
-1. API endpoint exists: `curl https://crypto-signals-api.fly.dev/metrics/performance/stream`
+1. API endpoint exists: `curl https://signals-api-gateway.fly.dev/metrics/performance/stream`
 2. Redis streams exist: `redis-cli ... KEYS "metrics:*"`
 3. Browser console for errors
 4. Network tab shows SSE connection
@@ -814,7 +814,7 @@ METRICS_ADDR=0.0.0.0
 
 **signals-site**:
 ```bash
-NEXT_PUBLIC_API_BASE_URL=https://crypto-signals-api.fly.dev
+NEXT_PUBLIC_API_BASE_URL=https://signals-api-gateway.fly.dev
 ```
 
 ### API Endpoints Summary

@@ -68,7 +68,7 @@ TRADING_MODE=live                 # Must be "live" for production
 # =============================================================================
 # REDIS CLOUD CONNECTION (TLS)
 # =============================================================================
-REDIS_URL=rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 REDIS_SSL=true
 REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
 
@@ -187,7 +187,7 @@ ENABLE_EMAIL_ALERTS=false
 
 **Redis Connection String:**
 ```
-rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 ```
 
 **Certificate Path:**
@@ -198,7 +198,7 @@ C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem
 **Test Redis Connection:**
 ```bash
 # Windows
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem ping
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem ping
 
 # Should return: PONG
 ```
@@ -206,10 +206,10 @@ redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns
 **Verify Redis Streams:**
 ```bash
 # Check if Redis is accessible
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem info server
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem info server
 
 # Check signal streams
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XLEN signals:live:BTC_USD:15s
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XLEN signals:live:BTC_USD:15s
 ```
 
 ### 1.3 Kraken API Credentials
@@ -449,7 +449,7 @@ event_age_ms{symbol="BTC_USD",timeframe="15s"} 87.5
 **Check Heartbeat Stream:**
 ```bash
 # Get latest heartbeat
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XREVRANGE metrics:live:heartbeat + - COUNT 1
 
@@ -484,7 +484,7 @@ curl -s http://localhost:9108/metrics | grep last_signal_age_ms
 **Check Signal Stream:**
 ```bash
 # Get latest signal
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XREVRANGE signals:live:BTC_USD:15s + - COUNT 1
 
@@ -526,7 +526,7 @@ for pos in positions:
 tail -100 logs/live_scalper.log | grep "TRADE_EXECUTED"
 
 # Via Redis
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XREVRANGE trades:live + - COUNT 10
 ```
@@ -536,7 +536,7 @@ redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns
 **Check Current P&L:**
 ```bash
 # Via performance metrics stream
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XREVRANGE metrics:performance + - COUNT 1
 
@@ -649,7 +649,7 @@ print(f'Kraken API latency: {latency:.1f}ms')
 "
 
 # Check Redis latency
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   --latency
 
@@ -691,7 +691,7 @@ w32tm /query /status  # Windows
 ps aux | grep signal
 
 # Check signal stream
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XLEN signals:live:BTC_USD:15s
 
@@ -763,7 +763,7 @@ w32tm /resync /force
 **Diagnosis:**
 ```bash
 # Check recent trades
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XREVRANGE trades:live + - COUNT 10
 
@@ -781,7 +781,7 @@ python scripts/generate_pnl_report.py --date today
 2. **Reset circuit breaker** (only after investigation):
    ```bash
    # Reset circuit breaker flag
-   redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+   redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
      --tls --cacert config/certs/redis_ca.pem \
      SET circuit_breaker:active false
    ```
@@ -886,7 +886,7 @@ ps aux | grep run_live_scalper
 # Should return nothing
 
 # Check no new signals
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XLEN signals:live:BTC_USD:15s
 # Length should stop increasing
@@ -1030,12 +1030,12 @@ aws s3 sync logs/ s3://my-trading-logs/crypto-bot/$(date +%Y%m%d)/ \
 **Clean Old Redis Data:**
 ```bash
 # Remove old signals (keep last 24 hours)
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XTRIM signals:live:BTC_USD:15s MAXLEN ~ 10000
 
 # Remove old metrics (keep last 7 days)
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   XTRIM metrics:performance MAXLEN ~ 10080
 ```
@@ -1083,7 +1083,7 @@ pkill -f run_live_scalper.py
 curl http://localhost:9108/metrics | grep -E "signals|heartbeat|pnl"
 
 # Check heartbeat
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XREVRANGE metrics:live:heartbeat + - COUNT 1
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XREVRANGE metrics:live:heartbeat + - COUNT 1
 
 # Check P&L
 python scripts/generate_pnl_report.py --date today

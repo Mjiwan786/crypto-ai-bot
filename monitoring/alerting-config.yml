@@ -1,0 +1,475 @@
+# ============================================================================
+# Monitoring & Alerting Configuration
+# 99.8% Uptime SLA | <500ms Latency Guarantee
+# ============================================================================
+
+# ============================================================================
+# Fly.io Built-in Monitoring
+# ============================================================================
+
+flyio:
+  # Health checks (configured in fly.toml)
+  health_checks:
+    - service: crypto-ai-bot
+      endpoint: /health
+      interval: 15s
+      timeout: 5s
+      restart_on_failure: true
+      max_failures: 3
+
+    - service: crypto-signals-api
+      endpoint: /health
+      interval: 15s
+      timeout: 5s
+      restart_on_failure: true
+      max_failures: 3
+
+  # Metrics endpoints
+  metrics:
+    - service: crypto-ai-bot
+      port: 9108
+      path: /metrics
+      format: prometheus
+
+    - service: crypto-signals-api
+      port: 9090
+      path: /metrics
+      format: prometheus
+
+  # Auto-scaling triggers
+  autoscaling:
+    - service: crypto-ai-bot
+      min_instances: 2
+      max_instances: 4
+      metrics:
+        - cpu_usage_percent: 70
+        - memory_usage_percent: 80
+
+    - service: crypto-signals-api
+      min_instances: 2
+      max_instances: 6
+      metrics:
+        - requests_per_second: 100
+        - connection_count: 500
+
+# ============================================================================
+# Redis Cloud Monitoring
+# ============================================================================
+
+redis_cloud:
+  # Connection: redis-19818.c9.us-east-1-4.ec2.cloud.redislabs.com:19818
+
+  alerts:
+    - name: High Memory Usage
+      metric: memory_usage_percent
+      threshold: 80
+      duration: 5m
+      severity: warning
+      action: email
+      recipients:
+        - devops@aipredictedsignals.cloud
+
+    - name: Critical Memory Usage
+      metric: memory_usage_percent
+      threshold: 95
+      duration: 1m
+      severity: critical
+      action: pagerduty
+
+    - name: High Connection Count
+      metric: connection_count
+      threshold: 25
+      duration: 5m
+      severity: warning
+
+    - name: Slow Operations
+      metric: avg_latency_ms
+      threshold: 100
+      duration: 5m
+      severity: warning
+
+    - name: Stream Backlog
+      metric: stream_length
+      streams:
+        - signals:paper
+        - signals:live
+      threshold: 50000
+      severity: warning
+
+  # Monitoring dashboards
+  dashboards:
+    - name: Redis Overview
+      metrics:
+        - memory_usage
+        - cpu_usage
+        - connection_count
+        - commands_per_second
+        - network_io
+
+    - name: Streams Health
+      metrics:
+        - stream_length
+        - consumer_lag
+        - pending_messages
+
+# ============================================================================
+# Vercel Monitoring (signals-site)
+# ============================================================================
+
+vercel:
+  # Built-in monitoring
+  analytics:
+    enabled: true
+    sampling_rate: 100  # 100% sampling
+
+  speed_insights:
+    enabled: true
+
+  # Web Vitals thresholds
+  web_vitals:
+    - metric: LCP  # Largest Contentful Paint
+      good: 2500ms
+      needs_improvement: 4000ms
+
+    - metric: FID  # First Input Delay
+      good: 100ms
+      needs_improvement: 300ms
+
+    - metric: CLS  # Cumulative Layout Shift
+      good: 0.1
+      needs_improvement: 0.25
+
+  # Alerts
+  alerts:
+    - name: High Error Rate
+      metric: error_rate
+      threshold: 5  # 5% error rate
+      duration: 5m
+      severity: critical
+
+    - name: Slow Response Time
+      metric: p95_duration_ms
+      threshold: 500  # SLA: <500ms
+      duration: 5m
+      severity: warning
+
+# ============================================================================
+# Custom Prometheus Alerts (for Grafana)
+# ============================================================================
+
+prometheus_alerts:
+  groups:
+    - name: uptime_sla
+      interval: 15s
+      rules:
+        - alert: ServiceDown
+          expr: up{job="crypto-ai-bot"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "crypto-ai-bot is down"
+            description: "Service has been down for more than 1 minute. SLA at risk!"
+
+        - alert: HighLatency
+          expr: http_request_duration_ms_p95 > 500
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency detected"
+            description: "P95 latency is {{ $value }}ms (SLA: <500ms)"
+
+        - alert: HighErrorRate
+          expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High error rate"
+            description: "Error rate is {{ $value }}% (threshold: 5%)"
+
+    - name: redis_health
+      interval: 15s
+      rules:
+        - alert: RedisDown
+          expr: redis_up == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Redis connection lost"
+
+        - alert: RedisHighMemory
+          expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Redis memory usage > 90%"
+
+        - alert: RedisStreamBacklog
+          expr: redis_stream_length{stream="signals:paper"} > 50000
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Large stream backlog detected"
+
+    - name: trading_signals
+      interval: 30s
+      rules:
+        - alert: NoSignalsGenerated
+          expr: rate(signals_generated_total[10m]) == 0
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No signals generated in 30 minutes"
+            description: "Signal generation pipeline may be broken"
+
+        - alert: HighSignalLatency
+          expr: signal_generation_latency_ms_p95 > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High signal generation latency"
+
+# ============================================================================
+# Notification Channels
+# ============================================================================
+
+notification_channels:
+  # Slack
+  slack:
+    enabled: true
+    webhook_url: ${SLACK_WEBHOOK_URL}
+    channels:
+      - name: alerts-critical
+        severity: critical
+        mention: "@devops @oncall"
+
+      - name: alerts-warning
+        severity: warning
+
+      - name: deployments
+        events:
+          - deployment_started
+          - deployment_completed
+          - deployment_failed
+
+  # Discord
+  discord:
+    enabled: true
+    webhook_url: ${DISCORD_WEBHOOK_URL}
+    channels:
+      - name: production-alerts
+        severity: critical,warning
+
+      - name: deployments
+        events:
+          - deployment_started
+          - deployment_completed
+
+  # Email
+  email:
+    enabled: true
+    smtp_host: smtp.sendgrid.net
+    smtp_port: 587
+    from: alerts@aipredictedsignals.cloud
+    recipients:
+      critical:
+        - devops@aipredictedsignals.cloud
+        - oncall@aipredictedsignals.cloud
+      warning:
+        - devops@aipredictedsignals.cloud
+
+  # PagerDuty
+  pagerduty:
+    enabled: false  # Enable for 24/7 on-call
+    integration_key: ${PAGERDUTY_INTEGRATION_KEY}
+    urgency:
+      critical: high
+      warning: low
+
+# ============================================================================
+# Uptime Monitoring (External)
+# ============================================================================
+
+uptime_monitoring:
+  # UptimeRobot or Pingdom
+  services:
+    - name: crypto-ai-bot
+      url: https://crypto-ai-bot.fly.dev/health
+      interval: 60s  # Check every minute
+      timeout: 10s
+      expected_status: 200
+      alert_after: 2  # Alert after 2 consecutive failures
+
+    - name: signals-api
+      url: https://signals-api-gateway.fly.dev/health
+      interval: 60s
+      timeout: 10s
+      expected_status: 200
+      alert_after: 2
+
+    - name: signals-site
+      url: https://aipredictedsignals.cloud
+      interval: 60s
+      timeout: 10s
+      expected_status: 200
+      alert_after: 2
+
+    - name: signals-api-sse
+      url: https://signals-api-gateway.fly.dev/v1/signals/sse
+      interval: 300s  # Check every 5 minutes
+      timeout: 30s
+      expected_content: "event:"  # SSE format
+
+  # SLA reporting
+  sla_reporting:
+    target_uptime: 99.8  # 99.8% uptime
+    measurement_window: monthly
+    alert_threshold: 99.5  # Alert if below 99.5%
+
+# ============================================================================
+# Performance Monitoring (Real User Monitoring)
+# ============================================================================
+
+rum:
+  # Frontend performance
+  signals_site:
+    provider: vercel_speed_insights
+    metrics:
+      - page_load_time
+      - time_to_interactive
+      - first_contentful_paint
+      - cumulative_layout_shift
+
+  # API performance
+  signals_api:
+    provider: custom_prometheus
+    metrics:
+      - request_duration_p50
+      - request_duration_p95
+      - request_duration_p99
+      - requests_per_second
+      - error_rate
+
+# ============================================================================
+# Log Aggregation
+# ============================================================================
+
+logging:
+  # Fly.io logs
+  flyio:
+    retention_days: 7
+    log_shipping:
+      enabled: false  # Enable for Datadog/Logtail
+      destination: datadog
+      api_key: ${DATADOG_API_KEY}
+
+  # Vercel logs
+  vercel:
+    retention_days: 7
+    log_drains:
+      enabled: false  # Enable for centralized logging
+      destinations:
+        - type: http
+          url: https://logs.datadog.com/api/v2/logs
+          headers:
+            DD-API-KEY: ${DATADOG_API_KEY}
+
+  # Application logs
+  application:
+    level: INFO  # DEBUG | INFO | WARNING | ERROR | CRITICAL
+    format: json
+    structured: true
+
+# ============================================================================
+# Incident Response
+# ============================================================================
+
+incident_response:
+  # Runbooks
+  runbooks:
+    - name: Service Down
+      severity: critical
+      steps:
+        - Check Fly.io status page
+        - Review recent deployments
+        - Check health endpoints
+        - Review logs for errors
+        - Rollback if recent deployment
+        - Scale up instances if needed
+        - Escalate to on-call if unresolved after 15 minutes
+
+    - name: High Latency
+      severity: warning
+      steps:
+        - Check Prometheus metrics
+        - Review Redis Cloud performance
+        - Check instance CPU/memory
+        - Review recent code changes
+        - Scale up if under load
+        - Optimize slow queries
+
+    - name: Redis Connection Issues
+      severity: critical
+      steps:
+        - Check Redis Cloud dashboard
+        - Verify secrets are set correctly
+        - Test connection from each service
+        - Check network connectivity
+        - Review Redis Cloud maintenance window
+        - Contact Redis Cloud support if needed
+
+  # Escalation policy
+  escalation:
+    - level: 1
+      duration: 15m
+      notify:
+        - devops@aipredictedsignals.cloud
+
+    - level: 2
+      duration: 30m
+      notify:
+        - oncall@aipredictedsignals.cloud
+        - cto@aipredictedsignals.cloud
+
+    - level: 3
+      duration: 60m
+      notify:
+        - all_hands
+
+# ============================================================================
+# Compliance & SLA Tracking
+# ============================================================================
+
+compliance:
+  sla_tracking:
+    uptime_target: 99.8
+    latency_target_p95_ms: 500
+    reporting:
+      frequency: weekly
+      recipients:
+        - stakeholders@aipredictedsignals.cloud
+
+  # Downtime allowance
+  downtime_budget:
+    monthly: 87  # minutes
+    weekly: 20  # minutes
+    daily: 3    # minutes
+
+  # SLA breach alerts
+  sla_breach_alerts:
+    - metric: uptime
+      threshold: 99.5
+      window: 24h
+      severity: critical
+
+    - metric: latency_p95_ms
+      threshold: 500
+      window: 1h
+      severity: warning

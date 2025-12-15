@@ -12,13 +12,13 @@
 Complete 48-hour soak test deployment across all 3 repositories with:
 - **Turbo Scalper** (15s bars) - PRIMARY strategy
 - **Bar Reaction 5m** - SECONDARY strategy
-- **Real-time metrics streaming** ’ signals-api ’ signals-site live dashboards
+- **Real-time metrics streaming** ï¿½ signals-api ï¿½ signals-site live dashboards
 - **Comprehensive monitoring** with alerts (heat/latency/lag)
 - **Automated pass/fail validation** against success criteria
 
 ---
 
-## =Ë Components Prepared
+## =ï¿½ Components Prepared
 
 ###  1. crypto-ai-bot
 
@@ -32,10 +32,10 @@ Complete 48-hour soak test deployment across all 3 repositories with:
 - **5s bars**: DISABLED by default, auto-enable if p95 latency < 50ms
 - **News overrides**: OFF by default, 4h test window capability
 - **Monitoring alerts**:
-  - Portfolio heat > 80% ’ alert
-  - Latency p95 > 500ms ’ alert
-  - Redis lag > 2s ’ pause strategy
-  - Circuit breaker trips > 3/hour ’ alert
+  - Portfolio heat > 80% ï¿½ alert
+  - Latency p95 > 500ms ï¿½ alert
+  - Redis lag > 2s ï¿½ pause strategy
+  - Circuit breaker trips > 3/hour ï¿½ alert
 - **Performance metrics**: Published every 30s to Redis streams
 
 **Pass Criteria** (Automated):
@@ -98,7 +98,7 @@ max_redis_lag_seconds: 2.0
 
 ---
 
-## =€ Deployment Steps
+## =ï¿½ Deployment Steps
 
 ### Step 1: Deploy crypto-ai-bot with Soak Test Config
 
@@ -135,7 +135,7 @@ fly logs --app crypto-ai-bot
 
 ```bash
 # Test REST endpoint
-curl https://crypto-signals-api.fly.dev/metrics/performance/summary | jq
+curl https://signals-api-gateway.fly.dev/metrics/performance/summary | jq
 
 # Expected output (after bot starts publishing):
 {
@@ -156,7 +156,7 @@ curl https://crypto-signals-api.fly.dev/metrics/performance/summary | jq
 }
 
 # Test SSE stream
-curl -N https://crypto-signals-api.fly.dev/metrics/performance/stream
+curl -N https://signals-api-gateway.fly.dev/metrics/performance/stream
 ```
 
 **No redeployment needed** - endpoints already exist.
@@ -202,14 +202,14 @@ graph LR
 
 ---
 
-## =Ê Monitoring During Soak Test
+## =ï¿½ Monitoring During Soak Test
 
 ### Health Endpoints
 
 | Service | Health URL | Expected Status |
 |---------|-----------|----------------|
 | crypto-ai-bot | `https://crypto-ai-bot.fly.dev/health` | `{"status": "healthy", "performance_metrics": {...}}` |
-| signals-api | `https://crypto-signals-api.fly.dev/health` | `{"status": "ok", "redis_ping_ms": <2.0}` |
+| signals-api | `https://signals-api-gateway.fly.dev/health` | `{"status": "ok", "redis_ping_ms": <2.0}` |
 | signals-site | `https://aipredictedsignals.cloud` | 200 OK |
 
 ### Key Metrics to Watch
@@ -229,7 +229,7 @@ graph LR
   },
   "publisher": {
     "last_publish_seconds_ago": 0.8,
-    "total_published": 5760,  // 2880 intervals × 2 (30s interval)
+    "total_published": 5760,  // 2880 intervals ï¿½ 2 (30s interval)
     "total_errors": 0,
     "publish_rate": "2.0/sec"
   }
@@ -262,7 +262,7 @@ fly logs --app crypto-ai-bot | grep "metrics publisher"
 curl https://crypto-ai-bot.fly.dev/health | jq .performance_metrics
 
 # Check Redis streams
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert C:\Users\Maith\OneDrive\Desktop\crypto_ai_bot\config\certs\redis_ca.pem \
   XLEN metrics:performance
 ```
@@ -289,9 +289,9 @@ The system will automatically evaluate against pass criteria and log results.
 ```bash
 # Automatic actions triggered by system:
 1. Tag config: PROD-CANDIDATE-v1
-2. Export Prometheus snapshot ’ reports/prometheus_snapshot_{timestamp}.json
-3. Generate final report ’ reports/soak_test_48h_{timestamp}.json
-4. Notify via Redis stream ’ metrics:alerts
+2. Export Prometheus snapshot ï¿½ reports/prometheus_snapshot_{timestamp}.json
+3. Generate final report ï¿½ reports/soak_test_48h_{timestamp}.json
+4. Notify via Redis stream ï¿½ metrics:alerts
 ```
 
 ### Manual Validation Commands
@@ -337,7 +337,7 @@ fly deploy --ha=false -a crypto-ai-bot
 ### Issue: SSE connection keeps dropping
 
 **Check**:
-- signals-api health: `curl https://crypto-signals-api.fly.dev/health`
+- signals-api health: `curl https://signals-api-gateway.fly.dev/health`
 - Redis connectivity
 - Browser network tab for connection errors
 
@@ -375,7 +375,7 @@ circuit_breakers:
 
 ---
 
-## =Ý Checkpoint Reports
+## =ï¿½ Checkpoint Reports
 
 Reports are auto-generated every 6 hours:
 
@@ -422,7 +422,7 @@ Reports are auto-generated every 6 hours:
 
 ---
 
-## <¯ Expected Outcomes
+## <ï¿½ Expected Outcomes
 
 ### Best Case Scenario
 - Net P&L: **+$500 to +$1,500** (5-15% gain on $10k)
@@ -431,7 +431,7 @@ Reports are auto-generated every 6 hours:
 - Total Trades: **100-300** (mix of 15s scalps and 5m swings)
 - Circuit Breaker Trips: **< 3 total**
 - Latency P95: **< 300ms**
-- **Result**: PASS ’ Tag as PROD-CANDIDATE-v1
+- **Result**: PASS ï¿½ Tag as PROD-CANDIDATE-v1
 
 ### Acceptable Scenario
 - Net P&L: **+$50 to +$500** (0.5-5% gain)
@@ -440,18 +440,18 @@ Reports are auto-generated every 6 hours:
 - Total Trades: **50-100**
 - Circuit Breaker Trips: **< 5 total**
 - Latency P95: **400-500ms**
-- **Result**: PASS ’ Tag as PROD-CANDIDATE-v1 (with notes)
+- **Result**: PASS ï¿½ Tag as PROD-CANDIDATE-v1 (with notes)
 
 ### Fail Scenarios
 - Net P&L: **Negative**
 - Profit Factor: **< 1.25**
 - Circuit Breaker Trips: **> 5**
 - Latency P95: **> 500ms sustained**
-- **Result**: FAIL ’ Generate failure report, recommend adjustments
+- **Result**: FAIL ï¿½ Generate failure report, recommend adjustments
 
 ---
 
-## =æ Deployment Checklist
+## =ï¿½ Deployment Checklist
 
 ### Pre-Deployment
 - [x] Soak test config created (`soak_test_48h_turbo.yaml`)
@@ -495,7 +495,7 @@ Reports are auto-generated every 6 hours:
 
 ---
 
-## =Ê Quick Reference
+## =ï¿½ Quick Reference
 
 ### Redis Streams
 ```
@@ -513,10 +513,10 @@ soak_test:v1                 - Soak test specific events
 GET  https://crypto-ai-bot.fly.dev/health
 
 # signals-api
-GET  https://crypto-signals-api.fly.dev/metrics/performance
-GET  https://crypto-signals-api.fly.dev/metrics/performance/stream  (SSE)
-GET  https://crypto-signals-api.fly.dev/metrics/performance/summary
-GET  https://crypto-signals-api.fly.dev/health
+GET  https://signals-api-gateway.fly.dev/metrics/performance
+GET  https://signals-api-gateway.fly.dev/metrics/performance/stream  (SSE)
+GET  https://signals-api-gateway.fly.dev/metrics/performance/summary
+GET  https://signals-api-gateway.fly.dev/health
 
 # signals-site
 GET  https://aipredictedsignals.cloud/dashboard
@@ -533,16 +533,16 @@ STARTING_EQUITY_USD=10000
 TARGET_EQUITY_USD=20000
 
 # signals-api
-REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 REDIS_CA_CERT_PATH=/app/redis_ca.pem
 
 # signals-site
-NEXT_PUBLIC_API_URL=https://crypto-signals-api.fly.dev
+NEXT_PUBLIC_API_URL=https://signals-api-gateway.fly.dev
 ```
 
 ---
 
-## =€ Ready to Deploy
+## =ï¿½ Ready to Deploy
 
 All components are prepared and ready for deployment:
 

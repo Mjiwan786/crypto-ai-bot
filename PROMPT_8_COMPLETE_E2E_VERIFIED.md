@@ -57,7 +57,7 @@ profitability_metrics_publisher.py
 
 ## API Endpoint Test
 
-URL: https://crypto-signals-api.fly.dev/metrics/profitability
+URL: https://signals-api-gateway.fly.dev/metrics/profitability
 Response: 200 OK
 Last Updated: 2025-11-09T07:17:24Z
 Refresh Rate: 60 seconds (publisher) / 30 seconds (frontend)

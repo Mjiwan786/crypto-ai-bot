@@ -133,26 +133,26 @@ protection_mode:
 | `/protection-mode/override` | DELETE | Clear manual override |
 | `/protection-mode/events` | GET | Get recent protection mode events |
 
-**Base URL**: `https://crypto-signals-api.fly.dev`
+**Base URL**: `https://signals-api-gateway.fly.dev`
 
 **Examples**:
 
 ```powershell
 # Get status
-curl https://crypto-signals-api.fly.dev/protection-mode/status
+curl https://signals-api-gateway.fly.dev/protection-mode/status
 
 # Force enable
-curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
   -H "Content-Type: application/json" `
   -d '{"action": "enable", "reason": "Locking in gains"}'
 
 # Force disable
-curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
   -H "Content-Type: application/json" `
   -d '{"action": "disable"}'
 
 # Clear override
-curl -X DELETE https://crypto-signals-api.fly.dev/protection-mode/override
+curl -X DELETE https://signals-api-gateway.fly.dev/protection-mode/override
 ```
 
 ---
@@ -250,26 +250,26 @@ No action needed - it's enabled by default in all configs.
 
 **Force enable** (reduce risk immediately):
 ```powershell
-curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
   -d '{"action": "enable", "reason": "Before major news event"}'
 ```
 
 **Force disable** (re-enable aggression):
 ```powershell
-curl -X POST https://crypto-signals-api.fly.dev/protection-mode/override `
+curl -X POST https://signals-api-gateway.fly.dev/protection-mode/override `
   -d '{"action": "disable", "reason": "Re-enabling growth mode"}'
 ```
 
 **Clear override** (return to automatic):
 ```powershell
-curl -X DELETE https://crypto-signals-api.fly.dev/protection-mode/override
+curl -X DELETE https://signals-api-gateway.fly.dev/protection-mode/override
 ```
 
 ### Monitoring
 
 **Check current status**:
 ```powershell
-curl https://crypto-signals-api.fly.dev/protection-mode/status
+curl https://signals-api-gateway.fly.dev/protection-mode/status
 ```
 
 **Watch bot logs**:

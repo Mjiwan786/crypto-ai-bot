@@ -23,6 +23,8 @@ import requests
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from config.signals_api_config import SIGNALS_API_BASE_URL
+
 try:
     import redis.asyncio as aioredis
     from core.protection_mode import (
@@ -42,7 +44,7 @@ class ProtectionModeTests:
     """Protection mode test suite"""
 
     def __init__(self, redis_url: str = None):
-        self.redis_url = redis_url or "rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+        self.redis_url = redis_url or "rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
         self.redis_client: aioredis.Redis = None
 
         # Test results
@@ -283,7 +285,7 @@ class ProtectionModeTests:
         """Test: API endpoints for runtime override"""
         print("\n🌐 Test: API Endpoints")
 
-        api_url = "https://crypto-signals-api.fly.dev"
+        api_url = SIGNALS_API_BASE_URL
 
         # Test 1: Get status
         try:

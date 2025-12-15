@@ -159,7 +159,7 @@ python scripts/generate_acquire_report.py
    - Report markdown can use emojis (rendered properly)
 
 ### Redis Configuration
-- URL: `rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
+- URL: `rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
 - TLS Cert: `config/certs/redis_ca.pem`
 - Environment: `crypto-bot` (conda)
 

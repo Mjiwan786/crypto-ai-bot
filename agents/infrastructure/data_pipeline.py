@@ -33,6 +33,15 @@ from pydantic import BaseModel, Field, field_validator
 
 from agents.infrastructure.redis_client import create_data_pipeline_redis_client
 
+# Import canonical trading pairs (single source of truth)
+try:
+    from config.trading_pairs import DEFAULT_TRADING_PAIRS_CSV
+    CANONICAL_PAIRS_AVAILABLE = True
+except ImportError:
+    CANONICAL_PAIRS_AVAILABLE = False
+    DEFAULT_TRADING_PAIRS_CSV = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"
+    logging.warning("canonical trading_pairs not available, using defaults")
+
 # --------------------------------------------------------------------------------------
 # Constants and stream naming
 # --------------------------------------------------------------------------------------
@@ -89,9 +98,9 @@ class DataPipelineConfig(BaseModel):
     # Redis connection
     redis_url: str = Field(default_factory=lambda: os.getenv("REDIS_URL", "redis://localhost:6379"))
 
-    # Trading pairs and timeframes
+    # Trading pairs and timeframes - uses canonical config/trading_pairs.py
     pairs: List[str] = Field(
-        default_factory=lambda: os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD").split(",")
+        default_factory=lambda: os.getenv("TRADING_PAIRS", DEFAULT_TRADING_PAIRS_CSV).split(",")
     )
     timeframes: List[str] = Field(
         default_factory=lambda: os.getenv("TIMEFRAMES", "1m,5m").split(",")

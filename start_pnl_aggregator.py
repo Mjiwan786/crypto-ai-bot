@@ -10,7 +10,7 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
 
 # Set environment variables for PnL aggregator
-os.environ["REDIS_URL"] = "rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+os.environ["REDIS_URL"] = "rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 os.environ["START_EQUITY"] = "10000.0"
 os.environ["POLL_MS"] = "500"
 os.environ["USE_PANDAS"] = "false"  # Disable pandas to avoid dependency issues

@@ -64,7 +64,7 @@ fly launch --name crypto-ai-bot --no-deploy --region ewr
 ```bash
 # Set all required secrets
 fly secrets set \
-  REDIS_URL="rediss://default:Salam78614%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0" \
+  REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;%2A%2A%24%24@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0" \
   KRAKEN_API_KEY="your_kraken_api_key_here" \
   KRAKEN_API_SECRET="your_kraken_api_secret_here" \
   DISCORD_BOT_TOKEN="your_discord_bot_token" \

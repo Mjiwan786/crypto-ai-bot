@@ -7,7 +7,7 @@ echo ========================================================================
 echo.
 
 REM Set Redis Cloud Connection
-set REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+set REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 
 REM Trading Configuration
 set TRADING_PAIRS=BTC/USD,ETH/USD,SOL/USD,ADA/USD

@@ -152,7 +152,7 @@ Recent Pairs (last 10):
 
 #### Check 2: Production API ✅
 ```
-Endpoint: https://crypto-signals-api.fly.dev/v1/signals
+Endpoint: https://signals-api-gateway.fly.dev/v1/signals
 Total Signals: 200
 
 Distribution:
@@ -300,7 +300,7 @@ See RUNBOOK_PAPER_PAIRS.md for full operational guide
                │
                ↓
 ┌─────────────────────────────────┐
-│ crypto-signals-api.fly.dev      │
+│ signals-api-gateway.fly.dev     │
 │ GET /v1/signals                 │
 │ Returns: 200 signals            │
 │ - BTC-USD: 53                   │

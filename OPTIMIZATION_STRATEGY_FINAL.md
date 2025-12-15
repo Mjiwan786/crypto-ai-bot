@@ -357,11 +357,11 @@ python scripts/validate_gates.py out/iter1_aggressive_365d.json --strict
 ### Monitor Redis (Check Signal Flow)
 ```powershell
 # Test Redis connection
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u redis://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem PING
 
 # Check signals stream
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   XLEN signals:paper
 ```
@@ -427,12 +427,12 @@ python main.py run --mode paper
 
 ### Kill Switch (Fastest)
 ```powershell
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   SET kraken:emergency:kill_switch true
 
 # Deactivate
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 `
   --tls --cacert config/certs/redis_ca.pem `
   DEL kraken:emergency:kill_switch
 ```
@@ -532,12 +532,12 @@ fly deploy --ha=false  # Redeploy
 - Parameter guide: `docs/PARAMETER_OPTIMIZATION.md`
 
 ### Redis Cloud
-- URL: `rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
+- URL: `rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
 - Cert: `config/certs/redis_ca.pem`
 
 ### Deployment URLs
 - crypto-ai-bot: https://crypto-ai-bot.fly.dev/health
-- signals-api: https://crypto-signals-api.fly.dev/health
+- signals-api: https://signals-api-gateway.fly.dev/health
 - signals-site: https://aipredictedsignals.cloud
 
 **Ready to execute optimization iterations and achieve profitability targets.**

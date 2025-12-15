@@ -35,7 +35,7 @@
 - **Type**: String (URL)
 - **Default**: `redis://localhost:6379/0`
 - **Description**: Redis connection URL (use `rediss://` for TLS)
-- **Production**: `rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
+- **Production**: `rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818`
 - **Example**: `export REDIS_URL="rediss://..."`
 
 ### REDIS_SSL
@@ -248,7 +248,7 @@ export TRADING_MODE=paper
 
 ### Production Setup (15s bars, conservative)
 ```bash
-export REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+export REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 export REDIS_SSL=true
 export REDIS_SSL_CA_CERT="config/certs/redis_ca.pem"
 export ENABLE_5S_BARS=false
@@ -261,7 +261,7 @@ export TRADING_MODE=paper
 
 ### Production Setup (5s bars, aggressive)
 ```bash
-export REDIS_URL="rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
+export REDIS_URL="rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818"
 export REDIS_SSL=true
 export REDIS_SSL_CA_CERT="config/certs/redis_ca.pem"
 export ENABLE_5S_BARS=true
@@ -281,7 +281,7 @@ Create a `.env` file in project root:
 
 ```bash
 # Redis Connection
-REDIS_URL=rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
+REDIS_URL=rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818
 REDIS_SSL=true
 REDIS_SSL_CA_CERT=config/certs/redis_ca.pem
 REDIS_CONNECTION_POOL_SIZE=10

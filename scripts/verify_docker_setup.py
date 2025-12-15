@@ -217,7 +217,7 @@ def check_environment_files():
         'ENVIRONMENT': 'staging',
         'PAPER_TRADING_ENABLED': 'true',
         'LIVE_TRADING_CONFIRMATION': '',
-        'REDIS_URL': 'rediss://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0'
+        'REDIS_URL': 'rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0'
     }
     
     success, message = check_env_file('.env.staging', staging_vars)
@@ -229,7 +229,7 @@ def check_environment_files():
         'ENVIRONMENT': 'production',
         'PAPER_TRADING_ENABLED': 'false',
         'LIVE_TRADING_CONFIRMATION': 'I CONFIRM LIVE TRADING ENABLED',
-        'REDIS_URL': 'rediss://default:inwjuBWkh4rAtGnbQkLBuPkHXSmfokn8@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0'
+        'REDIS_URL': 'rediss://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818/0'
     }
     
     success, message = check_env_file('.env.prod', prod_vars)

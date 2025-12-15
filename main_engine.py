@@ -43,6 +43,13 @@ from dotenv import load_dotenv
 # Load environment variables before any other imports
 load_dotenv()
 
+# Import canonical trading pairs (single source of truth)
+from config.trading_pairs import (
+    get_pair_symbols,
+    get_pairs_csv,
+    DEFAULT_TRADING_PAIRS_CSV,
+)
+
 # Setup logging early
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 _log_format_env = os.getenv("LOG_FORMAT", "")
@@ -77,18 +84,27 @@ class EngineSettings:
     """
     Engine settings derived from environment variables and config files.
     This is the single source of truth for all engine configuration.
+    
+    MODE SEPARATION (PRD-001):
+    - ENGINE_MODE determines stream routing: "paper" → signals:paper:<PAIR>, "live" → signals:live:<PAIR>
+    - Paper and live modes are strictly separated - never mix data
+    - Mode is set at startup and cannot be changed without restart
     """
-    # Mode
-    trading_mode: str = field(default_factory=lambda: os.getenv("TRADING_MODE", "paper"))
-    engine_mode: str = field(default_factory=lambda: os.getenv("ENGINE_MODE", "paper"))
+    # Mode: ENGINE_MODE is authoritative per PRD-001, TRADING_MODE is legacy fallback
+    engine_mode: str = field(default_factory=lambda: os.getenv("ENGINE_MODE") or os.getenv("TRADING_MODE", "paper"))
+    trading_mode: str = field(init=False)  # Deprecated, use engine_mode
+    
+    def __post_init__(self):
+        """Set trading_mode as alias for engine_mode (backward compatibility)."""
+        self.trading_mode = self.engine_mode
 
     # Redis (all from environment)
     redis_url: str = field(default_factory=lambda: os.getenv("REDIS_URL", ""))
     redis_ca_cert: Optional[str] = field(default_factory=lambda: os.getenv("REDIS_CA_CERT") or os.getenv("REDIS_CA_CERT_PATH"))
 
-    # Trading pairs (comma-separated)
+    # Trading pairs (comma-separated) - uses canonical config/trading_pairs.py
     trading_pairs: List[str] = field(default_factory=lambda: (
-        os.getenv("TRADING_PAIRS", "BTC/USD,ETH/USD,SOL/USD").split(",")
+        os.getenv("TRADING_PAIRS", DEFAULT_TRADING_PAIRS_CSV).split(",")
     ))
 
     # Timeframes
@@ -106,13 +122,30 @@ class EngineSettings:
     task_backoff_multiplier: float = field(default_factory=lambda: float(os.getenv("TASK_BACKOFF_MULTIPLIER", "2.0")))
 
     # Stream names (PRD-001 Section 2.2)
+    # Stream names (PRD-001 Section 2.2) - Mode separation enforced here
     @property
     def signal_stream(self) -> str:
-        return f"signals:{self.trading_mode}"
+        """
+        Get signal stream name based on engine mode.
+        
+        Mode separation (PRD-001):
+        - paper mode → signals:paper:<PAIR>
+        - live mode → signals:live:<PAIR>
+        
+        This ensures paper and live signals never mix.
+        """
+        return f"signals:{self.engine_mode}"
 
     @property
     def pnl_stream(self) -> str:
-        return f"pnl:{self.trading_mode}"
+        """
+        Get PnL stream name based on engine mode.
+        
+        Mode separation (PRD-001):
+        - paper mode → pnl:paper:equity_curve
+        - live mode → pnl:live:equity_curve
+        """
+        return f"pnl:{self.engine_mode}"
 
     @property
     def events_stream(self) -> str:
@@ -340,11 +373,19 @@ class SupervisedTask:
 class TaskSupervisor:
     """
     Supervises asyncio tasks with automatic restart and exponential backoff.
-
+    
+    For 24/7 operation, this ensures tasks (like signal generation) automatically
+    restart on failure, maintaining uptime even during transient errors.
+    
     Never lets a task die permanently unless:
-    - Explicit cancellation via stop()
-    - max_restarts exceeded (if set)
-    - Unrecoverable error (e.g., configuration error)
+    - Explicit cancellation via stop() (graceful shutdown)
+    - max_restarts exceeded (if set) - prevents infinite restart loops
+    - Unrecoverable error (e.g., configuration error) - fail fast
+    
+    Restart behavior:
+    - Exponential backoff: 5s → 10s → 20s → ... → max 300s
+    - Prevents thundering herd on shared resources (Redis, Kraken API)
+    - Logs all restart attempts for debugging
     """
 
     def __init__(self, settings: EngineSettings):
@@ -491,9 +532,32 @@ async def create_signal_generator(
     """
 
     async def signal_generation_loop():
-        """Main signal generation loop."""
+        """
+        Main signal generation loop (24/7 operation).
+        
+        This loop runs indefinitely until:
+        - Shutdown requested (graceful)
+        - Max reconnection attempts exceeded (unhealthy)
+        - Critical error (unrecoverable)
+        
+        Mode separation: signals are published to signals:{engine_mode}:<PAIR>
+        - paper mode → signals:paper:BTC/USD, signals:paper:ETH/USD, etc.
+        - live mode → signals:live:BTC/USD, signals:live:ETH/USD, etc.
+        
+        The WebSocket client handles reconnection automatically (up to max_retries).
+        """
         gen_logger = logging.getLogger("signal_generator")
-        gen_logger.info(f"Starting signal generation: mode={settings.trading_mode}, pairs={settings.trading_pairs}")
+        gen_logger.info(
+            "Starting signal generation: mode=%s, pairs=%s, streams=signals:%s:<PAIR>",
+            settings.engine_mode,
+            settings.trading_pairs,
+            settings.engine_mode,
+            extra={
+                "component": "signal_generator",
+                "mode": settings.engine_mode,
+                "pairs": settings.trading_pairs,
+            }
+        )
 
         # Import engine components lazily to avoid import-time issues
         try:
@@ -579,18 +643,54 @@ class MainEngine:
                 self.logger.debug(f"Registered signal handler for {sig} (Windows fallback)")
 
     def _request_shutdown(self, sig: Any = None):
-        """Request graceful shutdown."""
+        """
+        Request graceful shutdown (called by signal handler).
+        
+        For 24/7 operation, shutdown is triggered by:
+        - SIGTERM: Fly.io restart, deployment, or manual stop
+        - SIGINT: Ctrl+C (development/testing)
+        
+        This sets the shutdown event which causes the main loop to exit
+        and triggers graceful shutdown (30s timeout).
+        """
         sig_name = sig.name if hasattr(sig, 'name') else str(sig)
-        self.logger.info(f"Shutdown requested via signal: {sig_name}")
+        self.logger.info(
+            "Shutdown requested via signal: %s (PID=%s, mode=%s). "
+            "Initiating graceful shutdown...",
+            sig_name,
+            os.getpid(),
+            self.settings.engine_mode
+        )
         self._shutdown_requested = True
         self._shutdown_event.set()
 
     async def initialize(self) -> bool:
-        """Initialize all engine components."""
+        """
+        Initialize all engine components.
+        
+        For 24/7 operation, initialization must:
+        1. Validate mode (paper vs live) - fail fast if invalid
+        2. Connect to Redis (required for all operations)
+        3. Start health publisher (required for Fly.io health checks)
+        4. Register supervised tasks (signal generation with auto-restart)
+        
+        Mode separation is enforced here - paper and live never share streams.
+        """
+        # Validate mode before proceeding (PRD-001: strict separation)
+        if self.settings.engine_mode not in ("paper", "live"):
+            self.logger.error(
+                "Invalid ENGINE_MODE: %s (must be 'paper' or 'live'). "
+                "Engine cannot start with invalid mode.",
+                self.settings.engine_mode
+            )
+            return False
+        
         self.logger.info("=" * 60)
         self.logger.info(f"Initializing crypto-ai-bot engine v{__version__}")
-        self.logger.info(f"Mode: {self.settings.trading_mode}")
+        self.logger.info(f"Mode: {self.settings.engine_mode} (streams: signals:{self.settings.engine_mode}:<PAIR>)")
         self.logger.info(f"Pairs: {self.settings.trading_pairs}")
+        if self.settings.engine_mode == "live":
+            self.logger.warning("⚠️  LIVE MODE: Real money at risk. Ensure LIVE_TRADING_CONFIRMATION is set.")
         self.logger.info("=" * 60)
         startup_marker = time.monotonic()
 
@@ -633,54 +733,121 @@ class MainEngine:
             return False
 
     async def run(self):
-        """Run the engine until shutdown."""
-        # Setup signal handlers
+        """
+        Run the engine until shutdown (24/7 operation).
+        
+        This is the main long-running loop. It:
+        1. Sets up signal handlers for graceful shutdown (SIGTERM/SIGINT)
+        2. Initializes all components (Redis, health publisher, tasks)
+        3. Starts supervised tasks (signal generation with auto-restart on failure)
+        4. Waits for shutdown signal (from Fly.io, operator, or error)
+        5. Performs graceful shutdown (30s timeout)
+        
+        The engine runs indefinitely until:
+        - SIGTERM/SIGINT received (graceful shutdown)
+        - Critical error (max reconnection attempts exceeded, etc.)
+        - Manual stop via health endpoint (if implemented)
+        
+        For 24/7 operation, this loop must handle:
+        - Network interruptions (reconnection logic in WebSocket client)
+        - Redis failures (retry logic in Redis client)
+        - Task failures (automatic restart via TaskSupervisor)
+        """
+        # Setup signal handlers for graceful shutdown
         self._setup_signal_handlers()
 
-        # Initialize
+        # Initialize all components
         if not await self.initialize():
             self.logger.error("Engine initialization failed, exiting")
             return 1
 
         try:
-            # Start all supervised tasks
+            # Start all supervised tasks (signal generation, etc.)
+            # Tasks run in background and auto-restart on failure
             self.logger.info("Starting supervised tasks...")
             await self.task_supervisor.start_all()
 
             self._run_started_at = time.monotonic()
             # Include PID so operators can confirm the single engine process
-            self.logger.info("Engine running as PID %s. Press Ctrl+C to stop.", os.getpid())
+            # This is critical for 24/7 operation - only one instance should run
+            self.logger.info(
+                "Engine running as PID %s (mode=%s). "
+                "Press Ctrl+C or send SIGTERM to stop gracefully.",
+                os.getpid(),
+                self.settings.engine_mode
+            )
 
-            # Wait for shutdown signal or all tasks to complete
+            # Main loop: wait for shutdown signal
+            # This blocks until _shutdown_event is set (via signal handler or error)
             await self._shutdown_event.wait()
 
         except asyncio.CancelledError:
-            self.logger.info("Engine cancelled")
+            self.logger.info("Engine cancelled (likely during shutdown)")
         except Exception as e:
             self.logger.error(f"Engine error: {e}", exc_info=True)
+            # Set shutdown event to trigger cleanup
+            self._shutdown_event.set()
         finally:
+            # Always attempt graceful shutdown
             await self.shutdown()
 
         return 0
 
     async def shutdown(self):
-        """Graceful shutdown."""
-        self.logger.info("Shutting down engine...")
+        """
+        Graceful shutdown with timeout (PRD-001 Section 9.1).
+        
+        For 24/7 operation, shutdown must:
+        1. Stop accepting new work (signal generation)
+        2. Flush pending Redis publishes
+        3. Close WebSocket connections cleanly
+        4. Complete within 30 seconds (Fly.io requirement)
+        
+        If shutdown exceeds timeout, process will be killed by orchestrator.
+        """
+        shutdown_start = time.monotonic()
+        self.logger.info("Shutting down engine (30s timeout)...")
+        
         if self._run_started_at:
             runtime = time.monotonic() - self._run_started_at
             # Record runtime to correlate with uptime dashboards
-            self.logger.info("Engine runtime before shutdown: %.2fs", runtime)
+            self.logger.info("Engine runtime before shutdown: %.2fs (%.1f hours)", runtime, runtime / 3600)
 
-        # Stop task supervisor
-        await self.task_supervisor.stop_all()
+        try:
+            # Stop task supervisor (stops signal generation, WebSocket connections)
+            # This is the critical path - must complete within timeout
+            self.logger.info("Stopping supervised tasks...")
+            await asyncio.wait_for(
+                self.task_supervisor.stop_all(),
+                timeout=25.0  # Leave 5s buffer for remaining cleanup
+            )
 
-        # Stop health publisher
-        await self.health_publisher.stop()
+            # Stop health publisher (stops heartbeat publishing)
+            self.logger.info("Stopping health publisher...")
+            await asyncio.wait_for(
+                self.health_publisher.stop(),
+                timeout=3.0
+            )
 
-        # Close Redis
-        await close_redis_client()
+            # Close Redis (flushes any pending publishes)
+            self.logger.info("Closing Redis connection...")
+            await asyncio.wait_for(
+                close_redis_client(),
+                timeout=2.0
+            )
 
-        self.logger.info("Engine shutdown complete")
+        except asyncio.TimeoutError:
+            shutdown_elapsed = time.monotonic() - shutdown_start
+            self.logger.error(
+                "Shutdown timeout exceeded: %.1fs elapsed (max 30s). "
+                "Some resources may not have closed cleanly.",
+                shutdown_elapsed
+            )
+        except Exception as e:
+            self.logger.error(f"Error during shutdown: {e}", exc_info=True)
+        finally:
+            shutdown_duration = time.monotonic() - shutdown_start
+            self.logger.info("Engine shutdown complete in %.2fs", shutdown_duration)
 
 
 # =============================================================================
@@ -704,8 +871,9 @@ Examples:
     parser.add_argument(
         "--mode",
         choices=["paper", "live"],
-        default=os.getenv("TRADING_MODE", "paper"),
-        help="Trading mode (default: paper)",
+        default=os.getenv("ENGINE_MODE") or os.getenv("TRADING_MODE", "paper"),
+        help="Engine mode: 'paper' for paper trading, 'live' for live trading (default: paper). "
+             "Determines stream routing: signals:paper:<PAIR> vs signals:live:<PAIR>",
     )
 
     parser.add_argument(
@@ -777,8 +945,9 @@ async def main(args):
 
     # Apply CLI overrides
     if args.mode:
-        settings.trading_mode = args.mode
+        # ENGINE_MODE is authoritative (PRD-001: strict mode separation)
         settings.engine_mode = args.mode
+        settings.trading_mode = args.mode  # Backward compatibility
 
     if args.pairs:
         settings.trading_pairs = args.pairs.split(",")

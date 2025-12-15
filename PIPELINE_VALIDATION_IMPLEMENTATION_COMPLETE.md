@@ -41,7 +41,7 @@ Successfully implemented **end-to-end pipeline validation system** that validate
 python scripts/validate_pipeline.py
 
 # With SSE endpoint validation
-API_BASE=https://crypto-signals-api.fly.dev python scripts/validate_pipeline.py
+API_BASE=https://signals-api-gateway.fly.dev python scripts/validate_pipeline.py
 
 # Custom duration (60 seconds)
 VALIDATION_DURATION_SEC=60 API_BASE=https://... python scripts/validate_pipeline.py
@@ -299,7 +299,7 @@ Status: WARNING (unmatched signals)
 
 ```bash
 # Validate end-to-end pipeline
-API_BASE=https://crypto-signals-api.fly.dev \
+API_BASE=https://signals-api-gateway.fly.dev \
 VALIDATION_DURATION_SEC=300 \
 python scripts/validate_pipeline.py
 ```
@@ -313,7 +313,7 @@ python scripts/validate_pipeline.py
 Configuration:
   Duration: 300 seconds
   SLA Threshold: 2000.0ms
-  API Base: https://crypto-signals-api.fly.dev/sse/signals
+  API Base: https://signals-api-gateway.fly.dev/sse/signals
   Monitoring: 4 pairs x 2 timeframes
 
 [Monitors Redis and SSE for 5 minutes...]
@@ -352,7 +352,7 @@ Status: PASSED
 ```bash
 # Stricter SLA (1 second)
 SLA_THRESHOLD_MS=1000 \
-API_BASE=https://crypto-signals-api.fly.dev \
+API_BASE=https://signals-api-gateway.fly.dev \
 python scripts/validate_pipeline.py
 ```
 
@@ -574,8 +574,8 @@ Status: FAILED (SLA violations detected)
 - Redis slow to publish
 
 **Actions:**
-1. Check API health: `curl https://crypto-signals-api.fly.dev/health`
-2. Test network latency: `ping crypto-signals-api.fly.dev`
+1. Check API health: `curl https://signals-api-gateway.fly.dev/health`
+2. Test network latency: `ping signals-api-gateway.fly.dev`
 3. Check API logs
 4. Review signal processing pipeline
 5. Consider increasing SLA threshold if appropriate
@@ -717,7 +717,7 @@ VALIDATION_DURATION_SEC=300 python scripts/validate_pipeline.py
 python scripts/run_live_scalper.py
 
 # Terminal 2: Validate full pipeline
-API_BASE=https://crypto-signals-api.fly.dev \
+API_BASE=https://signals-api-gateway.fly.dev \
 VALIDATION_DURATION_SEC=300 \
 python scripts/validate_pipeline.py
 ```
@@ -794,7 +794,7 @@ python scripts/validate_pipeline.py
 python scripts/validate_pipeline.py
 
 # Full pipeline (with SSE)
-API_BASE=https://crypto-signals-api.fly.dev python scripts/validate_pipeline.py
+API_BASE=https://signals-api-gateway.fly.dev python scripts/validate_pipeline.py
 
 # Custom duration (5 minutes)
 VALIDATION_DURATION_SEC=300 python scripts/validate_pipeline.py

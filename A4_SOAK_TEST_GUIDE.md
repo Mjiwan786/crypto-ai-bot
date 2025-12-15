@@ -79,10 +79,10 @@ INFO:agents.core.signal_processor:  Extra pairs: SOL/USD, ADA/USD, AVAX/USD
 **In a separate terminal**, monitor Redis:
 ```bash
 # Watch stream length grow
-watch -n 5 'redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XLEN signals:paper:staging'
+watch -n 5 'redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XLEN signals:paper:staging'
 
 # Or one-time check
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XLEN signals:paper:staging
+redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XLEN signals:paper:staging
 ```
 
 ### Step 3: Collect Log Evidence
@@ -116,17 +116,17 @@ echo "" >> logs/redis_evidence.txt
 
 # Stream length
 echo "Stream Length:" >> logs/redis_evidence.txt
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XLEN signals:paper:staging >> logs/redis_evidence.txt
+redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XLEN signals:paper:staging >> logs/redis_evidence.txt
 echo "" >> logs/redis_evidence.txt
 
 # Stream info
 echo "Stream Info:" >> logs/redis_evidence.txt
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XINFO STREAM signals:paper:staging >> logs/redis_evidence.txt
+redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XINFO STREAM signals:paper:staging >> logs/redis_evidence.txt
 echo "" >> logs/redis_evidence.txt
 
 # Last 20 messages (showing pairs)
 echo "Last 20 Messages:" >> logs/redis_evidence.txt
-redis-cli -u redis://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XRANGE signals:paper:staging - + COUNT 20 >> logs/redis_evidence.txt
+redis-cli -u redis://default:<REDIS_PASSWORD>@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 --tls --cacert config/certs/redis_ca.pem XRANGE signals:paper:staging - + COUNT 20 >> logs/redis_evidence.txt
 ```
 
 ### Step 5: Stop Publisher

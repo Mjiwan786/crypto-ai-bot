@@ -253,7 +253,7 @@ git push origin main
 | Service | URL | Key Fields |
 |---------|-----|------------|
 | crypto-ai-bot | `https://crypto-ai-bot.fly.dev/health` | `performance_metrics`, `publisher`, `status` |
-| signals-api | `https://crypto-signals-api.fly.dev/health` | `redis_ping_ms`, `stream_lag_ms` |
+| signals-api | `https://signals-api-gateway.fly.dev/health` | `redis_ping_ms`, `stream_lag_ms` |
 | signals-site | `https://aipredictedsignals.cloud` | 200 OK |
 
 ### Redis Streams
@@ -315,7 +315,7 @@ python scripts/test_protection_mode.py --test all
 curl https://crypto-ai-bot.fly.dev/health | jq .performance_metrics
 
 # 2. Check signals-api endpoints
-curl https://crypto-signals-api.fly.dev/metrics/performance/summary | jq
+curl https://signals-api-gateway.fly.dev/metrics/performance/summary | jq
 
 # 3. Open dashboard in browser
 open https://aipredictedsignals.cloud/dashboard
@@ -443,7 +443,7 @@ curl https://crypto-ai-bot.fly.dev/health | jq .performance_metrics
 open https://aipredictedsignals.cloud/dashboard
 
 # Manual Protection Mode override (if needed)
-redis-cli -u rediss://default:Salam78614**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
+redis-cli -u rediss://default:&lt;REDIS_PASSWORD&gt;**$$@redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com:19818 \
   --tls --cacert config/certs/redis_ca.pem \
   SET protection:mode:override "enabled"
 ```
