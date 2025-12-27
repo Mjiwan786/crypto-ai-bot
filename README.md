@@ -410,6 +410,20 @@ The exported JSON files are designed for consumption by:
 - ✅ Troubleshooting guides
 - ✅ SLO compliance reports
 
+## Buyer Handoff
+
+**👉 [HANDOFF.md](HANDOFF.md)** - Complete acquisition guide including:
+- What this repository owns
+- External dependencies
+- 30/60/90 day roadmap
+- Post-sale support expectations
+
+See also:
+- [docs/ENVIRONMENT_MATRIX.md](docs/ENVIRONMENT_MATRIX.md) - Environment configuration
+- [docs/SMOKE_TESTS.md](docs/SMOKE_TESTS.md) - Buyer verification steps
+- [docs/DUE_DILIGENCE_CHECKLIST.md](docs/DUE_DILIGENCE_CHECKLIST.md) - Technical audit checklist
+- [docs/SECURITY_TRANSFER.md](docs/SECURITY_TRANSFER.md) - Credential setup guide
+
 ## Handover Checklist
 
 ### Technical Handover
