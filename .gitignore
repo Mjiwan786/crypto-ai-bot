@@ -169,6 +169,7 @@ cython_debug/
 
 # Project-specific ignores
 logs/
+cache/
 reports/
 artifacts/
 data/tmp/
@@ -221,7 +222,7 @@ tmp/
 *.p12
 *.pfx
 certs/
-config/certs/redis_ca.pem
+config/certs/*
 !config/certs/__init__.py
 !config/certs/README.md
 
