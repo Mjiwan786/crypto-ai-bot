@@ -120,6 +120,32 @@ class ScalpingExecutionEngine:
         if mode != "live" or confirmation != "I-accept-the-risk":
             raise RiskViolation("Live trading guard")
 
+        # =====================================================================
+        # RISK GUARD - Single choke point for all pre-order validation
+        # =====================================================================
+        try:
+            from protections.risk_guard import get_risk_guard
+
+            risk_guard = get_risk_guard()
+            notional_usd = float(signal_data.get("notional_usd", 0))
+
+            check_result = risk_guard.check_order(position_size_usd=notional_usd)
+
+            if not check_result.allowed:
+                logger.warning(
+                    "Scalp signal blocked by RiskGuard: %s", check_result.reason
+                )
+                return None
+        except ImportError as e:
+            # RiskGuard is REQUIRED - block signal if unavailable
+            logger.error("RiskGuard import failed - signal blocked: %s", e)
+            raise ExecutionError(
+                "RiskGuard unavailable - execution blocked for safety",
+                symbol=signal_data.get("symbol", "unknown"),
+                side=signal_data.get("side", "unknown"),
+                details={"import_error": str(e)},
+            )
+
         start_time = time.time()
 
         try:

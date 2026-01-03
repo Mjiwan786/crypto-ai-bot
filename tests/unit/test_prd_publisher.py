@@ -647,6 +647,55 @@ class TestPublisherConfiguration:
         """PRD-001: 3 retry attempts with backoff"""
         assert PRDPublisher.RETRY_ATTEMPTS == 3
 
+    def test_publisher_mode_from_env_var_live(self):
+        """Publisher uses ENGINE_MODE env var when mode not explicitly passed"""
+        import os
+        original = os.environ.get("ENGINE_MODE")
+
+        try:
+            os.environ["ENGINE_MODE"] = "live"
+            publisher = PRDPublisher()  # No mode arg - should use env var
+            assert publisher.mode == "live", "Publisher should use ENGINE_MODE=live from env var"
+        finally:
+            if original:
+                os.environ["ENGINE_MODE"] = original
+            else:
+                os.environ.pop("ENGINE_MODE", None)
+
+    def test_publisher_mode_from_env_var_paper(self):
+        """Publisher uses ENGINE_MODE=paper from env var"""
+        import os
+        original = os.environ.get("ENGINE_MODE")
+
+        try:
+            os.environ["ENGINE_MODE"] = "paper"
+            publisher = PRDPublisher()  # No mode arg - should use env var
+            assert publisher.mode == "paper", "Publisher should use ENGINE_MODE=paper from env var"
+        finally:
+            if original:
+                os.environ["ENGINE_MODE"] = original
+            else:
+                os.environ.pop("ENGINE_MODE", None)
+
+    def test_publisher_explicit_mode_overrides_env(self):
+        """Explicitly passed mode overrides ENGINE_MODE env var"""
+        import os
+        original = os.environ.get("ENGINE_MODE")
+
+        try:
+            os.environ["ENGINE_MODE"] = "paper"
+            publisher = PRDPublisher(mode="live")  # Explicit mode should win
+            assert publisher.mode == "live", "Explicit mode=live should override ENGINE_MODE=paper"
+
+            os.environ["ENGINE_MODE"] = "live"
+            publisher2 = PRDPublisher(mode="paper")  # Explicit mode should win
+            assert publisher2.mode == "paper", "Explicit mode=paper should override ENGINE_MODE=live"
+        finally:
+            if original:
+                os.environ["ENGINE_MODE"] = original
+            else:
+                os.environ.pop("ENGINE_MODE", None)
+
 
 # =============================================================================
 # SCHEMA DRIFT DETECTION TESTS

@@ -15,6 +15,12 @@ J3: Circuit Breakers
 - Spread/latency circuit trips pause entries for N seconds
 - Publishes status events to Redis
 - Auto-recovery after pause duration
+
+J4: Live Mode Guardrails (Small Capital Protection)
+- Capital-aware position sizing ($100-$500)
+- Tighter drawdown limits for micro-capital
+- Pre-flight checks before live trading
+- Emergency auto-halt on excessive losses
 """
 
 from __future__ import annotations
@@ -30,6 +36,15 @@ import yaml
 from pathlib import Path
 
 import redis
+
+# Import live mode guard for J4 integration
+try:
+    from protections.live_mode_guard import LiveModeGuard, TradeCheckResult
+    HAS_LIVE_MODE_GUARD = True
+except ImportError:
+    HAS_LIVE_MODE_GUARD = False
+    LiveModeGuard = None
+    TradeCheckResult = None
 
 logger = logging.getLogger(__name__)
 
@@ -741,16 +756,21 @@ class SafetyCheckResult:
     are_circuits_clear: bool
     errors: List[str]
     warnings: List[str]
+    # J4: Live mode guardrail results
+    live_mode_allowed: bool = True
+    live_mode_size_multiplier: float = 1.0
+    live_mode_max_notional: Optional[float] = None
 
 
 class SafetyController:
     """
-    Integrated safety controller for J1-J3.
+    Integrated safety controller for J1-J4.
 
     Combines:
     - J1: MODE switch + LIVE confirmation + emergency stop
     - J2: Pair whitelist + notional caps
     - J3: Circuit breakers with pause
+    - J4: Live mode guardrails (capital-aware limits for small capital)
     """
 
     def __init__(self, redis_client: Optional[redis.Redis] = None, config_path: Optional[Path] = None):
@@ -766,15 +786,30 @@ class SafetyController:
         self.pair_enforcer = PairWhitelistEnforcer(config_path)
         self.circuit_breaker = CircuitBreaker(redis_client)
 
+        # J4: Live mode guard (capital-aware limits)
+        self.live_mode_guard: Optional[LiveModeGuard] = None
+        if HAS_LIVE_MODE_GUARD:
+            try:
+                self.live_mode_guard = LiveModeGuard.from_config()
+                self.logger.info(
+                    f"LiveModeGuard enabled: capital=${self.live_mode_guard.capital_usd:.2f}"
+                )
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize LiveModeGuard: {e}")
+
         self.logger = logging.getLogger(f"{__name__}.SafetyController")
-        self.logger.info("SafetyController initialized (J1-J3 complete)")
+        self.logger.info("SafetyController initialized (J1-J4 complete)")
 
     def check_can_enter_trade(
         self,
         pair: str,
         notional_usd: float,
         spread_bps: Optional[float] = None,
-        latency_ms: Optional[float] = None
+        latency_ms: Optional[float] = None,
+        current_positions: int = 0,
+        daily_pnl: float = 0.0,
+        volatility_pct: Optional[float] = None,
+        volume_24h_usd: Optional[float] = None,
     ) -> SafetyCheckResult:
         """
         Comprehensive safety check before entering trade.
@@ -784,6 +819,10 @@ class SafetyController:
             notional_usd: Order notional in USD
             spread_bps: Current spread in bps (optional)
             latency_ms: Current latency in ms (optional)
+            current_positions: Number of current open positions (for J4)
+            daily_pnl: Today's P&L in USD (for J4)
+            volatility_pct: Current volatility percentage (for J4)
+            volume_24h_usd: 24-hour volume in USD (for J4)
 
         Returns:
             SafetyCheckResult with all check results
@@ -826,6 +865,32 @@ class SafetyController:
                 errors.append(latency_error)
                 circuits_clear = False
 
+        # J4: Live mode guardrails (capital-aware limits)
+        live_mode_allowed = True
+        live_mode_size_multiplier = 1.0
+        live_mode_max_notional = None
+
+        if self.live_mode_guard and self.live_mode_guard.should_enforce():
+            live_check = self.live_mode_guard.check_trade_allowed(
+                notional_usd=notional_usd,
+                current_positions=current_positions,
+                daily_pnl=daily_pnl,
+                spread_bps=spread_bps,
+                volatility_pct=volatility_pct,
+                latency_ms=latency_ms,
+                volume_24h_usd=volume_24h_usd,
+            )
+
+            live_mode_allowed = live_check.allowed
+            live_mode_size_multiplier = live_check.size_multiplier
+            live_mode_max_notional = live_check.max_allowed_notional
+
+            if not live_check.allowed:
+                errors.append(f"Live mode guard: {live_check.reason}")
+
+            if live_check.warnings:
+                warnings.extend(live_check.warnings)
+
         # Warnings
         if mode_config.is_live:
             warnings.append("LIVE trading mode - real money at risk")
@@ -840,7 +905,10 @@ class SafetyController:
             is_notional_valid=notional_valid,
             are_circuits_clear=circuits_clear,
             errors=errors,
-            warnings=warnings
+            warnings=warnings,
+            live_mode_allowed=live_mode_allowed,
+            live_mode_size_multiplier=live_mode_size_multiplier,
+            live_mode_max_notional=live_mode_max_notional,
         )
 
     def check_can_exit_trade(self, pair: str) -> SafetyCheckResult:
@@ -863,5 +931,41 @@ class SafetyController:
             is_notional_valid=True,
             are_circuits_clear=True,
             errors=[],
-            warnings=["Exit operations are always allowed"]
+            warnings=["Exit operations are always allowed"],
+            live_mode_allowed=True,
+            live_mode_size_multiplier=1.0,
+            live_mode_max_notional=None,
         )
+
+    def get_live_mode_status(self) -> Optional[Dict[str, Any]]:
+        """
+        Get current live mode guard status.
+
+        Returns:
+            Status dict if live mode guard is enabled, None otherwise
+        """
+        if self.live_mode_guard:
+            status = self.live_mode_guard.get_status()
+            return {
+                "is_live_mode": status.is_live_mode,
+                "guardrails_enabled": status.guardrails_enabled,
+                "capital_usd": status.capital_usd,
+                "max_position_usd": status.max_position_usd,
+                "daily_loss_limit_usd": status.daily_loss_limit_usd,
+                "current_daily_pnl": status.current_daily_pnl,
+                "positions_count": status.positions_count,
+                "is_halted": status.is_halted,
+                "halt_reason": status.halt_reason,
+            }
+        return None
+
+    def get_live_mode_limits(self) -> Optional[Dict[str, float]]:
+        """
+        Get calculated limits for live mode.
+
+        Returns:
+            Limits dict if live mode guard is enabled, None otherwise
+        """
+        if self.live_mode_guard:
+            return self.live_mode_guard.get_limits()
+        return None

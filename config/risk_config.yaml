@@ -178,3 +178,114 @@ monitoring:
   # Health checks
   health_check_interval_seconds: 30
   alert_on_unhealthy: true
+
+# =============================================================================
+# LIVE MODE RISK CONTROLS (Small Capital Protection)
+# =============================================================================
+# These settings apply ONLY when ENGINE_MODE=live
+# Designed for micro-capital trading ($100-$500)
+# All limits are config-driven and reversible
+
+live_mode:
+  # Enable live mode guardrails (set to false to disable all live mode restrictions)
+  enabled: true
+
+  # Capital configuration
+  capital:
+    # Starting capital for live trading (used for limit calculations)
+    # Override with TRADING_CAPITAL_USD environment variable
+    starting_capital_usd: 100.0
+
+    # Maximum capital allowed for live mode (safety cap)
+    max_capital_usd: 500.0
+
+    # Minimum capital required (below this, engine refuses to start live)
+    min_capital_usd: 50.0
+
+  # Position sizing (scaled for micro-capital)
+  position:
+    # Maximum position as percentage of capital
+    max_position_pct: 25.0  # $25 max on $100 capital
+
+    # Minimum position size (must meet exchange minimums)
+    min_position_usd: 5.0
+
+    # Maximum number of concurrent positions
+    max_concurrent_positions: 2
+
+    # Risk per trade as percentage of capital
+    risk_per_trade_pct: 2.0  # $2 max risk on $100 capital
+
+  # Drawdown protection (tighter for small capital)
+  drawdown:
+    # Daily drawdown halt (percentage of capital)
+    daily_halt_pct: 5.0  # $5 on $100 = halt for the day
+
+    # Rolling 4-hour drawdown limit
+    rolling_4h_halt_pct: 3.0  # $3 on $100
+
+    # Maximum consecutive losses before halt
+    max_consecutive_losses: 2  # Tighter than paper mode (3)
+
+    # Cooldown after hitting limits (seconds)
+    soft_cooldown_s: 1800   # 30 minutes
+    hard_cooldown_s: 7200   # 2 hours (until manual reset)
+
+  # Circuit breakers (micro-capital specific)
+  circuit_breakers:
+    # Spread threshold (tighter for small capital - fees matter more)
+    max_spread_bps: 5.0  # 5 bps vs 10 bps for paper
+
+    # Volatility threshold (avoid high-vol periods)
+    max_volatility_pct: 5.0  # 5% vs 10% for paper
+
+    # Minimum liquidity (ensure we can exit)
+    min_24h_volume_usd: 5000000  # Higher requirement
+
+    # Maximum latency before rejection
+    max_latency_ms: 300  # 300ms vs 500ms for paper
+
+  # Pre-flight checks (must pass before any live trade)
+  preflight:
+    # Require Redis connection health check
+    require_redis_health: true
+
+    # Require exchange API health check
+    require_exchange_health: true
+
+    # Require positive P&L in last N paper trades before going live
+    require_paper_profit: false  # Set true for extra safety
+    paper_profit_lookback_trades: 10
+
+    # Require explicit confirmation file exists
+    require_confirmation_file: false
+    confirmation_file_path: "config/.live_confirmed"
+
+  # Emergency controls
+  emergency:
+    # Auto-halt on any error in live mode
+    halt_on_any_error: true
+
+    # Maximum USD loss before auto-halt (hard stop)
+    max_loss_usd: 20.0  # 20% of $100 capital
+
+    # Auto-flatten all positions on halt
+    flatten_on_halt: true
+
+    # Notification webhook (optional)
+    notify_on_halt: true
+    webhook_url: ""  # Set via LIVE_HALT_WEBHOOK_URL env var
+
+  # Audit logging (enhanced for live mode)
+  audit:
+    # Log every order attempt (not just fills)
+    log_order_attempts: true
+
+    # Log all risk check results
+    log_risk_checks: true
+
+    # Log capital snapshots every N seconds
+    capital_snapshot_interval_s: 60
+
+    # Retain logs for N days
+    log_retention_days: 90

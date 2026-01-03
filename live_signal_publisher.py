@@ -519,6 +519,10 @@ class LiveSignalPublisher:
         # Determine regime based on randomized analysis (placeholder for ML)
         regime = random.choice(["TRENDING_UP", "TRENDING_DOWN", "RANGING", "VOLATILE"])
 
+        # Position size: use 80% of max to stay within limits
+        max_position = float(os.getenv("MAX_POSITION_SIZE_USD", "25"))
+        position_size = max_position * 0.8  # $20 default (80% of $25 limit)
+
         # Create PRD-001 compliant signal
         signal = create_prd_signal(
             pair=pair,
@@ -529,7 +533,7 @@ class LiveSignalPublisher:
             take_profit=tp,
             stop_loss=sl,
             confidence=confidence,
-            position_size_usd=100.0,
+            position_size_usd=position_size,
             indicators={
                 "rsi_14": random.uniform(30, 70),
                 "macd_signal": "BULLISH" if prd_side == "LONG" else "BEARISH",
@@ -822,8 +826,8 @@ def parse_args():
     parser.add_argument(
         "--mode",
         choices=["paper", "live"],
-        default="paper",
-        help="Trading mode (default: paper)",
+        default=None,
+        help="Trading mode (default: from ENGINE_MODE env var, or 'paper')",
     )
 
     parser.add_argument(
@@ -868,8 +872,12 @@ async def main():
     (project_root / "logs").mkdir(exist_ok=True)
 
     # Build configuration
+    # FIX: Use env var fallback when --mode not explicitly passed
+    resolved_mode = args.mode if args.mode is not None else os.getenv("ENGINE_MODE", "paper")
+    logger.info(f"Resolved trading mode: {resolved_mode}")
+
     config = PublisherConfig(
-        mode=args.mode,
+        mode=resolved_mode,
         max_signals_per_second=args.rate,
         health_port=args.health_port,
     )

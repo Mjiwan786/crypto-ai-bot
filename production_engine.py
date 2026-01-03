@@ -795,8 +795,12 @@ async def main(args) -> None:
     # Load environment
     load_dotenv()
 
+    # FIX: Use env var fallback when --mode not explicitly passed
+    resolved_mode = args.mode if args.mode is not None else os.getenv("ENGINE_MODE", "paper")
+    logger.info(f"Resolved trading mode: {resolved_mode}")
+
     # Create config
-    config = EngineConfig(mode=args.mode)
+    config = EngineConfig(mode=resolved_mode)
 
     try:
         # Validate config
@@ -843,9 +847,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         type=str,
-        default="paper",
+        default=None,
         choices=["paper", "live"],
-        help="Trading mode (paper or live)",
+        help="Trading mode (default: from ENGINE_MODE env var, or 'paper')",
     )
 
     args = parser.parse_args()

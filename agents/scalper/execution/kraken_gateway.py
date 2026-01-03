@@ -236,18 +236,147 @@ class KrakenGateway:
         Place an order on Kraken.
 
         Returns OrderResponse with execution details.
+
+        Uses ExecutionGate as the SINGLE CHOKE POINT for all order validation.
+        Gate checks (in order):
+        1. EMERGENCY_STOP=true -> reject all orders
+        2. LIVE_TRADING_ENABLED=false -> log DRY-RUN, don't execute
+        3. Dependency health -> must be healthy
+        4. Risk limits -> position size, daily loss, trades/day
+        5. MODE=live + confirmation -> final authorization
+        6. SHADOW_EXECUTION=true -> simulate without API call
         """
-        # Live trading guard
         import os
+        import uuid
 
         from agents.core.errors import RiskViolation
 
-        mode = os.getenv("MODE", "").strip()
-        confirmation = os.getenv("LIVE_TRADING_CONFIRMATION", "").strip()
+        notional_usd = float(order_request.size) * float(order_request.price or 0)
 
-        if mode != "live" or confirmation != "I-accept-the-risk":
-            raise RiskViolation("Live trading guard")
+        # =====================================================================
+        # EXECUTION GATE - Single choke point for all order validation
+        # =====================================================================
+        try:
+            from protections.execution_gate import get_execution_gate
 
+            gate = get_execution_gate()
+            gate_result = gate.check(position_size_usd=notional_usd)
+
+            # DRY-RUN MODE: Log "would place order" and return
+            if gate_result.dry_run:
+                gate.log_dry_run_order({
+                    "symbol": order_request.symbol,
+                    "side": order_request.side,
+                    "size": order_request.size,
+                    "price": order_request.price,
+                    "order_type": order_request.order_type,
+                    "client_order_id": order_request.client_order_id,
+                })
+                return OrderResponse(
+                    order_id="",
+                    client_order_id=order_request.client_order_id,
+                    symbol=order_request.symbol,
+                    side=order_request.side,
+                    order_type=order_request.order_type,
+                    size=order_request.size,
+                    price=order_request.price,
+                    status="dry_run",
+                    error_message="DRY-RUN: order logged but not executed",
+                )
+
+            # BLOCKED: Gate rejected the order
+            if not gate_result.allowed:
+                self.logger.warning(
+                    "Order blocked by ExecutionGate: %s (gate=%s)",
+                    gate_result.reason,
+                    gate_result.gate_name,
+                )
+                return OrderResponse(
+                    order_id="",
+                    client_order_id=order_request.client_order_id,
+                    symbol=order_request.symbol,
+                    side=order_request.side,
+                    order_type=order_request.order_type,
+                    size=order_request.size,
+                    price=order_request.price,
+                    status="rejected",
+                    error_message=f"ExecutionGate: {gate_result.reason}",
+                )
+
+            # SHADOW MODE: Simulate order without API call
+            # Records complete audit trail but NEVER calls Kraken private endpoints
+            if gate_result.shadow_mode:
+                shadow_order_id = f"SHADOW-{uuid.uuid4().hex[:12].upper()}"
+
+                # Record complete audit trail
+                try:
+                    from protections.shadow_recorder import get_shadow_recorder
+
+                    recorder = get_shadow_recorder()
+                    audit_event = recorder.record_shadow_order(
+                        shadow_order_id=shadow_order_id,
+                        symbol=order_request.symbol,
+                        side=order_request.side,
+                        size=float(order_request.size),
+                        price=float(order_request.price) if order_request.price else None,
+                        order_type=order_request.order_type,
+                        client_order_id=order_request.client_order_id,
+                        reason="scalp_signal",  # Signal that triggered this order
+                        risk_check_passed=True,  # Passed all risk checks to get here
+                        risk_check_details={
+                            "notional_usd": notional_usd,
+                            "max_position_size_usd": gate.max_position_size_usd,
+                            "within_limits": True,
+                        },
+                        gate_allowed=True,
+                        gate_name=None,
+                        gate_reason=gate_result.reason,
+                    )
+                    self.logger.info("Shadow audit recorded: %s", audit_event.shadow_order_id)
+                except ImportError:
+                    # Fallback logging if recorder not available
+                    self.logger.info(
+                        "SHADOW ORDER: %s %s %s @ %s (notional=$%.2f) -> %s",
+                        order_request.side,
+                        order_request.size,
+                        order_request.symbol,
+                        order_request.price,
+                        notional_usd,
+                        shadow_order_id,
+                    )
+
+                return OrderResponse(
+                    order_id=shadow_order_id,
+                    client_order_id=order_request.client_order_id,
+                    symbol=order_request.symbol,
+                    side=order_request.side,
+                    order_type=order_request.order_type,
+                    size=order_request.size,
+                    price=order_request.price,
+                    status="shadow",
+                    filled_size=order_request.size,
+                    avg_fill_price=order_request.price,
+                    error_message=None,
+                )
+
+        except ImportError as e:
+            # ExecutionGate is REQUIRED - block order if unavailable
+            self.logger.error("ExecutionGate import failed - order blocked: %s", e)
+            return OrderResponse(
+                order_id="",
+                client_order_id=order_request.client_order_id,
+                symbol=order_request.symbol,
+                side=order_request.side,
+                order_type=order_request.order_type,
+                size=order_request.size,
+                price=order_request.price,
+                status="rejected",
+                error_message="ExecutionGate unavailable - execution blocked for safety",
+            )
+
+        # =====================================================================
+        # LIVE EXECUTION - All gates passed, proceed with real order
+        # =====================================================================
         start_time = time.time()
 
         try:

@@ -368,7 +368,7 @@ class PRDPublisher:
         self,
         redis_url: Optional[str] = None,
         redis_ca_cert: Optional[str] = None,
-        mode: Literal["paper", "live"] = "paper",
+        mode: Optional[Literal["paper", "live"]] = None,
     ):
         """
         Initialize PRD-compliant publisher.
@@ -383,7 +383,9 @@ class PRDPublisher:
             "REDIS_CA_CERT",
             os.getenv("REDIS_CA_CERT_PATH", "config/certs/redis_ca.pem")
         )
-        self.mode = mode if mode else os.getenv("ENGINE_MODE", "paper")
+        # FIX: Use 'is not None' to allow env var fallback when mode not explicitly passed
+        self.mode = mode if mode is not None else os.getenv("ENGINE_MODE", "paper")
+        logger.info(f"PRDPublisher initialized with mode={self.mode}")
 
         self.redis_client: Optional[redis.Redis] = None
         self._connected = False
