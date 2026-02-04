@@ -41,6 +41,7 @@ from paper.state import AccountStateManager, PositionSnapshot
 from paper.publisher import DecisionPublisher
 from paper.kill_switch import KillSwitchManager, KillSwitchType
 from paper.risk_limits_provider import RiskLimitsProvider
+from paper.heartbeat import HeartbeatPublisher, EffectiveRiskLimitsSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -156,9 +157,19 @@ class PaperEngine:
         # Kill switch
         self.kill_switch_manager = KillSwitchManager(redis_client)
 
+        # Phase 2 Step 2.3: Heartbeat publisher for effective state visibility
+        self.heartbeat_publisher = HeartbeatPublisher(
+            redis_client=redis_client,
+            account_id=config.account_id,
+            bot_id=config.bot_id,
+        )
+
         # Runtime state
         self._running = False
         self._stopped_reason: str | None = None
+        self._last_effective_limits: EffectiveRiskLimitsSnapshot | None = None
+        self._last_limits_source: str = "default"
+        self._last_limits_refresh: datetime | None = None
 
     @property
     def is_running(self) -> bool:
@@ -169,6 +180,35 @@ class PaperEngine:
     def stopped_reason(self) -> str | None:
         """Get reason for stop if stopped."""
         return self._stopped_reason
+
+    async def _publish_heartbeat(
+        self,
+        trading_enabled: bool = True,
+        block_reason: str | None = None,
+        last_error: str | None = None,
+        kill_switch_global: bool = False,
+        kill_switch_account: bool = False,
+        kill_switch_bot: bool = False,
+        force: bool = False,
+    ) -> None:
+        """
+        Publish engine heartbeat with current effective state.
+
+        Phase 2 Step 2.3: This enables API/UI to show what the engine
+        is actually enforcing, not just what was saved.
+        """
+        await self.heartbeat_publisher.publish(
+            trading_enabled=trading_enabled,
+            block_reason=block_reason,
+            effective_limits=self._last_effective_limits,
+            limits_source=self._last_limits_source,
+            limits_refresh_ts=self._last_limits_refresh,
+            last_error=last_error,
+            kill_switch_global=kill_switch_global,
+            kill_switch_account=kill_switch_account,
+            kill_switch_bot=kill_switch_bot,
+            force=force,
+        )
 
     async def start(self) -> bool:
         """
@@ -230,6 +270,9 @@ class PaperEngine:
             reason=reason,
         )
 
+        # Phase 2 Step 2.3: Publish final heartbeat showing stopped state
+        await self.heartbeat_publisher.publish_stopped(reason)
+
         logger.info(
             f"Paper engine stopped | bot={self.config.bot_id} reason={reason}",
             extra={
@@ -271,6 +314,15 @@ class PaperEngine:
         if is_blocked:
             result.blocked = True
             result.block_reason = block_reason
+
+            # Publish heartbeat showing blocked state
+            await self._publish_heartbeat(
+                trading_enabled=False,
+                block_reason=block_reason,
+                kill_switch_global=block_reason == "GLOBAL_KILL",
+                kill_switch_account=block_reason == "ACCOUNT_KILL",
+                kill_switch_bot=block_reason == "BOT_KILL",
+            )
 
             # Stop engine if not already stopped
             if self._running:
@@ -377,7 +429,24 @@ class PaperEngine:
                 trade=None,
             )
 
+            # Publish heartbeat showing error state (Phase 2 Step 2.3)
+            await self._publish_heartbeat(
+                trading_enabled=False,
+                block_reason="REDIS_ERROR",
+                last_error=effective_limits.meta.error_message,
+                force=True,
+            )
+
             return result
+
+        # Phase 2 Step 2.3: Track effective limits for heartbeat
+        self._last_effective_limits = EffectiveRiskLimitsSnapshot(
+            max_trades_per_day=effective_limits.limits.max_trades_per_day,
+            max_position_size_usd=effective_limits.limits.max_position_size_usd,
+            max_daily_loss_pct=effective_limits.limits.max_daily_loss_pct,
+        )
+        self._last_limits_source = "redis" if effective_limits.meta.source_keys else "default"
+        self._last_limits_refresh = effective_limits.meta.fetched_at
 
         # Log when limits were refreshed from Redis (not cache hit)
         if not effective_limits.meta.cache_hit:
@@ -462,6 +531,10 @@ class PaperEngine:
                     "qty": str(trade.total_filled_quantity),
                 },
             )
+
+        # Phase 2 Step 2.3: Publish heartbeat with current effective state
+        # Throttled to every 5 seconds to avoid Redis spam
+        await self._publish_heartbeat(trading_enabled=True)
 
         return result
 
