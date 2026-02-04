@@ -20,6 +20,7 @@ websockets>=13.0
 # --- Async stack ---
 aiohttp==3.12.15
 aiodns==3.5.0
+pycares==4.9.0  # Pin to prevent API incompatibility (aiodns 3.5.0 requires >=4.9.0)
 aiohappyeyeballs==2.6.1
 aiosignal==1.4.0
 async-timeout==4.0.3
