@@ -9,7 +9,11 @@ This engine:
 - Enforces risk before execution (non-bypassable)
 - Publishes ALL decisions (approved + rejected) with explainability
 - Respects kill switches immediately
+- Dynamically refreshes risk limits from Redis (TTL-cached)
 - Maintains determinism for backtest parity
+
+Phase 2 Step 2.2: Dynamic risk limits enforcement.
+Risk limits are now fetched from Redis with caching, not static from config.
 """
 
 from dataclasses import dataclass, field
@@ -25,6 +29,9 @@ from shared_contracts import (
     Trade,
     MarketSnapshot,
     AccountState,
+    RejectionReason,
+    RiskSnapshot,
+    DecisionStatus,
 )
 
 from strategies.indicator import evaluate_strategy
@@ -33,6 +40,7 @@ from backtest.simulator import ExecutionSimulator
 from paper.state import AccountStateManager, PositionSnapshot
 from paper.publisher import DecisionPublisher
 from paper.kill_switch import KillSwitchManager, KillSwitchType
+from paper.risk_limits_provider import RiskLimitsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -110,14 +118,22 @@ class PaperEngine:
         self.redis = redis_client
         self.config = config
 
-        # Initialize components (reusing Step 2 implementations)
-        self.risk_evaluator = RiskEvaluator(
-            limits=RiskLimits(
-                max_position_size_usd=config.max_position_size_usd,
-                max_trades_per_day=config.max_trades_per_day,
-                max_daily_loss_pct=config.max_daily_loss_pct,
-            )
+        # Default risk limits from config (used as floor in dynamic merge)
+        self._default_limits = RiskLimits(
+            max_position_size_usd=config.max_position_size_usd,
+            max_trades_per_day=config.max_trades_per_day,
+            max_daily_loss_pct=config.max_daily_loss_pct,
         )
+
+        # Phase 2 Step 2.2: Dynamic risk limits provider
+        # Fetches limits from Redis with caching, merges with defaults
+        self.risk_limits_provider = RiskLimitsProvider(
+            redis_client=redis_client,
+            defaults=self._default_limits,
+            cache_ttl_seconds=15.0,  # Refresh every 15 seconds
+        )
+
+        # Simulator for executing approved trades
         self.simulator = ExecutionSimulator(
             fees_bps=config.fees_bps,
             slippage_bps=config.slippage_bps,
@@ -299,8 +315,89 @@ class PaperEngine:
         # Step 3: Load account state for risk evaluation
         account_state = await self.state_manager.load()
 
-        # Step 4: Evaluate risk (NON-BYPASSABLE)
-        decision = self.risk_evaluator.evaluate(intent, account_state)
+        # Step 3.5: Get dynamic risk limits (Phase 2 Step 2.2)
+        # Limits are cached with TTL, refreshed from Redis when stale
+        effective_limits = await self.risk_limits_provider.get_effective_limits(
+            account_id=self.config.account_id,
+            bot_id=self.config.bot_id,
+        )
+
+        # Check if risk limits fetch failed (fail-safe: block trading)
+        if not effective_limits.can_trade:
+            # Create rejection with RISK_LIMITS_UNAVAILABLE
+            risk_snapshot = RiskSnapshot(
+                account_equity_usd=float(account_state.total_equity_usd),
+                daily_pnl_usd=float(account_state.daily_pnl_usd),
+                daily_trades_count=account_state.trades_today,
+                open_positions_count=account_state.open_positions_count,
+                open_positions_exposure_usd=float(account_state.open_positions_exposure_usd),
+                max_position_size_usd=self._default_limits.max_position_size_usd,
+                max_daily_loss_usd=float(account_state.total_equity_usd) * (self._default_limits.max_daily_loss_pct / 100),
+                max_trades_per_day=self._default_limits.max_trades_per_day,
+                drawdown_pct=account_state.drawdown_pct,
+                trading_enabled=False,  # Trading blocked due to controls error
+            )
+
+            decision = ExecutionDecision.reject(
+                intent_id=intent.intent_id,
+                reasons=[
+                    RejectionReason(
+                        code="RISK_LIMITS_UNAVAILABLE",
+                        message=f"Cannot fetch risk limits: {effective_limits.meta.error_class}",
+                        details={
+                            "error_class": effective_limits.meta.error_class,
+                            "error_message": effective_limits.meta.error_message,
+                            "enforcement_state": effective_limits.meta.enforcement_state,
+                            "action": "trading_blocked",
+                        },
+                    )
+                ],
+                risk_snapshot=risk_snapshot,
+                rules_evaluated=["risk_limits_fetch"],
+                mode="paper",
+            )
+            result.decision = decision
+
+            logger.warning(
+                f"Trade REJECTED: RISK_LIMITS_UNAVAILABLE - {effective_limits.meta.error_class}",
+                extra={
+                    "bot_id": self.config.bot_id,
+                    "account_id": self.config.account_id,
+                    "decision_id": decision.decision_id,
+                    "error_class": effective_limits.meta.error_class,
+                    "error_message": effective_limits.meta.error_message,
+                },
+            )
+
+            # Still publish the rejected decision for visibility
+            await self.publisher.publish_decision(
+                strategy=self.config.strategy,
+                intent=intent,
+                decision=decision,
+                trade=None,
+            )
+
+            return result
+
+        # Log when limits were refreshed from Redis (not cache hit)
+        if not effective_limits.meta.cache_hit:
+            logger.debug(
+                f"Risk limits refreshed from Redis | sources={effective_limits.meta.source_keys}",
+                extra={
+                    "bot_id": self.config.bot_id,
+                    "account_id": self.config.account_id,
+                    "limits": {
+                        "max_position_size_usd": effective_limits.limits.max_position_size_usd,
+                        "max_trades_per_day": effective_limits.limits.max_trades_per_day,
+                        "max_daily_loss_pct": effective_limits.limits.max_daily_loss_pct,
+                    },
+                },
+            )
+
+        # Step 4: Evaluate risk with dynamic limits (NON-BYPASSABLE)
+        # Create evaluator with current effective limits
+        risk_evaluator = RiskEvaluator(limits=effective_limits.limits)
+        decision = risk_evaluator.evaluate(intent, account_state)
         result.decision = decision
 
         # Step 5: ALWAYS publish decision (approved OR rejected)
