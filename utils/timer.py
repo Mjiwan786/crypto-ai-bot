@@ -1,12 +1,15 @@
-# Timing utility.
 
+"""Timer context manager."""
 import time
-from contextlib import contextmanager
 
+class Timer:
+    def __enter__(self):
+        self.start = time.perf_counter()
+        return self
 
-@contextmanager
-def timer(name: str):
-    start = time.time()
-    yield
-    end = time.time()
-    print(f"[{name}] elapsed {end - start:.2f}s")
+    def __exit__(self, *exc):
+        self.end = time.perf_counter()
+
+    @property
+    def elapsed(self) -> float:
+        return self.end - self.start
