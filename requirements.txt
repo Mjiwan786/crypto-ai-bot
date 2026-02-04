@@ -116,7 +116,7 @@ psutil
 pyasn1
 pyasn1_modules
 pybase64
-pycares
+pycares==4.9.0  # Pin for aiodns 3.5.0 compatibility
 pycoingecko
 pycparser
 pydantic
