@@ -1,0 +1,3027 @@
+"""
+Production-Ready Kraken WebSocket Client
+Redis Cloud Optimized with all syntax errors fixed
+Designed for deployment with crypto-ai-bot architecture
+"""
+
+import asyncio
+import json
+import logging
+import time
+import os
+import random
+import uuid
+from typing import Dict, List, Optional, Callable, Any
+from enum import Enum
+from collections import deque
+import websockets
+import redis.asyncio as redis
+from redis import exceptions as redis_exceptions
+import orjson
+from datetime import datetime, timezone
+from contextlib import asynccontextmanager
+from pydantic import BaseModel, field_validator, Field, ValidationError
+
+# Prometheus metrics (optional) - PRD-001 Section 4.1, 4.2, 1.3, 1.4, 1.5 & 2.1
+try:
+    from prometheus_client import Counter, Histogram, Gauge
+    KRAKEN_WS_CONNECTIONS_TOTAL = Counter(
+        'kraken_ws_connections_total',
+        'Total WebSocket connection state changes',
+        ['state']
+    )
+    KRAKEN_WS_RECONNECTS_TOTAL = Counter(
+        'kraken_ws_reconnects_total',
+        'Total WebSocket reconnection attempts'
+    )
+    KRAKEN_WS_MESSAGE_GAPS_TOTAL = Counter(
+        'kraken_ws_message_gaps_total',
+        'Total message sequence gaps detected',
+        ['channel']
+    )
+    KRAKEN_WS_STALE_MESSAGES_TOTAL = Counter(
+        'kraken_ws_stale_messages_total',
+        'Total stale or future-dated messages rejected',
+        ['channel', 'reason']
+    )
+    KRAKEN_WS_DUPLICATES_REJECTED_TOTAL = Counter(
+        'kraken_ws_duplicates_rejected_total',
+        'Total duplicate messages rejected',
+        ['channel']
+    )
+    KRAKEN_WS_ERRORS_TOTAL = Counter(
+        'kraken_ws_errors_total',
+        'Total WebSocket errors by type',
+        ['error_type']
+    )
+    KRAKEN_WS_LATENCY_MS = Histogram(
+        'kraken_ws_latency_ms',
+        'Message processing latency in milliseconds',
+        ['channel'],
+        buckets=[1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]  # PRD-001 Section 1.5: target < 50ms
+    )
+    KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL = Counter(
+        'kraken_ws_backpressure_events_total',
+        'Total backpressure events (queue depth > 1000)',
+        ['action']
+    )
+    REDIS_CONNECTED = Gauge(
+        'redis_connected',
+        'Redis connection status (1=connected, 0=disconnected)',
+        ['instance']
+    )
+    REDIS_STREAM_LENGTH = Gauge(
+        'redis_stream_length',
+        'Current length of Redis streams',
+        ['stream']
+    )
+    # PRD-001 Section 2.3 Publishing Guarantees
+    REDIS_PUBLISH_ERRORS_TOTAL = Counter(
+        'redis_publish_errors_total',
+        'Total Redis publish errors by stream and error type',
+        ['stream', 'error_type']
+    )
+    SIGNAL_SCHEMA_ERRORS_TOTAL = Counter(
+        'signal_schema_errors_total',
+        'Total signal schema validation failures',
+        ['reason']
+    )
+    SIGNAL_DUPLICATES_REJECTED_TOTAL = Counter(
+        'signal_duplicates_rejected_total',
+        'Total duplicate signal IDs rejected',
+        ['stream']
+    )
+    # PRD-001 Section 2.4 Performance
+    REDIS_PUBLISH_LATENCY_MS = Histogram(
+        'redis_publish_latency_ms',
+        'Redis publish operation latency in milliseconds',
+        ['stream'],
+        buckets=[1, 2, 5, 10, 20, 50, 100, 250, 500, 1000]  # Target < 20ms
+    )
+    REDIS_PUBLISH_QUEUE_DEPTH = Gauge(
+        'redis_publish_queue_depth',
+        'Current depth of publish queue',
+        ['stream']
+    )
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    KRAKEN_WS_CONNECTIONS_TOTAL = None
+    KRAKEN_WS_RECONNECTS_TOTAL = None
+    KRAKEN_WS_MESSAGE_GAPS_TOTAL = None
+    KRAKEN_WS_STALE_MESSAGES_TOTAL = None
+    KRAKEN_WS_DUPLICATES_REJECTED_TOTAL = None
+    KRAKEN_WS_ERRORS_TOTAL = None
+    KRAKEN_WS_LATENCY_MS = None
+    KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL = None
+    REDIS_CONNECTED = None
+    REDIS_STREAM_LENGTH = None
+    REDIS_PUBLISH_ERRORS_TOTAL = None
+    SIGNAL_SCHEMA_ERRORS_TOTAL = None
+    SIGNAL_DUPLICATES_REJECTED_TOTAL = None
+    REDIS_PUBLISH_LATENCY_MS = None
+    REDIS_PUBLISH_QUEUE_DEPTH = None
+
+# Discord alerts (optional) - PRD-001 Section 4.2
+try:
+    from monitoring.discord_alerts import send_alert
+    DISCORD_ALERTS_AVAILABLE = True
+except ImportError:
+    DISCORD_ALERTS_AVAILABLE = False
+    send_alert = None
+
+# Import PRD signal schema for validation (PRD-001 Section 2.3)
+try:
+    from models.prd_signal_schema import PRDSignalSchema
+    PRD_SCHEMA_AVAILABLE = True
+except ImportError:
+    PRD_SCHEMA_AVAILABLE = False
+    PRDSignalSchema = None
+
+
+class ConnectionState(str, Enum):
+    """WebSocket connection states per PRD-001 Section 4.1"""
+    CONNECTING = "connecting"
+    CONNECTED = "connected"
+    DISCONNECTED = "disconnected"
+    RECONNECTING = "reconnecting"
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+# Setup module-level logger (must be defined before helper functions use it)
+logger = logging.getLogger(__name__)
+
+# Kraken pair normalization (XBT -> BTC) - PRD-001 compliance
+PAIR_NORMALIZE_MAP = {
+    "XBT/USD": "BTC/USD",
+    "XBT/EUR": "BTC/EUR",
+    "XBT/GBP": "BTC/GBP",
+    "XBT/CAD": "BTC/CAD",
+    "XBT/JPY": "BTC/JPY",
+    "XBT/AUD": "BTC/AUD",
+    "XBT/CHF": "BTC/CHF",
+}
+
+
+def normalize_kraken_pair(pair: str) -> str:
+    """Normalize Kraken pair names (XBT -> BTC) for PRD-001 compliance."""
+    return PAIR_NORMALIZE_MAP.get(pair, pair)
+
+
+# Import config loader for PRD-001 compliance
+try:
+    from utils.kraken_config_loader import get_kraken_config_loader
+    CONFIG_LOADER_AVAILABLE = True
+except ImportError:
+    CONFIG_LOADER_AVAILABLE = False
+    logger.warning("kraken_config_loader not available, using environment variables")
+
+# Import canonical trading pairs (single source of truth)
+try:
+    from config.trading_pairs import (
+        get_enabled_pairs,
+        get_pair_symbols,
+        is_enabled_pair,
+        DEFAULT_TRADING_PAIRS_CSV,
+        ENABLED_PAIR_SYMBOLS,
+    )
+    CANONICAL_PAIRS_AVAILABLE = True
+except ImportError:
+    CANONICAL_PAIRS_AVAILABLE = False
+    logger.warning("canonical trading_pairs not available, using defaults")
+
+
+# Helper functions for loading config (must be defined before KrakenWSConfig uses them)
+def _load_pairs_from_config() -> List[str]:
+    """
+    Load trading pairs from kraken_ohlcv.yaml (PRD-001 compliance).
+
+    Falls back to canonical config/trading_pairs.py or environment variable.
+    Only returns ENABLED pairs (filters out disabled pairs like MATIC/USD).
+    """
+    if CONFIG_LOADER_AVAILABLE:
+        try:
+            config_loader = get_kraken_config_loader()
+            pairs = config_loader.get_all_pairs()
+            if pairs:
+                # Filter to only enabled pairs using canonical config
+                if CANONICAL_PAIRS_AVAILABLE:
+                    pairs = [p for p in pairs if is_enabled_pair(p)]
+                logger.info(f"Loaded {len(pairs)} enabled pairs from kraken_ohlcv.yaml")
+                return pairs
+        except Exception as e:
+            logger.warning(f"Failed to load pairs from config: {e}, using fallback")
+
+    # Fallback to canonical config or environment variable
+    if CANONICAL_PAIRS_AVAILABLE:
+        default_pairs = DEFAULT_TRADING_PAIRS_CSV
+    else:
+        default_pairs = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"  # Only Kraken-supported pairs
+
+    env_pairs = os.getenv("TRADING_PAIRS", default_pairs)
+    pairs = [p.strip() for p in env_pairs.split(",") if p.strip()]
+
+    # Filter to only enabled pairs
+    if CANONICAL_PAIRS_AVAILABLE:
+        pairs = [p for p in pairs if is_enabled_pair(p)]
+
+    logger.info(f"Using {len(pairs)} enabled pairs: {pairs}")
+    return pairs
+
+
+def _load_timeframes_from_config() -> List[str]:
+    """
+    Load timeframes from kraken_ohlcv.yaml (PRD-001 compliance).
+    
+    Falls back to environment variable or defaults if config not available.
+    """
+    if CONFIG_LOADER_AVAILABLE:
+        try:
+            config_loader = get_kraken_config_loader()
+            timeframes = config_loader.get_all_timeframes()
+            if timeframes:
+                logger.info(f"Loaded {len(timeframes)} timeframes from kraken_ohlcv.yaml")
+                return timeframes
+        except Exception as e:
+            logger.warning(f"Failed to load timeframes from config: {e}, using env var fallback")
+    
+    # Fallback to environment variable
+    env_timeframes = os.getenv("TIMEFRAMES", "1m,5m,15m,30m,1h,4h,1d,15s,30s")
+    timeframes = [tf.strip() for tf in env_timeframes.split(",") if tf.strip()]
+    logger.info(f"Using timeframes from environment variable: {timeframes}")
+    return timeframes
+
+
+# Pydantic configuration validation - Redis Cloud Optimized
+class KrakenWSConfig(BaseModel):
+    """
+    Validated configuration matching YAML specs - Redis Cloud Optimized
+    
+    PRD-001 Compliance:
+    - Loads pairs from kraken_ohlcv.yaml (tier_1, tier_2, tier_3)
+    - Loads timeframes from kraken_ohlcv.yaml (primary, synthetic)
+    - Falls back to environment variables if config not found
+    """
+    url: str = Field(default="wss://ws.kraken.com", pattern=r"^wss?://.*")
+    
+    # PRD-001: Load pairs from kraken_ohlcv.yaml
+    pairs: List[str] = Field(
+        default_factory=lambda: _load_pairs_from_config()
+    )
+    
+    # PRD-001: Load timeframes from kraken_ohlcv.yaml
+    timeframes: List[str] = Field(
+        default_factory=lambda: _load_timeframes_from_config()
+    )
+    redis_url: str = Field(default_factory=lambda: os.getenv("REDIS_URL", ""))
+
+    # PRD-001 Section 2.2: Stream configuration based on trading mode
+    trading_mode: str = Field(default_factory=lambda: os.getenv("TRADING_MODE", "paper"))
+
+    redis_streams: Dict[str, str] = Field(default_factory=lambda: {
+        "ticker": "kraken:ticker",
+        "trade": "kraken:trade",
+        "spread": "kraken:spread",
+        "book": "kraken:book",
+        "ohlc": "kraken:ohlc",
+        "scalp_signals": "kraken:scalp"
+    })
+
+    # PRD-001 Section 2.2: Stream MAXLEN configuration
+    stream_maxlen: Dict[str, int] = Field(default_factory=lambda: {
+        "signals": 10000,      # PRD-001 Section 2.2: Signal streams
+        "pnl": 50000,          # PRD-001 Section 2.2: PnL stream
+        "events": 5000         # PRD-001 Section 2.2: Events stream
+    })
+
+    def get_signal_stream_name(self) -> str:
+        """Get signal stream name based on TRADING_MODE (PRD-001 Section 2.2)"""
+        return f"signals:{self.trading_mode}"
+
+    def get_pnl_stream_name(self) -> str:
+        """Get PnL stream name (PRD-001 Section 2.2)"""
+        return "pnl:signals"
+
+    def get_events_stream_name(self) -> str:
+        """Get events stream name (PRD-001 Section 2.2)"""
+        return "events:bus"
+
+    # UPDATED: Redis Cloud optimized connection settings (PRD-001 compliant)
+    # PRD-001 Section 4.2: Exponential backoff starts at 1s, doubles each time, max 60s
+    reconnect_delay: int = Field(
+        default=int(os.getenv("WEBSOCKET_RECONNECT_DELAY", "1")), ge=1, le=60,
+        description="Initial reconnection delay in seconds (PRD-001: 1s, doubles to max 60s)"
+    )
+    # PRD-001 Section 4.2: Max 10 reconnection attempts
+    max_retries: int = Field(
+        default=int(os.getenv("WEBSOCKET_MAX_RETRIES", "10")), ge=1, le=100,
+        description="Maximum reconnection attempts (PRD-001: 10)"
+    )
+    ping_interval: int = Field(default=int(os.getenv("WEBSOCKET_PING_INTERVAL", "30")), ge=5, le=60)
+    ping_timeout: int = Field(default=int(os.getenv("WEBSOCKET_PING_TIMEOUT", "60")), ge=10, le=120)
+    close_timeout: int = Field(default=int(os.getenv("WEBSOCKET_CLOSE_TIMEOUT", "5")), ge=1, le=30)
+    book_depth: int = Field(default=10, ge=5, le=1000)
+    heartbeat_interval: int = Field(default=15, ge=10, le=300)
+    
+    # FIXED: Redis Cloud connection pooling optimization
+    redis_pool_size: int = Field(
+        default=int(os.getenv("REDIS_CONNECTION_POOL_SIZE", "10")), ge=1, le=100
+    )
+    redis_socket_timeout: int = Field(
+        default=int(os.getenv("REDIS_SOCKET_TIMEOUT", "10")), ge=5, le=120
+    )
+    
+    # UPDATED: Circuit breaker settings for Redis Cloud
+    max_spread_bps: float = Field(
+        default=float(os.getenv("SPREAD_BPS_MAX", "5.0")), ge=0.1, le=100.0
+    )
+    max_latency_ms: float = Field(
+        default=float(os.getenv("LATENCY_MS_MAX", "100.0")), ge=10, le=5000
+    )
+    max_consecutive_errors: int = Field(
+        default=int(os.getenv("CIRCUIT_BREAKER_REDIS_ERRORS", "3")), ge=1, le=50
+    )
+    circuit_breaker_cooldown: int = Field(
+        default=int(os.getenv("CIRCUIT_BREAKER_COOLDOWN_SECONDS", "45")), ge=10, le=600
+    )
+    
+    # UPDATED: Scalping settings for Redis Cloud
+    scalp_enabled: bool = Field(default=os.getenv("SCALP_ENABLED", "true").lower() == "true")
+    scalp_min_volume: float = Field(default=float(os.getenv("SCALP_MIN_VOLUME", "0.1")), ge=0.001)
+    scalp_max_trades_per_minute: int = Field(
+        default=int(os.getenv("SCALP_MAX_TRADES_PER_MINUTE", "3")), ge=1, le=60
+    )
+    
+    # UPDATED: Performance monitoring for Redis Cloud
+    enable_latency_tracking: bool = Field(
+        default=os.getenv("ENABLE_LATENCY_TRACKING", "true").lower() == "true"
+    )
+    enable_health_monitoring: bool = Field(
+        default=os.getenv("ENABLE_HEALTH_MONITORING", "true").lower() == "true"
+    )
+    metrics_interval: int = Field(default=int(os.getenv("METRICS_INTERVAL", "15")), ge=5, le=300)
+    
+    # NEW: Redis Cloud specific settings
+    redis_cloud_optimized: bool = Field(
+        default=os.getenv("REDIS_CLOUD_OPTIMIZED", "true").lower() == "true"
+    )
+    redis_batch_size: int = Field(
+        default=int(os.getenv("REDIS_STREAM_BATCH_SIZE", "25")), ge=1, le=100
+    )
+    redis_memory_threshold_mb: int = Field(
+        default=int(os.getenv("REDIS_MEMORY_THRESHOLD_MB", "100")), ge=10, le=1000
+    )
+    
+    @field_validator("pairs")
+    @classmethod
+    def validate_pairs(cls, v):
+        if isinstance(v, str):
+            v = [p.strip() for p in v.split(",")]
+        if not v:
+            raise ValueError("Pairs list cannot be empty")
+
+        # PRD-001: Validate against canonical trading pairs config
+        # Use config/trading_pairs.py as single source of truth
+        if CANONICAL_PAIRS_AVAILABLE:
+            from config.trading_pairs import ALL_PAIR_SYMBOLS, is_enabled_pair
+            for pair in v:
+                if pair not in ALL_PAIR_SYMBOLS:
+                    logger.warning(f"Pair {pair} not in canonical trading_pairs config")
+                elif not is_enabled_pair(pair):
+                    logger.warning(f"Pair {pair} is disabled in canonical config (not available on Kraken WS)")
+        else:
+            # Fallback: warn if pair not in known set
+            known_pairs = {"BTC/USD", "ETH/USD", "SOL/USD", "LINK/USD"}
+            for pair in v:
+                if pair not in known_pairs:
+                    logger.warning(f"Pair {pair} may not be supported on Kraken WebSocket")
+        return v
+    
+    @field_validator("timeframes")
+    @classmethod
+    def validate_timeframes(cls, v):
+        if isinstance(v, str):
+            v = [tf.strip() for tf in v.split(",")]
+        valid_timeframes = ["15s", "1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"]
+        for tf in v:
+            if tf not in valid_timeframes:
+                raise ValueError(f"Invalid timeframe: {tf}")
+        return v
+    
+    @field_validator("redis_url")
+    @classmethod
+    def validate_redis_url(cls, v):
+        if v and not (v.startswith("redis://") or v.startswith("rediss://")):
+            raise ValueError("Redis URL must start with redis:// or rediss://")
+        return v
+
+
+class CircuitBreakerState(Enum):
+    CLOSED = "closed"      # Normal operation
+    OPEN = "open"          # Circuit breaker tripped
+    HALF_OPEN = "half_open" # Testing if service recovered
+
+
+class CircuitBreaker:
+    """Circuit breaker implementation for risk controls"""
+    
+    def __init__(self, name: str, failure_threshold: int = 3, timeout: int = 45):
+        self.name = name
+        self.failure_threshold = failure_threshold
+        self.timeout = timeout
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = CircuitBreakerState.CLOSED
+        self.logger = logging.getLogger(f"CircuitBreaker.{name}")
+    
+    async def call(self, func: Callable, *args, **kwargs):
+        """Execute function through circuit breaker"""
+        if self.state == CircuitBreakerState.OPEN:
+            if time.time() - self.last_failure_time > self.timeout:
+                self.state = CircuitBreakerState.HALF_OPEN
+                self.logger.info(f"Circuit breaker {self.name} entering HALF_OPEN state")
+            else:
+                raise Exception(f"Circuit breaker {self.name} is OPEN")
+        
+        try:
+            if asyncio.iscoroutinefunction(func):
+                result = await func(*args, **kwargs)
+            else:
+                result = func(*args, **kwargs)
+            await self.on_success()
+            return result
+        except Exception:
+            await self.on_failure()
+            raise
+    
+    async def on_success(self):
+        """Reset circuit breaker on success"""
+        self.failure_count = 0
+        if self.state == CircuitBreakerState.HALF_OPEN:
+            self.state = CircuitBreakerState.CLOSED
+            self.logger.info(f"Circuit breaker {self.name} reset to CLOSED")
+    
+    async def on_failure(self):
+        """Handle failure"""
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitBreakerState.OPEN
+            self.logger.error(
+                f"Circuit breaker {self.name} OPENED after {self.failure_count} failures"
+            )
+
+
+class LatencyTracker:
+    """Track latency metrics for monitoring (PRD-001 Section 1.5)"""
+
+    def __init__(self, max_samples: int = 1000):
+        self.max_samples = max_samples
+        self.samples = []
+        self.start_times = {}
+
+    def start_timing(self, operation_id: str):
+        """Start timing an operation"""
+        self.start_times[operation_id] = time.time()
+
+    def end_timing(self, operation_id: str, channel: str = None) -> float:
+        """
+        End timing and return latency in ms (PRD-001 Section 1.5).
+
+        Emits Prometheus histogram if channel is provided.
+
+        Args:
+            operation_id: Unique operation identifier
+            channel: Channel name for Prometheus labeling (e.g., 'trade', 'spread')
+
+        Returns:
+            Latency in milliseconds
+        """
+        if operation_id not in self.start_times:
+            return 0.0
+
+        latency_ms = (time.time() - self.start_times[operation_id]) * 1000
+        del self.start_times[operation_id]
+
+        # Keep rolling window of samples for P95 calculation
+        self.samples.append(latency_ms)
+        if len(self.samples) > self.max_samples:
+            self.samples.pop(0)
+
+        # Emit Prometheus histogram (PRD-001 Section 1.5)
+        if channel and PROMETHEUS_AVAILABLE and KRAKEN_WS_LATENCY_MS:
+            KRAKEN_WS_LATENCY_MS.labels(channel=channel).observe(latency_ms)
+
+        return latency_ms
+    
+    def get_stats(self) -> Dict[str, float]:
+        """Get latency statistics"""
+        if not self.samples:
+            return {"avg": 0, "p50": 0, "p95": 0, "p99": 0, "max": 0}
+        
+        sorted_samples = sorted(self.samples)
+        n = len(sorted_samples)
+        
+        return {
+            "avg": sum(self.samples) / n,
+            "p50": sorted_samples[int(n * 0.5)],
+            "p95": sorted_samples[int(n * 0.95)],
+            "p99": sorted_samples[int(n * 0.99)],
+            "max": max(self.samples)
+        }
+
+
+class RedisConnectionState(str, Enum):
+    """Redis connection states (PRD-001 Section 2.1)"""
+    CONNECTED = "CONNECTED"
+    DISCONNECTED = "DISCONNECTED"
+    RECONNECTING = "RECONNECTING"
+
+
+class RedisConnectionManager:
+    """Manage Redis connections with pooling - Redis Cloud Optimized (PRD-001 Section 2.1)"""
+
+    def __init__(self, config: KrakenWSConfig):
+        self.config = config
+        self.redis_client: Optional[redis.Redis] = None
+        self.logger = logging.getLogger(__name__)
+
+        # Connection state tracking (PRD-001 Section 2.1)
+        self.connection_state = RedisConnectionState.DISCONNECTED
+        self.last_health_check = 0  # Timestamp of last successful PING
+        self.health_check_interval = 60  # PRD-001 Section 2.1: PING every 60 seconds
+        self.instance_name = "kraken-ws"  # For Prometheus labels
+
+        # Failed publish queue (PRD-001 Section 2.3)
+        self.failed_publishes: deque = deque(maxlen=1000)  # Max 1000 failed publishes
+
+        # Publish queue tracking (PRD-001 Section 2.4)
+        self.publish_queue_depth: Dict[str, int] = {}  # Track in-progress publishes per stream
+        self.publish_backpressure_threshold = 1000  # PRD-001 Section 2.4: reject when depth > 1000
+
+        # Data integrity tracking (PRD-001 Section 2.5)
+        self.last_timestamp: Dict[str, float] = {}  # Last published timestamp per stream
+        self.sequence_counter: Dict[str, int] = {}  # Sequence number per stream
+    
+    @asynccontextmanager
+    async def get_connection(self):
+        """Get Redis connection"""
+        if not self.redis_client:
+            await self.initialize_pool()
+        
+        yield self.redis_client
+    
+    def _set_connection_state(self, state: RedisConnectionState):
+        """Set connection state and emit Prometheus metric (PRD-001 Section 2.1)"""
+        self.connection_state = state
+        self.logger.debug(f"Redis connection state: {state.value}")
+
+        # Emit Prometheus gauge (PRD-001 Section 2.1)
+        if PROMETHEUS_AVAILABLE and REDIS_CONNECTED:
+            status_value = 1 if state == RedisConnectionState.CONNECTED else 0
+            REDIS_CONNECTED.labels(instance=self.instance_name).set(status_value)
+
+    async def initialize_pool(self):
+        """Initialize Redis connection - Redis Cloud Optimized (PRD-001 Section 2.1)"""
+        if not self.config.redis_url:
+            self.logger.warning("No Redis URL provided, skipping Redis initialization")
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
+            return
+
+        try:
+            self._set_connection_state(RedisConnectionState.RECONNECTING)
+
+            # PRD-001 Section 2.1: Redis Cloud TLS connection
+            if self.config.redis_url.startswith("rediss://"):
+                self.logger.info("Connecting to Redis Cloud via TLS...")
+
+                # PRD-001 Section 2.1: Load TLS certificate
+                import ssl
+                ssl_context = ssl.create_default_context()
+                cert_path = "config/certs/redis_ca.pem"
+                if os.path.exists(cert_path):
+                    ssl_context.load_verify_locations(cert_path)
+                    self.logger.info(f"Loaded TLS certificate from {cert_path}")
+                else:
+                    self.logger.warning(f"TLS certificate not found at {cert_path}, using system certs")
+
+                # Note: socket_keepalive_options not supported on Windows
+                import platform
+                keepalive_opts = {}
+                if platform.system() != 'Windows':
+                    keepalive_opts = {
+                        'socket_keepalive_options': {
+                            'TCP_KEEPIDLE': 1,
+                            'TCP_KEEPINTVL': 3,
+                            'TCP_KEEPCNT': 5
+                        }
+                    }
+
+                # PRD-001 Section 2.1: Connection pooling with max 10 connections
+                self.redis_client = redis.from_url(
+                    self.config.redis_url,
+                    ssl_ca_certs=cert_path,
+                    ssl_cert_reqs='required',
+                    decode_responses=False,
+                    socket_timeout=self.config.redis_socket_timeout,
+                    socket_keepalive=True,
+                    socket_connect_timeout=5,
+                    max_connections=10,  # PRD-001 Section 2.1
+                    **keepalive_opts
+                )
+            elif self.config.redis_url.startswith(("redis://", "rediss://")):
+                # Generic Redis URL with optimizations - fixed
+                import platform
+                keepalive_opts = {}
+                if platform.system() != 'Windows':
+                    keepalive_opts = {
+                        'socket_keepalive_options': {
+                            'TCP_KEEPIDLE': 1,
+                            'TCP_KEEPINTVL': 3,
+                            'TCP_KEEPCNT': 5
+                        }
+                    }
+
+                self.redis_client = redis.from_url(
+                    self.config.redis_url,
+                    socket_timeout=self.config.redis_socket_timeout,
+                    socket_keepalive=True,
+                    decode_responses=False,
+                    socket_connect_timeout=5,
+                    **keepalive_opts
+                )
+            else:
+                # Direct host/port configuration
+                self.redis_client = redis.Redis(
+                    host=self.config.redis_url,
+                    port=6379,
+                    decode_responses=False,
+                    socket_timeout=self.config.redis_socket_timeout,
+                )
+            
+            # PRD-001 Section 2.1: Test connection with PING
+            await self.redis_client.ping()
+            self.last_health_check = time.time()
+            self._set_connection_state(RedisConnectionState.CONNECTED)
+            self.logger.info("[OK] Redis connection initialized successfully (max_connections=10)")
+
+            # Test stream operations if configured
+            if self.config.redis_cloud_optimized:
+                await self._test_redis_cloud_features()
+
+        except Exception as e:
+            self.logger.error(f"[ERROR] Redis initialization failed: {e}")
+            self.redis_client = None
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
+    
+    async def _test_redis_cloud_features(self):
+        """Test Redis Cloud specific features"""
+        try:
+            # Test stream operations
+            test_stream = "test:redis_cloud_init"
+            await self.redis_client.xadd(
+                test_stream, {"init": "test", "timestamp": str(time.time())}
+            )
+            
+            # Test memory usage (Redis Cloud specific)
+            info = await self.redis_client.info('memory')
+            used_memory_mb = int(info.get('used_memory', 0)) / (1024 * 1024)
+            
+            if used_memory_mb > self.config.redis_memory_threshold_mb:
+                self.logger.warning(f"[WARN] Redis Cloud memory usage high: {used_memory_mb:.1f}MB")
+            
+            # Cleanup test data
+            await self.redis_client.delete(test_stream)
+            self.logger.info("[OK] Redis Cloud features test passed")
+            
+        except Exception as e:
+            self.logger.warning(f"[WARN] Redis Cloud features test failed: {e}")
+    
+    async def health_check(self):
+        """Perform Redis PING health check (PRD-001 Section 2.1)
+
+        Should be called every 60 seconds to verify connection health.
+        """
+        if not self.redis_client:
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
+            return False
+
+        # Check if health check is due (every 60 seconds)
+        current_time = time.time()
+        if current_time - self.last_health_check < self.health_check_interval:
+            return self.connection_state == RedisConnectionState.CONNECTED
+
+        try:
+            # PRD-001 Section 2.1: Redis PING health check
+            await self.redis_client.ping()
+            self.last_health_check = current_time
+
+            if self.connection_state != RedisConnectionState.CONNECTED:
+                self.logger.info("Redis health check passed - connection restored")
+                self._set_connection_state(RedisConnectionState.CONNECTED)
+
+            return True
+
+        except Exception as e:
+            self.logger.warning(f"Redis health check failed: {e}")
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
+            return False
+
+    async def verify_stream_configuration(self):
+        """Verify stream configuration on startup (PRD-001 Section 2.2)"""
+        if not self.redis_client:
+            self.logger.warning("Cannot verify streams: Redis not connected")
+            return
+
+        try:
+            # PRD-001 Section 2.2: Get stream names from config
+            signal_stream = self.config.get_signal_stream_name()
+            pnl_stream = self.config.get_pnl_stream_name()
+            events_stream = self.config.get_events_stream_name()
+
+            streams_to_check = [signal_stream, pnl_stream, events_stream]
+
+            # PRD-001 Section 2.2: Verify each stream and log configuration
+            for stream_name in streams_to_check:
+                try:
+                    # Try to get stream info
+                    info = await self.redis_client.xinfo_stream(stream_name)
+                    stream_length = info.get('length', 0)
+
+                    # PRD-001 Section 2.2: Log stream configuration at INFO level
+                    self.logger.info(
+                        f"Stream '{stream_name}': length={stream_length}, "
+                        f"first_entry={info.get('first-entry')}, "
+                        f"last_entry={info.get('last-entry')}"
+                    )
+
+                    # PRD-001 Section 2.2: Emit Prometheus gauge for stream length
+                    if PROMETHEUS_AVAILABLE and REDIS_STREAM_LENGTH:
+                        REDIS_STREAM_LENGTH.labels(stream=stream_name).set(stream_length)
+
+                except Exception as e:
+                    # Stream doesn't exist yet - this is OK
+                    self.logger.info(f"Stream '{stream_name}' not yet created (will be created on first publish)")
+
+            # Log overall stream configuration
+            self.logger.info(
+                f"Stream configuration verified - "
+                f"signal_stream={signal_stream}, "
+                f"pnl_stream={pnl_stream}, "
+                f"events_stream={events_stream}"
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error verifying stream configuration: {e}")
+
+    async def update_stream_metrics(self):
+        """Update stream length metrics for all configured streams (PRD-001 Section 2.2)"""
+        if not self.redis_client or not PROMETHEUS_AVAILABLE or not REDIS_STREAM_LENGTH:
+            return
+
+        try:
+            signal_stream = self.config.get_signal_stream_name()
+            pnl_stream = self.config.get_pnl_stream_name()
+            events_stream = self.config.get_events_stream_name()
+
+            for stream_name in [signal_stream, pnl_stream, events_stream]:
+                try:
+                    info = await self.redis_client.xinfo_stream(stream_name)
+                    stream_length = info.get('length', 0)
+                    REDIS_STREAM_LENGTH.labels(stream=stream_name).set(stream_length)
+                except:
+                    # Stream doesn't exist yet
+                    pass
+
+        except Exception as e:
+            self.logger.debug(f"Error updating stream metrics: {e}")
+
+    async def publish_signal(
+        self,
+        signal_data: Dict[str, Any],
+        stream_name: Optional[str] = None,
+        timeout: float = 5.0
+    ) -> bool:
+        """
+        Publish signal to Redis stream with PRD-001 Section 2.3 & 2.4 guarantees:
+        - UUID v4 message ID for idempotency
+        - Pydantic validation before publish
+        - Retry logic with exponential backoff
+        - Comprehensive error handling and metrics
+        - P95 latency tracking (target < 20ms)
+
+        Args:
+            signal_data: Signal data dict to publish
+            stream_name: Optional stream name (defaults to signal stream from config)
+            timeout: Max timeout in seconds (default 5s per PRD-001)
+
+        Returns:
+            bool: True if published successfully, False otherwise
+        """
+        # PRD-001 Section 2.4: Start latency tracking
+        start_time = time.time()
+
+        if not self.redis_client:
+            self.logger.error("Cannot publish signal: Redis not connected")
+            self.failed_publishes.append((signal_data, stream_name))
+            return False
+
+        # PRD-001 Section 2.3: Use signal stream if not specified
+        if stream_name is None:
+            stream_name = self.config.get_signal_stream_name()
+
+        # PRD-001 Section 2.4: Check backpressure before publishing
+        current_depth = self.publish_queue_depth.get(stream_name, 0)
+        if current_depth > self.publish_backpressure_threshold:
+            self.logger.error(
+                f"Backpressure detected: queue depth {current_depth} > threshold "
+                f"{self.publish_backpressure_threshold} for stream {stream_name}. "
+                f"Rejecting new signal to prevent overload."
+            )
+            return False
+
+        # PRD-001 Section 2.4: Increment queue depth
+        self.publish_queue_depth[stream_name] = current_depth + 1
+
+        # PRD-001 Section 2.4: Emit queue depth gauge
+        if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_QUEUE_DEPTH:
+            REDIS_PUBLISH_QUEUE_DEPTH.labels(stream=stream_name).set(self.publish_queue_depth[stream_name])
+
+        try:
+            # PRD-001 Section 2.5: Generate server-side timestamp
+            server_timestamp = datetime.now(timezone.utc).timestamp()
+
+            # PRD-001 Section 2.5: Enforce monotonically increasing timestamps
+            last_ts = self.last_timestamp.get(stream_name, 0.0)
+            if server_timestamp <= last_ts:
+                timestamp_delta = server_timestamp - last_ts
+                self.logger.warning(
+                    f"Timestamp validation failed: non-monotonic timestamp detected. "
+                    f"Current: {server_timestamp}, Last: {last_ts}, Delta: {timestamp_delta:.6f}s"
+                )
+                return False
+
+            # PRD-001 Section 2.5: Reject timestamps > 5s in future (clock skew protection)
+            now = datetime.now(timezone.utc).timestamp()
+            if server_timestamp > now + 5.0:
+                clock_skew = server_timestamp - now
+                self.logger.warning(
+                    f"Timestamp validation failed: timestamp too far in future. "
+                    f"Server: {server_timestamp}, Now: {now}, Skew: {clock_skew:.6f}s"
+                )
+                return False
+
+            # PRD-001 Section 2.5: Increment sequence number per stream
+            sequence_num = self.sequence_counter.get(stream_name, 0) + 1
+            self.sequence_counter[stream_name] = sequence_num
+
+            # PRD-001 Section 2.3: Generate UUID v4 for idempotency
+            signal_id = str(uuid.uuid4())
+
+            # PRD-001 Section 2.3: Validate with Pydantic schema BEFORE adding signal_id
+            if PRD_SCHEMA_AVAILABLE and PRDSignalSchema:
+                try:
+                    validated_signal = PRDSignalSchema(**signal_data)
+                    signal_data_copy = validated_signal.model_dump()
+                except ValidationError as e:
+                    error_reason = str(e.errors()[0]['type']) if e.errors() else 'unknown'
+                    self.logger.error(
+                        f"Signal schema validation failed for signal_id={signal_id}: {e}"
+                    )
+
+                    # PRD-001 Section 2.3: Emit schema error counter
+                    if PROMETHEUS_AVAILABLE and SIGNAL_SCHEMA_ERRORS_TOTAL:
+                        SIGNAL_SCHEMA_ERRORS_TOTAL.labels(reason=error_reason).inc()
+
+                    return False
+            else:
+                signal_data_copy = signal_data.copy()
+
+            # Add signal_id AFTER validation
+            signal_data_copy['signal_id'] = signal_id
+
+            # PRD-001 Section 2.5: Add server timestamp and sequence number
+            signal_data_copy['server_timestamp'] = server_timestamp
+            signal_data_copy['server_timestamp_iso'] = datetime.fromtimestamp(
+                server_timestamp, tz=timezone.utc
+            ).isoformat()
+            signal_data_copy['sequence_number'] = sequence_num
+
+            # PRD-001 Section 2.3: Serialize to JSON with UTF-8 encoding
+            try:
+                serialized_data = orjson.dumps(signal_data_copy).decode('utf-8')
+            except Exception as e:
+                self.logger.error(f"Failed to serialize signal data for signal_id={signal_id}: {e}")
+                if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
+                    REDIS_PUBLISH_ERRORS_TOTAL.labels(stream=stream_name, error_type='serialization').inc()
+                return False
+
+            # PRD-001 Section 2.3: Retry logic with exponential backoff (100ms, 200ms, 400ms)
+            max_retries = 3
+            backoff_delays = [0.1, 0.2, 0.4]  # 100ms, 200ms, 400ms
+
+            for attempt in range(max_retries):
+                try:
+                    # PRD-001 Section 2.3: Add timeout to prevent hanging (5s max)
+                    await asyncio.wait_for(
+                        self.redis_client.xadd(
+                            stream_name,
+                            {'data': serialized_data},
+                            id=signal_id,
+                            maxlen=self.config.stream_maxlen.get('signals', 10000),
+                            approximate=True  # Use ~ for performance
+                        ),
+                        timeout=timeout
+                    )
+
+                    self.logger.debug(
+                        f"Published signal to {stream_name} with signal_id={signal_id}, "
+                        f"sequence={sequence_num}"
+                    )
+
+                    # PRD-001 Section 2.5: Update last timestamp after successful publish
+                    self.last_timestamp[stream_name] = server_timestamp
+
+                    # PRD-001 Section 2.4: Emit latency histogram
+                    latency_ms = (time.time() - start_time) * 1000
+                    if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_LATENCY_MS:
+                        REDIS_PUBLISH_LATENCY_MS.labels(stream=stream_name).observe(latency_ms)
+
+                    return True
+
+                except redis_exceptions.ResponseError as e:
+                    # PRD-001 Section 2.3: Handle duplicate ID rejection
+                    if "ID" in str(e) and "equal or smaller" in str(e):
+                        self.logger.debug(
+                            f"Duplicate signal_id rejected: {signal_id} for stream {stream_name}"
+                        )
+
+                        # PRD-001 Section 2.3: Emit duplicate counter
+                        if PROMETHEUS_AVAILABLE and SIGNAL_DUPLICATES_REJECTED_TOTAL:
+                            SIGNAL_DUPLICATES_REJECTED_TOTAL.labels(stream=stream_name).inc()
+
+                        return False  # Don't retry duplicates
+                    else:
+                        # Other Redis errors - retry with backoff
+                        if attempt < max_retries - 1:
+                            retry_delay = backoff_delays[attempt]
+                            # Explicit retry log helps correlate transient Redis errors
+                            self.logger.warning(
+                                "Redis publish error (%s) on %s attempt %d/%d; retrying in %.1fs",
+                                e.__class__.__name__,
+                                stream_name,
+                                attempt + 1,
+                                max_retries,
+                                retry_delay,
+                            )
+                            await asyncio.sleep(backoff_delays[attempt])
+                            continue
+                        else:
+                            # PRD-001 Section 2.3: Log publish failure at ERROR level
+                            self.logger.error(
+                                f"Failed to publish signal after {max_retries} attempts. "
+                                f"signal_id={signal_id}, stream={stream_name}, error={e}"
+                            )
+
+                            # PRD-001 Section 2.3: Emit error counter
+                            if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
+                                REDIS_PUBLISH_ERRORS_TOTAL.labels(
+                                    stream=stream_name,
+                                    error_type='redis_error'
+                                ).inc()
+
+                            # PRD-001 Section 2.3: Queue for retry on reconnection
+                            self.failed_publishes.append((signal_data, stream_name))
+                            return False
+
+                except asyncio.TimeoutError:
+                    # PRD-001 Section 2.3: Timeout handling
+                    if attempt < max_retries - 1:
+                        retry_delay = backoff_delays[attempt]
+                        self.logger.warning(
+                            "Redis publish timeout (>%ss) for %s attempt %d/%d; retrying in %.1fs",
+                            timeout,
+                            stream_name,
+                            attempt + 1,
+                            max_retries,
+                            retry_delay,
+                        )
+                        await asyncio.sleep(backoff_delays[attempt])
+                        continue
+                    else:
+                        self.logger.error(
+                            f"Publish timeout after {timeout}s for signal_id={signal_id}, "
+                            f"stream={stream_name}"
+                        )
+
+                        if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
+                            REDIS_PUBLISH_ERRORS_TOTAL.labels(
+                                stream=stream_name,
+                                error_type='timeout'
+                            ).inc()
+
+                        self.failed_publishes.append((signal_data, stream_name))
+                        return False
+
+                except Exception as e:
+                    # Generic error handling
+                    if attempt < max_retries - 1:
+                        retry_delay = backoff_delays[attempt]
+                        self.logger.warning(
+                            "Redis publish unexpected error (%s) for %s attempt %d/%d; retrying in %.1fs",
+                            e.__class__.__name__,
+                            stream_name,
+                            attempt + 1,
+                            max_retries,
+                            retry_delay,
+                        )
+                        await asyncio.sleep(backoff_delays[attempt])
+                        continue
+                    else:
+                        self.logger.error(
+                            f"Unexpected error publishing signal. signal_id={signal_id}, "
+                            f"stream={stream_name}, error={e}"
+                        )
+
+                        if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_ERRORS_TOTAL:
+                            REDIS_PUBLISH_ERRORS_TOTAL.labels(
+                                stream=stream_name,
+                                error_type='unknown'
+                            ).inc()
+
+                        self.failed_publishes.append((signal_data, stream_name))
+                        return False
+
+            return False
+
+        finally:
+            # PRD-001 Section 2.4: Decrement queue depth
+            self.publish_queue_depth[stream_name] = self.publish_queue_depth.get(stream_name, 1) - 1
+            if PROMETHEUS_AVAILABLE and REDIS_PUBLISH_QUEUE_DEPTH:
+                REDIS_PUBLISH_QUEUE_DEPTH.labels(stream=stream_name).set(self.publish_queue_depth[stream_name])
+
+    async def close(self):
+        """Close Redis connection"""
+        if self.redis_client:
+            await self.redis_client.aclose()
+            self.redis_client = None
+            self._set_connection_state(RedisConnectionState.DISCONNECTED)
+
+
+class KrakenWebSocketClient:
+    """
+    Production-grade Kraken WebSocket client with Redis Cloud optimization and fixes
+    """
+    
+    def __init__(self, config: KrakenWSConfig = None):
+        # Validate configuration
+        if config is None:
+            config = KrakenWSConfig()
+        elif isinstance(config, dict):
+            config = KrakenWSConfig(**config)
+        elif not isinstance(config, KrakenWSConfig):
+            raise ValueError("Config must be KrakenWSConfig instance or dict")
+
+        self.config = config
+        self.logger = logging.getLogger(__name__)
+
+        # Connection state tracking (PRD-001 Section 4.1)
+        self.connection_state = ConnectionState.DISCONNECTED
+        self.connection_state_changed_at = time.time()  # Track when state changed
+        self.reconnection_attempt = 0  # Current reconnection attempt (reset on success) - PRD-001 Section 4.2
+
+        # Resource management
+        self.redis_manager = RedisConnectionManager(config)
+        self.ws: Optional[websockets.WebSocketServerProtocol] = None
+        self.running = False
+        self.last_heartbeat = time.time()
+        
+        # Circuit breakers (Redis Cloud optimized)
+        self.circuit_breakers = {
+            "spread": CircuitBreaker(
+                "spread", self.config.max_consecutive_errors, 
+                self.config.circuit_breaker_cooldown
+            ),
+            "latency": CircuitBreaker(
+                "latency", self.config.max_consecutive_errors, 
+                self.config.circuit_breaker_cooldown
+            ),
+            "connection": CircuitBreaker(
+                "connection", self.config.max_consecutive_errors, 
+                self.config.circuit_breaker_cooldown
+            )
+        }
+        
+        # Latency tracking
+        self.latency_tracker = LatencyTracker() if config.enable_latency_tracking else None
+        
+        # Callbacks for different data types
+        self.callbacks: Dict[str, List[Callable]] = {
+            "trade": [],
+            "spread": [],
+            "book": [],
+            "ohlc": [],
+            "ticker": [],
+            "circuit_breaker": []
+        }
+        
+        # Statistics and monitoring
+        self.stats = {
+            "messages_received": 0,
+            "reconnects": 0,
+            "last_data_time": None,
+            "latency_ms": 0,
+            "circuit_breaker_trips": 0,
+            "errors": 0,
+            "trades_per_minute": 0,
+            "last_trade_count_reset": time.time(),
+            # PRD-001: Health metrics per pair
+            "last_message_timestamp_by_pair": {},  # pair -> timestamp
+            "reconnect_count_by_pair": {},  # pair -> count
+            "subscription_errors": [],  # List of (pair, channel, error) tuples
+            "dropped_messages": 0,  # Count of dropped messages
+        }
+
+        # Sequence number tracking per channel (PRD-001 Section 1.3)
+        self.last_sequence: Dict[str, int] = {}
+
+        # Message deduplication cache (PRD-001 Section 1.3)
+        # Store last 100 message IDs per channel to detect duplicates
+        self.dedup_cache: Dict[str, deque] = {}
+
+        # Data cache for graceful degradation (PRD-001 Section 1.4)
+        # Store latest data for each channel:pair with timestamp
+        # Cache TTL: 5 minutes (300 seconds)
+        self.data_cache: Dict[str, Dict[str, Any]] = {}
+        self.cache_ttl = 300  # 5 minutes in seconds
+
+        # Backpressure detection (PRD-001 Section 1.5)
+        # Track pending messages to prevent memory overflow
+        # Threshold: 1000 messages (drop oldest if exceeded)
+        self.message_queue: deque = deque(maxlen=10000)  # Hard cap at 10k
+        self.backpressure_threshold = 1000
+        self.backpressure_warned_at = 0  # Timestamp of last warning
+
+        # Memory bounds (PRD-001 Section 1.5)
+        # WebSocket buffer limits: 100MB total
+        self.websocket_read_limit = 50 * 1024 * 1024  # 50MB read buffer
+        self.websocket_write_limit = 50 * 1024 * 1024  # 50MB write buffer
+
+        # Scalping rate limiting
+        self.trade_timestamps = []
+    
+    def create_subscription(self, channel: str, pairs: List[str], **kwargs) -> dict:
+        """Create a subscription message for Kraken WebSocket"""
+        return {
+            "event": "subscribe",
+            "pair": pairs,
+            "subscription": {"name": channel, **kwargs}
+        }
+
+    def _set_connection_state(self, new_state: ConnectionState, reason: str = ""):
+        """
+        Set connection state and log the transition (PRD-001 Section 4.1).
+
+        Args:
+            new_state: The new connection state
+            reason: Optional reason for the state change
+        """
+        if self.connection_state != new_state:
+            old_state = self.connection_state
+            self.connection_state = new_state
+            self.connection_state_changed_at = time.time()  # Track timestamp for health check
+            timestamp = datetime.now().isoformat()
+
+            # Log state change at INFO level with timestamp (PRD-001 Section 8.1)
+            log_msg = f"[{timestamp}] Connection state: {old_state.value} -> {new_state.value}"
+            if reason:
+                log_msg += f" ({reason})"
+            self.logger.info(log_msg)
+
+            # Emit Prometheus metric (PRD-001 Section 4.1 & 8.2)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_CONNECTIONS_TOTAL:
+                KRAKEN_WS_CONNECTIONS_TOTAL.labels(state=new_state.value).inc()
+
+    def get_connection_state(self) -> ConnectionState:
+        """Get the current connection state"""
+        return self.connection_state
+
+    @property
+    def is_healthy(self) -> bool:
+        """
+        Check if bot is healthy based on connection state (PRD-001 Section 4.1 & 4.2).
+
+        Returns False if:
+        - WebSocket has been disconnected for > 2 minutes, OR
+        - Reconnection attempts have reached or exceeded max_retries
+        """
+        # Unhealthy if max reconnection attempts reached (PRD-001 Section 4.2)
+        if self.reconnection_attempt >= self.config.max_retries:
+            return False
+
+        # Unhealthy if not disconnected (connecting, connected, reconnecting are all healthy)
+        if self.connection_state != ConnectionState.DISCONNECTED:
+            return True
+
+        # Check how long we've been disconnected (2 minutes = 120 seconds)
+        time_disconnected = time.time() - self.connection_state_changed_at
+        return time_disconnected <= 120
+
+    async def trigger_circuit_breaker(self, breaker_name: str, reason: str):
+        """Trigger a circuit breaker"""
+        self.stats["circuit_breaker_trips"] += 1
+        self.logger.error(f"[ALERT] Circuit breaker {breaker_name} triggered: {reason}")
+        
+        # Notify callbacks
+        for callback in self.callbacks["circuit_breaker"]:
+            try:
+                await callback(breaker_name, reason)
+            except Exception as e:
+                self.logger.error(f"Error in circuit breaker callback: {e}")
+    
+    async def check_spread_circuit_breaker(self, spread_bps: float, pair: str):
+        """Check if spread exceeds maximum allowed"""
+        if spread_bps > self.config.max_spread_bps:
+            await self.trigger_circuit_breaker(
+                "spread", 
+                f"{pair} spread {spread_bps:.2f} bps > limit {self.config.max_spread_bps} bps"
+            )
+            return True
+        return False
+    
+    async def check_latency_circuit_breaker(self, latency_ms: float):
+        """Check if latency exceeds maximum allowed"""
+        if latency_ms > self.config.max_latency_ms:
+            await self.trigger_circuit_breaker(
+                "latency", 
+                f"Latency {latency_ms:.2f}ms > limit {self.config.max_latency_ms}ms"
+            )
+            return True
+        return False
+    
+    async def check_scalping_rate_limit(self):
+        """Check scalping rate limits"""
+        now = time.time()
+        
+        # Clean old timestamps (older than 1 minute)
+        self.trade_timestamps = [ts for ts in self.trade_timestamps if now - ts < 60]
+        
+        # Check rate limit
+        if len(self.trade_timestamps) >= self.config.scalp_max_trades_per_minute:
+            await self.trigger_circuit_breaker(
+                "scalping_rate", 
+                f"Scalping rate limit exceeded: {len(self.trade_timestamps)} trades/min"
+            )
+            return True
+        
+        return False
+    
+    async def setup_subscriptions(self):
+        """
+        Setup all required subscriptions based on configuration (PRD-001 Section 4.1).
+
+        This method is called on every successful connection, including reconnections.
+        It automatically resubscribes to all channels after a reconnection (PRD-001 Section 4.2).
+        """
+        subscriptions = []
+
+        # Log subscription setup - distinguish initial vs resubscription (PRD-001 Section 4.2)
+        is_reconnection = self.reconnection_attempt > 0 or self.stats["reconnects"] > 0
+        if is_reconnection:
+            self.logger.info(
+                f"Resubscribing to all channels after reconnection for {len(self.config.pairs)} pairs: "
+                f"{', '.join(self.config.pairs)}"
+            )
+        else:
+            self.logger.info(
+                f"Setting up initial Kraken WS subscriptions for {len(self.config.pairs)} pairs: "
+                f"{', '.join(self.config.pairs)}"
+            )
+
+        # Ticker data for all pairs (PRD-001 Section 4.1)
+        subscriptions.append(
+            self.create_subscription("ticker", self.config.pairs)
+        )
+
+        # Trade data for all pairs
+        subscriptions.append(
+            self.create_subscription("trade", self.config.pairs)
+        )
+
+        # Spread data for all pairs
+        subscriptions.append(
+            self.create_subscription("spread", self.config.pairs)
+        )
+
+        # Order book data (L2, configurable depth) (PRD-001 Section 4.1)
+        subscriptions.append(
+            self.create_subscription(
+                "book",
+                self.config.pairs,
+                depth=self.config.book_depth
+            )
+        )
+        
+        # PRD-001: OHLC data for all native timeframes from kraken_ohlcv.yaml
+        # Only subscribe to native timeframes (Kraken API supports these)
+        # Synthetic timeframes (5s, 15s, 30s) are generated from trades, not subscribed
+        native_timeframes = []
+        if CONFIG_LOADER_AVAILABLE:
+            try:
+                config_loader = get_kraken_config_loader()
+                native_timeframes = config_loader.get_native_timeframes()
+                intervals = config_loader.get_kraken_ohlc_intervals()
+            except Exception as e:
+                logger.warning(f"Failed to load native timeframes from config: {e}, using fallback")
+                # Fallback: extract native timeframes from config.timeframes
+                native_timeframes = [tf for tf in self.config.timeframes if tf not in ["5s", "15s", "30s", "2m", "3m"]]
+                intervals = {tf: {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}.get(tf) 
+                            for tf in native_timeframes}
+                intervals = [v for v in intervals.values() if v]
+        else:
+            # Fallback: use config.timeframes and filter out synthetic
+            native_timeframes = [tf for tf in self.config.timeframes if tf not in ["5s", "15s", "30s", "2m", "3m"]]
+            intervals = []
+            tf_to_interval = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+            for tf in native_timeframes:
+                if tf in tf_to_interval:
+                    intervals.append(tf_to_interval[tf])
+        
+        # Subscribe to each native timeframe
+        for interval in sorted(set(intervals)):
+            try:
+                subscriptions.append(
+                    self.create_subscription(
+                        "ohlc", 
+                        self.config.pairs, 
+                        interval=interval
+                    )
+                )
+                self.logger.debug(f"Added OHLC subscription: interval={interval} minutes for {len(self.config.pairs)} pairs")
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to create OHLC subscription for interval {interval}: {e}",
+                    extra={"interval": interval, "pairs": self.config.pairs}
+                )
+        
+        # Send all subscriptions with circuit breaker protection
+        sent_count = 0
+        for sub in subscriptions:
+            try:
+                await self.circuit_breakers["connection"].call(
+                    self.ws.send, json.dumps(sub)
+                )
+                self.logger.debug(f"Sent subscription: {sub}")
+                sent_count += 1
+                await asyncio.sleep(0.1)  # Rate limiting
+            except Exception as e:
+                # PRD-001: Enhanced subscription error logging with context
+                channel = sub.get("subscription", {}).get("name", "unknown")
+                pairs = sub.get("pair", [])
+                error_msg = f"Failed to send subscription: channel={channel}, pairs={pairs}, error={e}"
+                
+                # Track subscription errors per pair/channel
+                for pair in pairs:
+                    self.stats["subscription_errors"].append({
+                        "pair": pair,
+                        "channel": channel,
+                        "error": str(e),
+                        "timestamp": time.time(),
+                        "subscription": sub
+                    })
+                
+                self.logger.error(
+                    error_msg,
+                    extra={
+                        "channel": channel,
+                        "pairs": pairs,
+                        "error": str(e),
+                        "subscription": sub
+                    }
+                )
+                # Emit Prometheus counter (PRD-001 Section 1.4)
+                if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                    KRAKEN_WS_ERRORS_TOTAL.labels(error_type='subscription').inc()
+
+        # Log subscription completion at INFO level (PRD-001 Section 8.1 & 4.2)
+        if is_reconnection:
+            self.logger.info(
+                f"Resubscription complete: {sent_count}/{len(subscriptions)} channels successfully resubscribed "
+                f"(ticker, spread, trade, book)"
+            )
+        else:
+            self.logger.info(
+                f"Initial subscriptions complete: {sent_count}/{len(subscriptions)} sent successfully"
+            )
+
+    async def handle_ticker_data(self, channel_id: int, data: dict, channel: str, pair: str):
+        """Handle ticker data and store in Redis with TTL (PRD-001 Section 1.6)"""
+        operation_id = f"ticker_{channel_id}_{time.time()}"
+
+        if self.latency_tracker:
+            self.latency_tracker.start_timing(operation_id)
+
+        try:
+            # Extract ticker information from Kraken format
+            ticker_info = {
+                "pair": pair,
+                "ask": data.get("a", [None, None, None]),  # [price, whole lot volume, lot volume]
+                "bid": data.get("b", [None, None, None]),  # [price, whole lot volume, lot volume]
+                "close": data.get("c", [None, None]),  # [price, lot volume]
+                "volume": data.get("v", [None, None]),  # [today, last 24 hours]
+                "vwap": data.get("p", [None, None]),  # [today, last 24 hours]
+                "trades": data.get("t", [None, None]),  # [today, last 24 hours]
+                "low": data.get("l", [None, None]),  # [today, last 24 hours]
+                "high": data.get("h", [None, None]),  # [today, last 24 hours]
+                "open": data.get("o", [None, None]),  # [today, last 24 hours]
+                "timestamp": time.time(),  # PRD-001 Section 1.6: Add timestamp
+                "sequence": channel_id  # PRD-001 Section 1.6: Add sequence number
+            }
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, ticker_info)
+
+            # Store latest ticker in Redis with 60s TTL (PRD-001 Section 1.6)
+            if self.redis_manager.redis_client:
+                try:
+                    async with self.redis_manager.get_connection() as redis_conn:
+                        # Use simple key format: kraken:ticker:{pair}
+                        redis_key = f"{self.config.redis_streams['ticker']}:{pair.replace('/', '-')}"
+
+                        # Store as JSON with 60s TTL
+                        await redis_conn.setex(
+                            redis_key,
+                            60,  # TTL: 60 seconds
+                            orjson.dumps(ticker_info).decode('utf-8')
+                        )
+                        self.logger.debug(f"[OK] Stored ticker data to Redis key {redis_key}")
+
+                except Exception as e:
+                    if "MAXMEMORY" in str(e) or "OOM" in str(e):
+                        self.logger.warning(f"Redis Cloud memory limit reached: {e}")
+                    else:
+                        self.logger.debug(f"Redis write failed (non-critical): {e}")
+
+            # Call registered callbacks
+            for callback in self.callbacks["ticker"]:
+                try:
+                    await callback(pair, ticker_info)
+                except Exception as e:
+                    self.logger.error(f"Error in ticker callback: {e}")
+
+        except Exception as e:
+            self.stats["errors"] += 1
+            self.logger.error(f"Error handling ticker data: {e}")
+        finally:
+            if self.latency_tracker:
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='ticker')
+                await self.check_latency_circuit_breaker(latency_ms)
+
+    async def handle_trade_data(self, channel_id: int, data: List, channel: str, pair: str):
+        """Handle trade data with enhanced logging and debugging"""
+        operation_id = f"trade_{channel_id}_{time.time()}"
+        
+        if self.latency_tracker:
+            self.latency_tracker.start_timing(operation_id)
+        
+        try:
+            trades = []
+            self.logger.debug(f"🔄 Processing {len(data)} trade records for {pair}")
+            
+            for i, trade_data in enumerate(data):
+                try:
+                    if len(trade_data) < 5:
+                        self.logger.warning(f"[WARN] Incomplete trade data at index {i}: {trade_data}")
+                        continue
+                    
+                    trade = {
+                        "pair": pair,
+                        "price": float(trade_data[0]),
+                        "volume": float(trade_data[1]),
+                        "timestamp": float(trade_data[2]),
+                        "side": trade_data[3],  # 'b' for buy, 's' for sell
+                        "order_type": trade_data[4],  # 'l' for limit, 'm' for market
+                        "misc": trade_data[5] if len(trade_data) > 5 else "",
+                        "received_at": time.time()
+                    }
+                    trades.append(trade)
+                    
+                    # Log significant trades
+                    if trade["volume"] >= 0.01:  # Log trades >= 0.01 BTC
+                        self.logger.info(
+                            f"💰 {pair} Trade: {trade['side'].upper()} "
+                            f"{trade['volume']:.4f} @ ${trade['price']:.2f}"
+                        )
+                    
+                    # Check scalping volume threshold
+                    if (self.config.scalp_enabled and 
+                        trade["volume"] >= self.config.scalp_min_volume):
+                        self.trade_timestamps.append(trade["received_at"])
+                        
+                except (ValueError, IndexError) as e:
+                    self.logger.warning(f"[WARN] Error parsing trade data at index {i}: {e}")
+                    continue
+            
+            if not trades:
+                self.logger.warning(f"[WARN] No valid trades parsed from {len(data)} records for {pair}")
+                return
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, trades)
+
+            # Check scalping rate limits
+            if self.config.scalp_enabled:
+                await self.check_scalping_rate_limit()
+
+            # Stream to Redis only if available - with better error handling
+            if self.redis_manager.redis_client:
+                try:
+                    async with self.redis_manager.get_connection() as redis_conn:
+                        # Shard by pair for scalability
+                        stream_name = (
+                            f"{self.config.redis_streams['trade']}:"
+                            f"{pair.replace('/', '-')}"
+                        )
+                        
+                        # Redis Cloud optimized data structure
+                        # PRD-001 Section 1.6: Include timestamp and sequence number
+                        stream_data = {
+                            "channel": "trade",
+                            "pair": pair,
+                            "trades": orjson.dumps(trades).decode('utf-8'),
+                            "timestamp": str(time.time()),
+                            "sequence": str(channel_id),  # PRD-001 Section 1.6
+                            "shard": pair.replace('/', '-'),
+                            "batch_size": str(len(trades)),
+                            "redis_optimized": "true"
+                        }
+                        
+                        # Use Redis Cloud optimized stream operations
+                        # PRD-001 Section 1.6: MAXLEN 1000 for trade events
+                        await redis_conn.xadd(
+                            stream_name,
+                            stream_data,
+                            maxlen=1000
+                        )
+                        self.logger.debug(
+                            f"[OK] Stored {len(trades)} trades to Redis stream {stream_name}"
+                        )
+                        
+                except Exception as e:
+                    # Redis Cloud specific error handling
+                    if "MAXMEMORY" in str(e) or "OOM" in str(e):
+                        self.logger.warning(f"Redis Cloud memory limit reached: {e}")
+                    else:
+                        self.logger.debug(f"Redis write failed (non-critical): {e}")
+            
+            # Call registered callbacks
+            for callback in self.callbacks["trade"]:
+                try:
+                    await callback(pair, trades)
+                except Exception as e:
+                    self.logger.error(f"Error in trade callback: {e}")
+            
+            # Update statistics
+            self.stats["messages_received"] += 1
+            # PRD-001: Track last message timestamp per pair
+            self.stats["last_message_timestamp_by_pair"][pair] = time.time()
+            self.logger.debug(f"📈 Processed {len(trades)} trades for {pair}")
+            
+        except Exception as e:
+            self.stats["errors"] += 1
+            self.logger.error(f"Error handling trade data: {e}")
+            # Don't raise - continue processing
+        finally:
+            if self.latency_tracker:
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='trade')
+                self.stats["latency_ms"] = latency_ms
+                await self.check_latency_circuit_breaker(latency_ms)
+    
+    async def handle_spread_data(self, channel_id: int, data: List, channel: str, pair: str):
+        """Handle spread data with circuit breaker for wide spreads"""
+        operation_id = f"spread_{channel_id}_{time.time()}"
+        
+        if self.latency_tracker:
+            self.latency_tracker.start_timing(operation_id)
+        
+        try:
+            spread_info = {
+                "pair": pair,
+                "bid": float(data[0]),
+                "ask": float(data[1]),
+                "timestamp": float(data[2]),
+                "bid_volume": float(data[3]),
+                "ask_volume": float(data[4]),
+                "received_at": time.time(),
+                "sequence": channel_id  # PRD-001 Section 1.6: Add sequence number
+            }
+
+            # Calculate spread in basis points
+            spread_bps = ((spread_info["ask"] - spread_info["bid"]) / spread_info["bid"]) * 10000
+            spread_info["spread_bps"] = spread_bps
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, spread_info)
+
+            # Check spread circuit breaker
+            await self.check_spread_circuit_breaker(spread_bps, pair)
+
+            # Persist to Redis (PRD-001 Section 1.6)
+            if self.redis_manager.redis_client:
+                try:
+                    async with self.redis_manager.get_connection() as redis_conn:
+                        # Store latest spread as Redis key with 60s TTL (PRD-001 Section 1.6)
+                        redis_key = f"{self.config.redis_streams['spread']}:{pair.replace('/', '-')}"
+                        await redis_conn.setex(
+                            redis_key,
+                            60,  # TTL: 60 seconds
+                            orjson.dumps(spread_info).decode('utf-8')
+                        )
+
+                        # Also publish to stream for historical tracking
+                        stream_name = f"{self.config.redis_streams['spread']}:stream:{pair.replace('/', '-')}"
+
+                        stream_data = {
+                            "channel": "spread",
+                            "pair": pair,
+                            "data": orjson.dumps(spread_info).decode('utf-8'),
+                            "timestamp": str(time.time()),
+                            "sequence": str(channel_id),  # PRD-001 Section 1.6
+                            "spread_bps": str(spread_bps),
+                            "shard": pair.replace('/', '-')
+                        }
+
+                        await redis_conn.xadd(stream_name, stream_data, maxlen=5000)
+                except Exception as e:
+                    if "MAXMEMORY" in str(e) or "OOM" in str(e):
+                        self.logger.warning(f"Redis Cloud memory limit reached: {e}")
+                    else:
+                        self.logger.debug(f"Redis write failed (non-critical): {e}")
+            
+            # Call registered callbacks
+            for callback in self.callbacks["spread"]:
+                try:
+                    await callback(pair, spread_info)
+                except Exception as e:
+                    self.logger.error(f"Error in spread callback: {e}")
+            
+        except Exception as e:
+            self.stats["errors"] += 1
+            self.logger.error(f"Error handling spread data: {e}")
+            # Don't raise - continue processing
+        finally:
+            if self.latency_tracker:
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='spread')
+                await self.check_latency_circuit_breaker(latency_ms)
+    
+    async def handle_book_data(self, channel_id: int, data: dict, channel: str, pair: str):
+        """Handle order book data - Redis Cloud optimized"""
+        operation_id = f"book_{channel_id}_{time.time()}"
+        
+        if self.latency_tracker:
+            self.latency_tracker.start_timing(operation_id)
+        
+        try:
+            book_data = {
+                "pair": pair,
+                "bids": [[float(price), float(volume), float(timestamp)]
+                        for price, volume, timestamp in data.get("bs", [])],
+                "asks": [[float(price), float(volume), float(timestamp)]
+                        for price, volume, timestamp in data.get("as", [])],
+                "checksum": data.get("c"),
+                "received_at": time.time(),
+                "sequence": channel_id  # PRD-001 Section 1.6: Add sequence number
+            }
+
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, book_data)
+
+            # Persist to Redis (PRD-001 Section 1.6)
+            if self.redis_manager.redis_client:
+                try:
+                    async with self.redis_manager.get_connection() as redis_conn:
+                        # Store latest book snapshot as Redis key with 60s TTL (PRD-001 Section 1.6)
+                        redis_key = f"{self.config.redis_streams['book']}:{pair.replace('/', '-')}"
+                        await redis_conn.setex(
+                            redis_key,
+                            60,  # TTL: 60 seconds
+                            orjson.dumps(book_data).decode('utf-8')
+                        )
+
+                        # Also publish to stream for historical tracking
+                        stream_name = f"{self.config.redis_streams['book']}:stream:{pair.replace('/', '-')}"
+
+                        stream_data = {
+                            "channel": "book",
+                            "pair": pair,
+                            "data": orjson.dumps(book_data).decode('utf-8'),
+                            "timestamp": str(time.time()),
+                            "sequence": str(channel_id),  # PRD-001 Section 1.6
+                            "shard": pair.replace('/', '-')
+                        }
+
+                        await redis_conn.xadd(stream_name, stream_data, maxlen=3000)
+                except Exception as e:
+                    if "MAXMEMORY" in str(e) or "OOM" in str(e):
+                        self.logger.warning(f"Redis Cloud memory limit reached: {e}")
+                    else:
+                        self.logger.debug(f"Redis write failed (non-critical): {e}")
+            
+            # Call registered callbacks
+            for callback in self.callbacks["book"]:
+                try:
+                    await callback(pair, book_data)
+                except Exception as e:
+                    self.logger.error(f"Error in book callback: {e}")
+                    self.stats["errors"] += 1
+                    self.stats["dropped_messages"] += 1
+        finally:
+            if self.latency_tracker:
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='book')
+                await self.check_latency_circuit_breaker(latency_ms)
+    
+    async def handle_ohlc_data(self, channel_id: int, data: List, channel: str, pair: str):
+        """Handle OHLC/candlestick data with safe parsing - Redis Cloud optimized"""
+        operation_id = f"ohlc_{channel_id}_{time.time()}"
+        
+        if self.latency_tracker:
+            self.latency_tracker.start_timing(operation_id)
+        
+        try:
+            # Validate data structure - OHLC data should have at least 10 elements
+            if not isinstance(data, list) or len(data) < 10:
+                self.logger.debug(
+                    f"Invalid OHLC data structure for {pair}: "
+                    f"{len(data) if isinstance(data, list) else 'not list'} elements"
+                )
+                return
+            
+            ohlc = {
+                "pair": pair,
+                "time": float(data[1]) if len(data) > 1 else 0,
+                "etime": float(data[2]) if len(data) > 2 else 0,
+                "open": float(data[3]) if len(data) > 3 else 0,
+                "high": float(data[4]) if len(data) > 4 else 0,
+                "low": float(data[5]) if len(data) > 5 else 0,
+                "close": float(data[6]) if len(data) > 6 else 0,
+                "vwap": float(data[7]) if len(data) > 7 else 0,
+                "volume": float(data[8]) if len(data) > 8 else 0,
+                "count": int(data[9]) if len(data) > 9 else 0,
+                "received_at": time.time()
+            }
+
+            # PRD-001: Track last message timestamp per pair
+            self.stats["last_message_timestamp_by_pair"][pair] = time.time()
+            
+            # Cache data for graceful degradation (PRD-001 Section 1.4)
+            self.cache_data(channel, pair, ohlc)
+
+            # Stream to Redis only if available - Redis Cloud optimized
+            if self.redis_manager.redis_client:
+                try:
+                    async with self.redis_manager.get_connection() as redis_conn:
+                        stream_name = (
+                            f"{self.config.redis_streams['ohlc']}:"
+                            f"{pair.replace('/', '-')}"
+                        )
+                        
+                        stream_data = {
+                            "channel": "ohlc",
+                            "pair": pair,
+                            "data": orjson.dumps(ohlc).decode('utf-8'),
+                            "timestamp": str(time.time()),
+                            "shard": pair.replace('/', '-')
+                        }
+                        
+                        await redis_conn.xadd(stream_name, stream_data, maxlen=2000)
+                except Exception as e:
+                    if "MAXMEMORY" in str(e) or "OOM" in str(e):
+                        self.logger.warning(f"Redis Cloud memory limit reached: {e}")
+                    else:
+                        self.logger.debug(f"Redis write failed (non-critical): {e}")
+            
+            # Call registered callbacks
+            for callback in self.callbacks["ohlc"]:
+                try:
+                    await callback(pair, ohlc)
+                except Exception as e:
+                    self.logger.error(f"Error in ohlc callback: {e}")
+            
+        except (ValueError, IndexError) as e:
+            self.logger.debug(f"Error parsing OHLC data for {pair}: {e}")
+        except Exception as e:
+            self.stats["errors"] += 1
+            self.logger.error(f"Error handling OHLC data: {e}")
+            # Don't raise - continue processing
+        finally:
+            if self.latency_tracker:
+                latency_ms = self.latency_tracker.end_timing(operation_id, channel='ohlc')
+                await self.check_latency_circuit_breaker(latency_ms)
+    
+    async def handle_subscription_status(self, data: dict):
+        """Handle subscription confirmation messages"""
+        status = data.get("status")
+        subscription = data.get("subscription", {})
+        channel = subscription.get("name")
+        
+        if status == "subscribed":
+            self.logger.info(f"[OK] Subscribed to {channel}")
+        elif status == "error":
+            error_msg = data.get("errorMessage", "Unknown error")
+            self.logger.error(f"[ERROR] Subscription error for {channel}: {error_msg}")
+    
+    def validate_message_schema(self, data) -> tuple[bool, str]:
+        """
+        Validate Kraken message schema (PRD-001 Section 1.3).
+
+        Returns:
+            tuple[bool, str]: (is_valid, error_message)
+        """
+        # Event messages (dict) are valid - they have different schema
+        if isinstance(data, dict):
+            return True, ""
+
+        # Data messages must be arrays with at least 4 elements (PRD-001 Section 1.3)
+        if not isinstance(data, list):
+            return False, f"Invalid message type: expected list or dict, got {type(data).__name__}"
+
+        if len(data) < 4:
+            return False, f"Invalid message length: expected >= 4, got {len(data)}"
+
+        # Check required fields: channel_id (int), payload (dict/list), channel (str), pair (str)
+        channel_id = data[0]
+        payload = data[1]
+        channel = data[2]
+        pair = normalize_kraken_pair(data[3])  # PRD-001: Normalize XBT -> BTC
+
+        # Validate channel_id is numeric
+        if not isinstance(channel_id, (int, float)):
+            return False, f"Invalid channel_id type: expected int, got {type(channel_id).__name__}"
+
+        # Validate payload is dict or list
+        if not isinstance(payload, (dict, list)):
+            return False, f"Invalid payload type: expected dict or list, got {type(payload).__name__}"
+
+        # Validate channel is string
+        if not isinstance(channel, str):
+            return False, f"Invalid channel type: expected str, got {type(channel).__name__}"
+
+        # Validate pair is string
+        if not isinstance(pair, str):
+            return False, f"Invalid pair type: expected str, got {type(pair).__name__}"
+
+        # All validations passed
+        return True, ""
+
+    def extract_and_validate_sequence(self, data: list, channel: str, pair: str) -> None:
+        """
+        Extract and validate sequence numbers from Kraken messages (PRD-001 Section 1.3).
+
+        Tracks last sequence number per channel and detects gaps.
+        Currently, sequence numbers are primarily found in book (order book) messages.
+        """
+        # Only list messages can have sequence numbers
+        if not isinstance(data, list) or len(data) < 2:
+            return
+
+        payload = data[1]
+
+        # Extract sequence number from payload (if available)
+        sequence = None
+
+        # For book messages, sequence may be in the payload dict
+        if isinstance(payload, dict):
+            # Try different possible sequence field names
+            sequence = payload.get("s") or payload.get("sequence")
+
+        # If we found a sequence number, validate it
+        if sequence is not None:
+            try:
+                sequence = int(sequence)
+            except (ValueError, TypeError):
+                self.logger.warning(f"Invalid sequence number format for {channel}/{pair}: {sequence}")
+                return
+
+            # Create unique key for this channel/pair combination
+            channel_key = f"{channel}:{pair}"
+
+            # Check for sequence gaps (PRD-001 Section 1.3)
+            if channel_key in self.last_sequence:
+                last_seq = self.last_sequence[channel_key]
+                expected_seq = last_seq + 1
+
+                if sequence != expected_seq:
+                    gap = sequence - last_seq
+                    self.logger.warning(
+                        f"Sequence gap detected for {channel}/{pair}: "
+                        f"expected {expected_seq}, got {sequence} (gap: {gap})"
+                    )
+
+                    # Emit Prometheus counter for sequence gaps (PRD-001 Section 1.3)
+                    if PROMETHEUS_AVAILABLE and KRAKEN_WS_MESSAGE_GAPS_TOTAL:
+                        KRAKEN_WS_MESSAGE_GAPS_TOTAL.labels(channel=channel).inc()
+
+            # Update last sequence for this channel
+            self.last_sequence[channel_key] = sequence
+
+    def validate_message_timestamp(self, data: list, channel: str) -> tuple[bool, str]:
+        """
+        Validate message timestamp (PRD-001 Section 1.3).
+
+        Rejects messages that are:
+        - More than 5 seconds old (stale data protection)
+        - More than 5 seconds in the future (clock skew protection)
+
+        Returns:
+            tuple[bool, str]: (is_valid, rejection_reason)
+        """
+        # Only list messages can have timestamps
+        if not isinstance(data, list) or len(data) < 2:
+            return True, ""
+
+        payload = data[1]
+        timestamp = None
+
+        # Extract timestamp from payload
+        # Different message types have timestamps in different locations
+        if isinstance(payload, dict):
+            # Book messages might have timestamp in the dict
+            timestamp = payload.get("timestamp") or payload.get("ts") or payload.get("time")
+        elif isinstance(payload, list) and len(payload) > 0:
+            # Trade/OHLC messages often have timestamp as last element in each trade
+            # Try to find a timestamp field
+            for item in payload:
+                if isinstance(item, dict):
+                    timestamp = item.get("timestamp") or item.get("ts") or item.get("time")
+                    if timestamp:
+                        break
+
+        # If we found a timestamp, validate it
+        if timestamp is not None:
+            try:
+                # Convert to float if it's a string
+                if isinstance(timestamp, str):
+                    message_time = float(timestamp)
+                else:
+                    message_time = float(timestamp)
+
+                current_time = time.time()
+                time_delta = current_time - message_time
+
+                # Reject if more than 5 seconds old (stale data)
+                if time_delta > 5.0:
+                    reason = f"stale (age: {time_delta:.2f}s)"
+                    self.logger.warning(
+                        f"Rejecting stale message for {channel}: "
+                        f"timestamp {message_time:.2f}, current {current_time:.2f}, "
+                        f"delta {time_delta:.2f}s"
+                    )
+
+                    # Emit Prometheus counter (PRD-001 Section 1.3)
+                    if PROMETHEUS_AVAILABLE and KRAKEN_WS_STALE_MESSAGES_TOTAL:
+                        KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel=channel, reason='stale').inc()
+
+                    return False, reason
+
+                # Reject if more than 5 seconds in the future (clock skew)
+                if time_delta < -5.0:
+                    reason = f"future (delta: {abs(time_delta):.2f}s)"
+                    self.logger.warning(
+                        f"Rejecting future-dated message for {channel}: "
+                        f"timestamp {message_time:.2f}, current {current_time:.2f}, "
+                        f"delta {time_delta:.2f}s"
+                    )
+
+                    # Emit Prometheus counter (PRD-001 Section 1.3)
+                    if PROMETHEUS_AVAILABLE and KRAKEN_WS_STALE_MESSAGES_TOTAL:
+                        KRAKEN_WS_STALE_MESSAGES_TOTAL.labels(channel=channel, reason='future').inc()
+
+                    return False, reason
+
+            except (ValueError, TypeError) as e:
+                self.logger.debug(f"Could not parse timestamp for {channel}: {e}")
+                # Don't reject on parse errors - might not be a timestamp field
+
+        # No timestamp found or timestamp is valid
+        return True, ""
+
+    def generate_message_id(self, data: list, channel: str, pair: str) -> str:
+        """
+        Generate unique message ID for deduplication (PRD-001 Section 1.3).
+
+        Creates ID from: channel + pair + timestamp + sequence + payload hash
+
+        Returns:
+            str: Unique message ID
+        """
+        if not isinstance(data, list) or len(data) < 2:
+            return ""
+
+        payload = data[1]
+
+        # Start with channel and pair
+        id_parts = [channel, pair]
+
+        # Add timestamp if available
+        if isinstance(payload, dict):
+            timestamp = payload.get("timestamp") or payload.get("ts") or payload.get("time")
+            if timestamp:
+                id_parts.append(str(timestamp))
+
+            # Add sequence if available
+            sequence = payload.get("s") or payload.get("sequence")
+            if sequence:
+                id_parts.append(str(sequence))
+
+        # Add a hash of the payload for uniqueness
+        # Use a simple string representation to keep it lightweight
+        payload_str = str(payload)[:100]  # First 100 chars to keep it manageable
+        id_parts.append(str(hash(payload_str)))
+
+        return ":".join(id_parts)
+
+    def cache_data(self, channel: str, pair: str, data: Any) -> None:
+        """
+        Cache latest data for graceful degradation (PRD-001 Section 1.4).
+
+        Stores data with timestamp for 5-minute TTL.
+
+        Args:
+            channel: Channel name (e.g., 'trade', 'spread', 'ticker', 'book')
+            pair: Trading pair (e.g., 'BTC/USD')
+            data: Data to cache
+        """
+        cache_key = f"{channel}:{pair}"
+        self.data_cache[cache_key] = {
+            "data": data,
+            "timestamp": time.time(),
+            "channel": channel,
+            "pair": pair
+        }
+        self.logger.debug(f"Cached data for {cache_key}")
+
+    def get_cached_data(self, channel: str, pair: str) -> Optional[Dict[str, Any]]:
+        """
+        Get cached data if available and not stale (PRD-001 Section 1.4).
+
+        Returns cached data only if:
+        - Cache entry exists
+        - Cache age < TTL (5 minutes)
+        - WebSocket has been unavailable > 30 seconds
+
+        Args:
+            channel: Channel name
+            pair: Trading pair
+
+        Returns:
+            Cached data dict with 'data', 'timestamp', 'age' keys, or None
+        """
+        cache_key = f"{channel}:{pair}"
+
+        # Check if we have cached data
+        if cache_key not in self.data_cache:
+            return None
+
+        cached = self.data_cache[cache_key]
+        cache_age = time.time() - cached["timestamp"]
+
+        # Check if cache is still valid (< 5 minutes old)
+        if cache_age > self.cache_ttl:
+            self.logger.debug(f"Cache expired for {cache_key} (age: {cache_age:.1f}s)")
+            return None
+
+        # Only serve cached data if WebSocket has been unavailable > 30 seconds
+        time_since_connection = time.time() - self.connection_state_changed_at
+        if self.connection_state == ConnectionState.CONNECTED or time_since_connection < 30:
+            return None  # Don't serve cache if recently connected
+
+        self.logger.info(
+            f"Serving cached data for {cache_key} "
+            f"(age: {cache_age:.1f}s, disconnected: {time_since_connection:.1f}s)"
+        )
+
+        return {
+            "data": cached["data"],
+            "timestamp": cached["timestamp"],
+            "age": cache_age,
+            "cached": True
+        }
+
+    def is_cache_valid(self, channel: str, pair: str) -> bool:
+        """
+        Check if cached data exists and is valid (PRD-001 Section 1.4).
+
+        Args:
+            channel: Channel name
+            pair: Trading pair
+
+        Returns:
+            True if cache exists and age < TTL (5 minutes)
+        """
+        cache_key = f"{channel}:{pair}"
+
+        if cache_key not in self.data_cache:
+            return False
+
+        cache_age = time.time() - self.data_cache[cache_key]["timestamp"]
+        return cache_age <= self.cache_ttl
+
+    def check_backpressure(self) -> bool:
+        """
+        Check for backpressure and drop oldest messages if needed (PRD-001 Section 1.5).
+
+        If queue depth > 1000, logs warning and drops oldest messages.
+        Handles 100+ messages/second without backpressure under normal conditions.
+
+        Returns:
+            bool: True if backpressure detected, False otherwise
+        """
+        queue_depth = len(self.message_queue)
+
+        if queue_depth > self.backpressure_threshold:
+            # Only log warning once per minute to avoid log spam
+            current_time = time.time()
+            if current_time - self.backpressure_warned_at > 60:
+                self.logger.warning(
+                    f"Backpressure detected: queue depth = {queue_depth} "
+                    f"(threshold = {self.backpressure_threshold}). "
+                    f"Dropping oldest messages to prevent memory overflow."
+                )
+                self.backpressure_warned_at = current_time
+
+                # Emit Prometheus counter (PRD-001 Section 1.5)
+                if PROMETHEUS_AVAILABLE and KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL:
+                    KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL.labels(action='threshold_exceeded').inc()
+
+            # Drop oldest messages (deque will auto-evict at maxlen=10000)
+            # But we actively clear down to threshold to recover faster
+            messages_to_drop = queue_depth - self.backpressure_threshold
+            for _ in range(min(messages_to_drop, 100)):  # Drop max 100 at a time
+                if self.message_queue:
+                    self.message_queue.popleft()
+
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL:
+                KRAKEN_WS_BACKPRESSURE_EVENTS_TOTAL.labels(action='messages_dropped').inc()
+
+            return True
+
+        return False
+
+    def check_duplicate(self, data: list, channel: str, pair: str) -> bool:
+        """
+        Check if message is a duplicate (PRD-001 Section 1.3).
+
+        Maintains a cache of last 100 message IDs per channel.
+
+        Returns:
+            bool: True if duplicate, False if new message
+        """
+        # Generate message ID
+        msg_id = self.generate_message_id(data, channel, pair)
+
+        if not msg_id:
+            return False  # Can't determine, assume not duplicate
+
+        # Get or create dedup cache for this channel
+        channel_key = f"{channel}:{pair}"
+        if channel_key not in self.dedup_cache:
+            self.dedup_cache[channel_key] = deque(maxlen=100)
+
+        # Check if message ID is in cache
+        if msg_id in self.dedup_cache[channel_key]:
+            # Duplicate detected!
+            self.logger.warning(f"Duplicate message detected for {channel}/{pair}: {msg_id}")
+
+            # Emit Prometheus counter (PRD-001 Section 1.3)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_DUPLICATES_REJECTED_TOTAL:
+                KRAKEN_WS_DUPLICATES_REJECTED_TOTAL.labels(channel=channel).inc()
+
+            return True
+
+        # Not a duplicate - add to cache
+        self.dedup_cache[channel_key].append(msg_id)
+        return False
+
+    async def handle_message(self, message: str):
+        """Handle incoming WebSocket messages with enhanced debugging and validation (PRD-001 Section 1.3)"""
+        message_start_time = time.time()
+
+        # Check backpressure before processing (PRD-001 Section 1.5)
+        # If queue too deep, oldest messages will be dropped
+        self.check_backpressure()
+
+        # Add to message queue for backpressure tracking
+        self.message_queue.append(message_start_time)
+
+        try:
+            data = json.loads(message)
+            self.stats["messages_received"] += 1
+            self.stats["last_data_time"] = time.time()
+
+            # Enhanced logging for debugging
+            if isinstance(data, dict):
+                event_type = data.get("event", "unknown")
+                self.logger.debug(f"📨 Received event: {event_type}")
+
+                if data.get("event") == "subscriptionStatus":
+                    await self.handle_subscription_status(data)
+                elif data.get("event") == "systemStatus":
+                    status = data.get("status")
+                    self.logger.info(f"Kraken system status: {status}")
+                elif data.get("event") == "heartbeat":
+                    self.last_heartbeat = time.time()
+                    self.logger.debug("💓 Heartbeat received")
+                return
+
+            # Validate message schema (PRD-001 Section 1.3)
+            is_valid, error_msg = self.validate_message_schema(data)
+            if not is_valid:
+                self.logger.warning(f"Invalid message schema: {error_msg}")
+                self.stats["errors"] += 1
+                return
+
+            # Handle data messages (arrays) with enhanced logging
+            if isinstance(data, list) and len(data) >= 4:
+                channel_id = data[0]
+                payload = data[1]
+                channel = data[2]
+                pair = normalize_kraken_pair(data[3])  # PRD-001: Normalize XBT -> BTC
+
+                # Extract and validate sequence numbers (PRD-001 Section 1.3)
+                self.extract_and_validate_sequence(data, channel, pair)
+
+                # Validate message timestamp (PRD-001 Section 1.3)
+                is_valid_timestamp, rejection_reason = self.validate_message_timestamp(data, channel)
+                if not is_valid_timestamp:
+                    self.logger.debug(f"Message rejected due to timestamp: {rejection_reason}")
+                    self.stats["errors"] += 1
+                    return
+
+                # Check for duplicate messages (PRD-001 Section 1.3)
+                if self.check_duplicate(data, channel, pair):
+                    self.logger.debug(f"Message rejected: duplicate")
+                    self.stats["errors"] += 1
+                    return
+
+                # Log the message type for debugging
+                self.logger.debug(f"📊 Received {channel} data for {pair} (items: {len(payload) if isinstance(payload, list) else 'dict'})")
+
+                # Route to appropriate handler with circuit breaker protection
+                try:
+                    if channel.startswith("ticker"):
+                        await self.circuit_breakers["connection"].call(
+                            self.handle_ticker_data, channel_id, payload, channel, pair
+                        )
+                    elif channel.startswith("trade"):
+                        await self.circuit_breakers["connection"].call(
+                            self.handle_trade_data, channel_id, payload, channel, pair
+                        )
+                    elif channel.startswith("spread"):
+                        await self.circuit_breakers["spread"].call(
+                            self.handle_spread_data, channel_id, payload, channel, pair
+                        )
+                    elif channel.startswith("book"):
+                        await self.circuit_breakers["connection"].call(
+                            self.handle_book_data, channel_id, payload, channel, pair
+                        )
+                    elif channel.startswith("ohlc"):
+                        await self.circuit_breakers["connection"].call(
+                            self.handle_ohlc_data, channel_id, payload, channel, pair
+                        )
+                    else:
+                        self.logger.debug(f"🤷 Unknown channel type: {channel}")
+                except Exception as e:
+                    self.logger.error(f"Handler error for {channel}: {e}")
+                    # Emit Prometheus counter (PRD-001 Section 1.4)
+                    if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                        KRAKEN_WS_ERRORS_TOTAL.labels(error_type='handler_error').inc()
+                    # Don't raise - continue processing other messages
+            else:
+                self.logger.debug(f"📋 Received data structure: {type(data)} with length {len(data) if hasattr(data, '__len__') else 'unknown'}")
+
+        except json.JSONDecodeError as e:
+            self.stats["errors"] += 1
+            self.logger.warning(f"Message parsing error: {e}")  # PRD-001 Section 1.4: WARNING level for parsing errors
+            self.logger.debug(f"Raw message: {message[:200]}...")  # First 200 chars for debugging
+            # Emit Prometheus counter (PRD-001 Section 1.4)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                KRAKEN_WS_ERRORS_TOTAL.labels(error_type='json_decode').inc()
+        except Exception as e:
+            self.stats["errors"] += 1
+            self.logger.error(f"Error handling message: {e}")
+            # Emit Prometheus counter (PRD-001 Section 1.4)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                KRAKEN_WS_ERRORS_TOTAL.labels(error_type='message_handling').inc()
+            # Don't raise - continue processing
+        finally:
+            # Track message processing latency
+            if self.latency_tracker:
+                processing_time = (time.time() - message_start_time) * 1000
+                if processing_time > 10:  # Log slow message processing
+                    self.logger.warning(f"Slow message processing: {processing_time:.2f}ms")
+    
+    def register_callback(self, channel: str, callback: Callable):
+        """Register a callback for specific channel data"""
+        if channel in self.callbacks:
+            self.callbacks[channel].append(callback)
+        else:
+            self.logger.warning(f"Unknown channel: {channel}")
+    
+    async def _get_redis_cloud_health(self) -> Dict[str, Any]:
+        """Get Redis Cloud specific health metrics"""
+        health = {
+            "connected": False,
+            "memory_usage_mb": 0,
+            "memory_usage_percent": 0,
+            "connection_count": 0,
+            "latency_ms": 0
+        }
+        
+        if not self.redis_manager.redis_client:
+            return health
+        
+        try:
+            start_time = time.time()
+            
+            # Test connection and measure latency
+            await self.redis_manager.redis_client.ping()
+            health["latency_ms"] = (time.time() - start_time) * 1000
+            health["connected"] = True
+            
+            # Get memory info
+            info = await self.redis_manager.redis_client.info('memory')
+            health["memory_usage_mb"] = int(info.get('used_memory', 0)) / (1024 * 1024)
+            
+            # Estimate percentage (Redis Cloud typically has 100MB limit)
+            health["memory_usage_percent"] = (health["memory_usage_mb"] / self.config.redis_memory_threshold_mb) * 100
+            
+            # Get connection info
+            client_info = await self.redis_manager.redis_client.info('clients')
+            health["connection_count"] = int(client_info.get('connected_clients', 0))
+            
+        except Exception as e:
+            self.logger.debug(f"Redis Cloud health check failed: {e}")
+        
+        return health
+    
+    def get_health_metrics(self) -> Dict[str, Any]:
+        """
+        Get comprehensive health metrics (PRD-001 Section 4.1).
+
+        Returns:
+            Dict with health metrics including:
+            - last_message_timestamp_by_pair: Dict[pair, timestamp]
+            - reconnect_count_by_pair: Dict[pair, count]
+            - overall connection health
+            - subscription errors
+            - dropped messages count
+        """
+        current_time = time.time()
+        
+        # Calculate time since last message for each pair
+        pair_freshness = {}
+        for pair, timestamp in self.stats["last_message_timestamp_by_pair"].items():
+            age_seconds = current_time - timestamp
+            pair_freshness[pair] = {
+                "last_message_timestamp": timestamp,
+                "age_seconds": age_seconds,
+                "is_fresh": age_seconds < 120,  # Fresh if < 2 minutes old
+            }
+        
+        return {
+            "connection_state": self.connection_state.value,
+            "is_healthy": self.is_healthy,
+            "reconnection_attempt": self.reconnection_attempt,
+            "total_reconnects": self.stats["reconnects"],
+            "last_message_timestamp_by_pair": pair_freshness,
+            "reconnect_count_by_pair": dict(self.stats["reconnect_count_by_pair"]),
+            "subscription_errors": self.stats["subscription_errors"][-10:],  # Last 10 errors
+            "dropped_messages": self.stats["dropped_messages"],
+            "total_messages_received": self.stats["messages_received"],
+            "total_errors": self.stats["errors"],
+            "circuit_breaker_trips": self.stats["circuit_breaker_trips"],
+        }
+    
+    def get_last_message_age_summary(self) -> Dict[str, float]:
+        """
+        Get last message age per pair in seconds (PRD-001 Task B requirement).
+        
+        Returns:
+            Dict mapping pair -> age_seconds (None if no messages received)
+        """
+        current_time = time.time()
+        summary = {}
+        
+        for pair, timestamp in self.stats["last_message_timestamp_by_pair"].items():
+            summary[pair] = current_time - timestamp
+            
+        # Include all configured pairs, even if no messages received
+        for pair in self.config.pairs:
+            if pair not in summary:
+                summary[pair] = None
+                
+        return summary
+    
+    async def monitor_health(self):
+        """Enhanced health monitoring with Redis Cloud specific metrics"""
+        while self.running:
+            try:
+                current_time = time.time()
+
+                # PRD-001 Section 2.1: Redis PING health check every 60 seconds
+                await self.redis_manager.health_check()
+
+                # PRD-001 Section 2.2: Update stream length metrics
+                await self.redis_manager.update_stream_metrics()
+
+                # PRD-001 Task B: Log last message age per pair (every 60 seconds)
+                if int(current_time) % 60 == 0:  # Log every minute
+                    age_summary = self.get_last_message_age_summary()
+                    age_str = ", ".join([
+                        f"{pair}: {age:.1f}s" if age is not None else f"{pair}: NO_MSG"
+                        for pair, age in sorted(age_summary.items())
+                    ])
+                    self.logger.info(f"Last message age per pair: {age_str}")
+
+                # Check overall health status (PRD-001 Section 4.1)
+                if not self.is_healthy:
+                    time_disconnected = current_time - self.connection_state_changed_at
+                    self.logger.warning(
+                        f"[WARN] Bot unhealthy: WebSocket disconnected for {time_disconnected:.1f}s (> 2 minutes)"
+                    )
+
+                # Check heartbeat and PONG timeout (PRD-001 Section 4.1)
+                time_since_heartbeat = current_time - self.last_heartbeat
+                if time_since_heartbeat > 60:
+                    self.logger.warning(
+                        f"[WARN] Connection timeout: No PONG/heartbeat for {time_since_heartbeat:.1f}s (> 60s)"
+                    )
+
+                    # Close WebSocket to trigger reconnection (PRD-001 Section 4.1)
+                    if self.ws and self.connection_state == ConnectionState.CONNECTED:
+                        self.logger.warning("Closing WebSocket due to PONG timeout, will reconnect...")
+                        try:
+                            await self.ws.close()
+                        except Exception as close_error:
+                            self.logger.error(f"Error closing WebSocket: {close_error}")
+
+                # Check data flow
+                if self.stats["last_data_time"]:
+                    time_since_data = current_time - self.stats["last_data_time"]
+                    if time_since_data > 30:
+                        self.logger.warning(f"No data received for {time_since_data:.1f}s")
+                
+                # Calculate trades per minute
+                recent_trades = len([ts for ts in self.trade_timestamps if current_time - ts < 60])
+                self.stats["trades_per_minute"] = recent_trades
+                
+                # Get latency statistics
+                latency_stats = self.latency_tracker.get_stats() if self.latency_tracker else {}
+                
+                # Circuit breaker statuses
+                cb_statuses = {name: cb.state.value for name, cb in self.circuit_breakers.items()}
+                
+                # Redis Cloud specific health metrics
+                redis_health = await self._get_redis_cloud_health()
+                
+                # Emit comprehensive health metrics to Redis
+                if self.redis_manager.redis_client:
+                    try:
+                        async with self.redis_manager.get_connection() as redis_conn:
+                            health_data = {
+                                "timestamp": str(current_time),
+                                "is_healthy": str(self.is_healthy),  # PRD-001 Section 4.1
+                                "connection_state": self.connection_state.value,  # PRD-001 Section 4.1
+                                "messages_received": str(self.stats["messages_received"]),
+                                "reconnects": str(self.stats["reconnects"]),
+                                "time_since_heartbeat": str(time_since_heartbeat),
+                                "running": str(self.running),
+                                "errors": str(self.stats["errors"]),
+                                "trades_per_minute": str(self.stats["trades_per_minute"]),
+                                "circuit_breaker_trips": str(self.stats["circuit_breaker_trips"]),
+                                **{f"latency_{k}": str(v) for k, v in latency_stats.items()},
+                                **{f"cb_{k}": v for k, v in cb_statuses.items()},
+                                # Redis Cloud health metrics
+                                **{f"redis_{k}": str(v) for k, v in redis_health.items()}
+                            }
+                            # Use smaller max length for Redis Cloud
+                            await redis_conn.xadd("kraken:health", health_data, maxlen=1000)
+                    except Exception as e:
+                        self.logger.error(f"Failed to emit health metrics: {e}")
+                
+                # Adaptive monitoring interval based on Redis Cloud performance
+                sleep_interval = self.config.metrics_interval
+                if redis_health.get('memory_usage_percent', 0) > 80:
+                    # Monitor more frequently if memory high
+                    sleep_interval = max(5, sleep_interval // 2)
+                
+                await asyncio.sleep(sleep_interval)
+                
+            except Exception as e:
+                self.logger.error(f"Error in health monitor: {e}")
+                await asyncio.sleep(self.config.metrics_interval)
+
+    async def connect_once(self):
+        """Single connection attempt with circuit breaker protection"""
+        try:
+            # Set state to CONNECTING (PRD-001 Section 4.1)
+            self._set_connection_state(ConnectionState.CONNECTING, "Starting connection attempt")
+            self.logger.info(f"Kraken WS connecting to {self.config.url}")
+
+            async with websockets.connect(
+                self.config.url,
+                ping_interval=self.config.ping_interval,
+                ping_timeout=self.config.ping_timeout,  # PRD-001 Section 4.1: PONG timeout detection
+                close_timeout=self.config.close_timeout,
+                compression=None,  # Kraken doesn't support compression
+                max_size=self.websocket_read_limit,  # PRD-001 Section 1.5: 50MB read buffer
+                write_limit=self.websocket_write_limit  # PRD-001 Section 1.5: 50MB write buffer
+            ) as ws:
+                self.ws = ws
+
+                # Set state to CONNECTED (PRD-001 Section 4.1)
+                self._set_connection_state(ConnectionState.CONNECTED, "WebSocket connection established")
+                self.logger.info("Kraken WS connected")
+
+                # Setup subscriptions
+                await self.setup_subscriptions()
+                
+                # Start health monitoring if enabled
+                health_task = None
+                if self.config.enable_health_monitoring:
+                    health_task = asyncio.create_task(self.monitor_health())
+                
+                try:
+                    # Main message loop
+                    async for message in ws:
+                        if isinstance(message, (bytes, bytearray)):
+                            message = message.decode('utf-8')
+                        await self.handle_message(message)
+                        
+                except websockets.exceptions.ConnectionClosed as e:
+                    # Handle WebSocket protocol errors (PRD-001 Section 1.4)
+                    close_code = e.code if hasattr(e, 'code') else None
+                    close_reason = e.reason if hasattr(e, 'reason') else "Unknown"
+
+                    # Log based on close code
+                    if close_code == 1000:
+                        # Normal closure
+                        self.logger.info(f"Kraken WS closed normally (code 1000): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Normal closure")
+                    elif close_code == 1001:
+                        # Going away
+                        self.logger.info(f"Kraken WS endpoint going away (code 1001): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Endpoint going away")
+                    elif close_code == 1006:
+                        # Abnormal closure (connection lost)
+                        self.logger.warning(f"Kraken WS abnormal closure (code 1006): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Abnormal closure - connection lost")
+                        # Emit error counter for abnormal closures
+                        if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                            KRAKEN_WS_ERRORS_TOTAL.labels(error_type='protocol_error_1006').inc()
+                    elif close_code == 1011:
+                        # Server error
+                        self.logger.error(f"Kraken WS server error (code 1011): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Server error")
+                        if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                            KRAKEN_WS_ERRORS_TOTAL.labels(error_type='protocol_error_1011').inc()
+                    elif close_code == 1012:
+                        # Service restart
+                        self.logger.info(f"Kraken WS service restarting (code 1012): {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, "Service restart")
+                    else:
+                        # Other close codes
+                        self.logger.warning(f"Kraken WS closed with code {close_code}: {close_reason}")
+                        self._set_connection_state(ConnectionState.DISCONNECTED, f"Closed with code {close_code}")
+                        if close_code and close_code >= 1002:  # Error codes start at 1002
+                            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                                KRAKEN_WS_ERRORS_TOTAL.labels(error_type=f'protocol_error_{close_code}').inc()
+                finally:
+                    if health_task:
+                        health_task.cancel()
+                        try:
+                            await health_task
+                        except asyncio.CancelledError:
+                            pass
+
+        except websockets.exceptions.WebSocketException as e:
+            # Handle other WebSocket exceptions (PRD-001 Section 1.4)
+            self._set_connection_state(ConnectionState.DISCONNECTED, f"WebSocket error: {str(e)}")
+            self.logger.error(f"Kraken WS protocol error: {e}")
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                KRAKEN_WS_ERRORS_TOTAL.labels(error_type='websocket_protocol').inc()
+            raise
+        except Exception as e:
+            # Set state to DISCONNECTED on error (PRD-001 Section 4.1)
+            self._set_connection_state(ConnectionState.DISCONNECTED, f"Connection error: {str(e)}")
+            self.logger.error(f"Kraken WS connection error: {e}")  # PRD-001 Section 1.4: ERROR level with exception details
+            # Emit Prometheus counter (PRD-001 Section 1.4)
+            if PROMETHEUS_AVAILABLE and KRAKEN_WS_ERRORS_TOTAL:
+                KRAKEN_WS_ERRORS_TOTAL.labels(error_type='connection').inc()
+            raise
+
+    async def start(self):
+        """Start the WebSocket client with enhanced reconnection logic (PRD-001 Section 4.2)"""
+        self.running = True
+        await self.redis_manager.initialize_pool()
+
+        # PRD-001 Section 2.2: Verify stream configuration on startup
+        await self.redis_manager.verify_stream_configuration()
+
+        backoff = self.config.reconnect_delay
+        max_backoff = 60
+
+        while self.running:
+            try:
+                await self.circuit_breakers["connection"].call(self.connect_once)
+                # If we get here, connection closed normally
+                if not self.running:
+                    break
+
+                # Reset backoff and reconnection attempt on successful connection (PRD-001 Section 4.2)
+                # For 24/7 operation, successful reconnection means engine is healthy again
+                backoff = self.config.reconnect_delay
+                previous_attempts = self.reconnection_attempt
+                self.reconnection_attempt = 0
+                self.logger.info(
+                    "Connection successful - reconnection attempt counter reset to 0 "
+                    "(previous attempts=%d, pairs=%s)",
+                    previous_attempts,
+                    self.config.pairs,
+                    extra={
+                        "component": "kraken_ws",
+                        "event": "reconnection_success",
+                        "previous_attempts": previous_attempts,
+                        "pairs": self.config.pairs,
+                    }
+                )
+
+            except Exception as e:
+                self.reconnection_attempt += 1
+                self.stats["reconnects"] += 1  # Keep historical total
+                downtime = time.time() - self.connection_state_changed_at
+                
+                # Enhanced logging for 24/7 operation: include context for debugging
+                # This helps operators understand reconnect patterns and correlate with incidents
+                error_type = type(e).__name__
+                error_msg = str(e)[:200]  # Truncate long error messages
+                
+                self.logger.warning(
+                    "Kraken WS reconnect triggered: attempt=%d/%d, downtime=%.1fs, "
+                    "state=%s, error_type=%s, error=%s",
+                    self.reconnection_attempt,
+                    self.config.max_retries,
+                    downtime,
+                    self.connection_state.value,
+                    error_type,
+                    error_msg,
+                    extra={
+                        "component": "kraken_ws",
+                        "reconnection_attempt": self.reconnection_attempt,
+                        "max_retries": self.config.max_retries,
+                        "downtime_seconds": round(downtime, 1),
+                        "connection_state": self.connection_state.value,
+                        "error_type": error_type,
+                        "pairs": self.config.pairs,
+                    }
+                )
+
+                # Emit Prometheus counter for reconnection attempts (PRD-001 Section 4.2)
+                if PROMETHEUS_AVAILABLE and KRAKEN_WS_RECONNECTS_TOTAL:
+                    KRAKEN_WS_RECONNECTS_TOTAL.inc()
+
+                # Set state to RECONNECTING (PRD-001 Section 4.1)
+                self._set_connection_state(
+                    ConnectionState.RECONNECTING,
+                    f"Reconnection attempt {self.reconnection_attempt}/{self.config.max_retries}"
+                )
+
+                # Log error details for debugging (but don't log full traceback unless DEBUG)
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug(
+                        f"Kraken WS connection failure details (attempt {self.reconnection_attempt}/{self.config.max_retries}): {e}",
+                        exc_info=True
+                    )
+                else:
+                    self.logger.error(
+                        f"Kraken WS connection failed (attempt {self.reconnection_attempt}/{self.config.max_retries}): {error_type}: {error_msg}"
+                    )
+
+                # PRD-001: Track reconnect count per pair (increment for all pairs on reconnect)
+                for pair in self.config.pairs:
+                    if pair not in self.stats["reconnect_count_by_pair"]:
+                        self.stats["reconnect_count_by_pair"][pair] = 0
+                    self.stats["reconnect_count_by_pair"][pair] += 1
+                
+                if self.reconnection_attempt >= self.config.max_retries:
+                    # Critical failure: max reconnection attempts exceeded
+                    # For 24/7 operation, this means the engine cannot maintain connection
+                    # and should be marked unhealthy (health check will fail)
+                    total_downtime = time.time() - self.connection_state_changed_at
+                    self.logger.error(
+                        "Kraken WS max reconnection attempts reached: "
+                        "attempts=%d/%d, total_downtime=%.1fs, pairs=%s. "
+                        "Engine marked UNHEALTHY - manual intervention required.",
+                        self.reconnection_attempt,
+                        self.config.max_retries,
+                        total_downtime,
+                        self.config.pairs,
+                        extra={
+                            "component": "kraken_ws",
+                            "severity": "critical",
+                            "reconnection_attempt": self.reconnection_attempt,
+                            "max_retries": self.config.max_retries,
+                            "total_downtime_seconds": round(total_downtime, 1),
+                            "pairs": self.config.pairs,
+                        }
+                    )
+                    # Set state to DISCONNECTED after max retries
+                    self._set_connection_state(ConnectionState.DISCONNECTED, "Max reconnection attempts reached")
+
+                    # Trigger critical alert (PRD-001 Section 4.2)
+                    if DISCORD_ALERTS_AVAILABLE and send_alert:
+                        try:
+                            send_alert(
+                                title="[WARN] Kraken WebSocket: Max Reconnection Attempts Reached",
+                                description=(
+                                    f"Bot has failed to reconnect after {self.config.max_retries} attempts. "
+                                    f"WebSocket connection to {self.config.url} is down. "
+                                    f"Bot is now marked as UNHEALTHY and requires intervention."
+                                ),
+                                severity="CRITICAL",
+                                tags={
+                                    "component": "kraken_ws",
+                                    "max_retries": str(self.config.max_retries),
+                                    "pairs": ", ".join(self.config.pairs)
+                                }
+                            )
+                            self.logger.info("Critical alert sent for max reconnection attempts")
+                        except Exception as alert_error:
+                            self.logger.error(f"Failed to send critical alert: {alert_error}")
+
+                    break
+
+                # Calculate backoff with ±20% jitter (PRD-001 Section 4.2)
+                jitter = random.uniform(-0.2, 0.2)
+                jitter_pct = jitter * 100
+                backoff_with_jitter = backoff * (1 + jitter)
+
+                # Log reconnection attempt with attempt number and wait time (PRD-001 Section 4.2 & 8.1)
+                # For 24/7 operation, this helps operators understand reconnect behavior
+                self.logger.info(
+                    "Reconnection attempt %d/%d: waiting %.1fs before retry "
+                    "(base=%.1fs, jitter=%+.0f%%, pairs=%s)",
+                    self.reconnection_attempt,
+                    self.config.max_retries,
+                    backoff_with_jitter,
+                    backoff,
+                    jitter_pct,
+                    self.config.pairs,
+                    extra={
+                        "component": "kraken_ws",
+                        "reconnection_attempt": self.reconnection_attempt,
+                        "max_retries": self.config.max_retries,
+                        "backoff_seconds": round(backoff_with_jitter, 1),
+                        "base_backoff_seconds": round(backoff, 1),
+                        "jitter_percent": round(jitter_pct, 1),
+                        "pairs": self.config.pairs,
+                    }
+                )
+
+                await asyncio.sleep(backoff_with_jitter)
+
+                # Check if shutdown requested during sleep (PRD-001 Section 4.2)
+                if not self.running:
+                    self.logger.info("Reconnection cancelled - graceful shutdown in progress")
+                    break
+
+                # Exponential backoff: double each time (PRD-001 Section 4.2)
+                backoff = min(backoff * 2, max_backoff)
+
+    async def stop(self):
+        """Stop the WebSocket client (PRD-001 Section 9.1)"""
+        self.logger.info("Stopping Kraken WebSocket client...")
+        self.running = False
+
+        # Set state to DISCONNECTED (PRD-001 Section 4.1)
+        self._set_connection_state(ConnectionState.DISCONNECTED, "Graceful shutdown requested")
+
+        if self.ws:
+            await self.ws.close()
+
+        await self.redis_manager.close()
+
+        self.logger.info("Kraken WebSocket client stopped")
+
+    def get_stats(self) -> dict:
+        """Get comprehensive connection statistics (PRD-001 Section 8.2)"""
+        latency_stats = self.latency_tracker.get_stats() if self.latency_tracker else {}
+        cb_statuses = {name: cb.state.value for name, cb in self.circuit_breakers.items()}
+
+        return {
+            **self.stats,
+            "running": self.running,
+            "connection_state": self.connection_state.value,  # PRD-001 Section 4.1
+            "is_healthy": self.is_healthy,  # PRD-001 Section 4.1 - Health based on connection duration
+            "reconnection_attempt": self.reconnection_attempt,  # PRD-001 Section 4.2 - Current reconnection attempt
+            "redis_connected": self.redis_manager.redis_client is not None,
+            "latency_stats": latency_stats,
+            "circuit_breakers": cb_statuses,
+            "config": self.config.model_dump()
+        }
+
+
+# Production callbacks and integrations - Redis Cloud optimized
+async def production_scalping_callback(pair: str, trades: List[dict]):
+    """Production scalping strategy callback - Redis Cloud optimized"""
+    for trade in trades:
+        # Log significant trades for scalping analysis
+        if trade["volume"] >= float(os.getenv("SCALP_MIN_VOLUME", "0.1")):
+            target_bps = int(os.getenv("SCALP_TARGET_BPS", "10"))
+            
+            print(
+                f"[TARGET] SCALP SIGNAL {pair}: {trade['side'].upper()} "
+                f"{trade['volume']:.4f} @ ${trade['price']:.2f}"
+            )
+            print(f"   Target: {target_bps} bps, Volume: {trade['volume']:.4f}")
+            
+            # This is where you'd integrate with your MCP brain
+            # signal_data = {
+            #     "strategy": "scalp",
+            #     "pair": pair,
+            #     "signal": "entry",
+            #     "price": trade["price"],
+            #     "volume": trade["volume"],
+            #     "target_bps": target_bps
+            # }
+
+
+async def production_spread_callback(pair: str, spread_data: dict):
+    """Production spread monitoring callback - Redis Cloud optimized"""
+    spread_bps = spread_data["spread_bps"]
+    max_spread = float(os.getenv("SPREAD_BPS_MAX", "5.0"))
+    
+    if spread_bps <= 2.0:  # Very tight spread
+        print(f"[TIGHT] TIGHT SPREAD {pair}: {spread_bps:.2f} bps - excellent for scalping!")
+    elif spread_bps > max_spread:
+        print(f"[WARN] WIDE SPREAD {pair}: {spread_bps:.2f} bps > {max_spread} bps limit")
+
+
+async def production_circuit_breaker_callback(breaker_name: str, reason: str):
+    """Production circuit breaker callback - Redis Cloud optimized"""
+    print(f"[ALERT] CIRCUIT BREAKER ALERT: {breaker_name}")
+    print(f"   Reason: {reason}")
+    print(f"   Time: {datetime.now().strftime('%H:%M:%S')}")
+    
+    # This is where you'd send alerts to Slack/Discord/monitoring systems
+    alert_data = {
+        "timestamp": datetime.now().isoformat(),
+        "breaker": breaker_name,
+        "reason": reason,
+        "severity": "CRITICAL"
+    }
+    
+    # Example integration points:
+    # await send_slack_alert(alert_data)
+    # await update_monitoring_dashboard(alert_data)
+    # await pause_trading_strategies(breaker_name)
+
+
+async def redis_cloud_monitoring_callback(breaker_name: str, reason: str):
+    """Redis Cloud specific monitoring callback"""
+    if "redis" in breaker_name.lower() or "memory" in reason.lower():
+        print(f"🔧 REDIS CLOUD ALERT: {breaker_name}")
+        print(f"   Reason: {reason}")
+        print(f"   Time: {datetime.now().strftime('%H:%M:%S')}")
+        
+        # Log Redis Cloud specific metrics
+        try:
+            print("   💾 Check Redis Cloud dashboard for memory usage")
+            print("   🔌 Check connection pool status")
+        except Exception as e:
+            print(f"   [WARN] Failed to get Redis Cloud metrics: {e}")
+
+
+# Production deployment function - Redis Cloud optimized
+async def production_main():
+    """Production deployment with Redis Cloud optimizations"""
+    
+    # Setup logging
+    logging.basicConfig(
+        level=getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper()),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info("🚀 Starting Production Kraken WebSocket with Redis Cloud...")
+    
+    # Validate environment with Redis Cloud specifics
+    required_env_vars = ["REDIS_URL", "TRADING_PAIRS"]
+    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+    if missing_vars:
+        logger.error(f"[ERROR] Missing required environment variables: {missing_vars}")
+        return
+    
+    # Redis Cloud specific validation
+    redis_url = os.getenv("REDIS_URL", "")
+    if "redis-19818.c9.us-east-1-4.ec2.redns.redis-cloud.com" not in redis_url:
+        logger.warning("[WARN] Not using verified Redis Cloud instance")
+    
+    # Create production configuration
+    try:
+        config = KrakenWSConfig()
+        logger.info("[OK] Redis Cloud optimized configuration loaded:")
+        logger.info(f"   Pairs: {config.pairs}")
+        logger.info(f"   Timeframes: {config.timeframes}")
+        logger.info(f"   Redis: {'[OK] Redis Cloud' if config.redis_url else '[X] Not configured'}")
+        logger.info(f"   Scalping: {'[OK] Enabled' if config.scalp_enabled else '[X] Disabled'}")
+        logger.info("   Circuit Breakers: [OK] Redis Cloud Optimized")
+        logger.info(f"   Pool Size: {config.redis_pool_size} (optimized for Redis Cloud)")
+        logger.info(f"   Socket Timeout: {config.redis_socket_timeout}s (optimized)")
+        logger.info(f"   Batch Size: {config.redis_batch_size} (optimized)")
+        
+    except Exception as e:
+        logger.error(f"[ERROR] Configuration error: {e}")
+        return
+    
+    # Create client with Redis Cloud optimizations
+    client = KrakenWebSocketClient(config)
+    
+    # Register production callbacks with Redis Cloud awareness
+    client.register_callback("trade", production_scalping_callback)
+    client.register_callback("spread", production_spread_callback)
+    client.register_callback("circuit_breaker", production_circuit_breaker_callback)
+    client.register_callback("circuit_breaker", redis_cloud_monitoring_callback)
+    
+    try:
+        logger.info("[TARGET] Starting production WebSocket with Redis Cloud streams...")
+        await client.start()
+        
+    except KeyboardInterrupt:
+        logger.info("\n[STOP] Graceful shutdown initiated...")
+    except Exception as e:
+        logger.error(f"[ERROR] Production error: {e}")
+    finally:
+        await client.stop()
+        logger.info("[OK] Production shutdown complete")
+
+
+# Test function for development - Redis Cloud optimized
+async def test_redis_connection():
+    """Test Redis connection separately - Redis Cloud optimized"""
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        print("[ERROR] REDIS_URL not set in environment")
+        return False
+    
+    try:
+        # Use environment variable for security - NO hardcoded credentials
+        client = redis.from_url(
+            redis_url,
+            ssl_cert_reqs='required' if redis_url.startswith('rediss://') else None,
+            decode_responses=False,
+            socket_timeout=10,  # Redis Cloud optimized
+            socket_keepalive=True,
+            socket_connect_timeout=5  # Redis Cloud optimized
+        )
+        
+        # Test basic connection
+        await client.ping()
+        print("[OK] Redis Cloud connection successful!")
+        
+        # Test stream operations
+        test_data = {"test": "connection", "timestamp": str(time.time())}
+        await client.xadd("test:stream", test_data, maxlen=100)
+        print("[OK] Redis Cloud stream write successful!")
+        
+        # Test memory info (Redis Cloud specific)
+        try:
+            info = await client.info('memory')
+            memory_mb = int(info.get('used_memory', 0)) / (1024 * 1024)
+            print(f"[OK] Redis Cloud memory usage: {memory_mb:.1f}MB")
+        except Exception as e:
+            print(f"[WARN] Could not get memory info: {e}")
+        
+        # Clean up test data
+        await client.delete("test:stream")
+        await client.aclose()
+        print("[OK] Redis Cloud test completed successfully!")
+        return True
+        
+    except Exception as e:
+        print(f"[ERROR] Redis Cloud connection failed: {e}")
+        return False
+
+
+if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "test-redis":
+        # Test Redis connection only
+        asyncio.run(test_redis_connection())
+    else:
+        # Run production WebSocket
+        asyncio.run(production_main())
