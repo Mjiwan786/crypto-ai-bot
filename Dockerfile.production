@@ -30,11 +30,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy requirements and shared_contracts
 COPY requirements.txt ./
+COPY shared_contracts/ ./shared_contracts/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (including shared_contracts)
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir ./shared_contracts
 
 # ==============================================================================
 # Stage 2: Production - Minimal runtime image
