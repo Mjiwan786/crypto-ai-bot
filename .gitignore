@@ -239,4 +239,6 @@ service-account*.json
 
 # API keys that might be accidentally created
 *_api_key*
-*_secret*
+*_secret*tmpclaude-*
+*.pyc
+__pycache__/
