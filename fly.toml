@@ -1,0 +1,162 @@
+# fly.toml - crypto-ai-bot (Signal Generation Engine)
+# Production-ready configuration for 99.8% uptime SLA
+# Health checks every 15s, auto-restart, multi-instance deployment
+
+app = 'crypto-ai-bot-engine'
+primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
+
+[build]
+  dockerfile = "Dockerfile.production"
+
+[env]
+  # Application
+  NODE_ENV = "production"
+  ENVIRONMENT = "prod"
+  APP_NAME = "crypto-ai-bot"
+  LOG_LEVEL = "INFO"
+  LOG_FORMAT = "json"
+  PYTHONUNBUFFERED = "1"
+
+  # CRITICAL: Engine mode controls Redis stream separation
+  # - "paper" = signals:paper, pnl:paper (for backtests/marketing)
+  # - "live"  = signals:live, pnl:live (for real trading)
+  ENGINE_MODE = "paper"
+
+  # Trading Configuration
+  TRADING_MODE = "paper"  # Change to "live" for real trading
+  BOT_MODE = "PAPER"
+  ENABLE_TRADING = "false"
+  TRADING_PAIRS = "BTC/USD,ETH/USD,SOL/USD"
+
+  # Kraken WebSocket
+  KRAKEN_WS_URL = "wss://ws.kraken.com"
+  WEBSOCKET_RECONNECT_DELAY = "1"
+  WEBSOCKET_MAX_RETRIES = "10"
+  WEBSOCKET_PING_INTERVAL = "30"
+  WEBSOCKET_PING_TIMEOUT = "60"
+
+  # Redis Cloud Configuration (non-sensitive)
+  REDIS_SSL = "true"
+  REDIS_CA_CERT = "/app/config/certs/redis_ca.pem"
+  REDIS_MAX_CONNECTIONS = "30"
+  REDIS_SOCKET_TIMEOUT = "10"
+  REDIS_RETRY_ATTEMPTS = "3"
+  REDIS_DECODE_RESPONSES = "true"
+  REDIS_CLIENT_NAME = "crypto-ai-bot-flyio"
+
+  # Stream Configuration (mode-aware via ENGINE_MODE)
+  STREAM_SIGNALS_PAPER = "signals:paper"
+  STREAM_SIGNALS_LIVE = "signals:live"
+  PNL_STREAM_PAPER = "pnl:paper"
+  PNL_STREAM_LIVE = "pnl:live"
+  ACTIVE_SIGNALS_STREAM = "signals:paper"
+
+  # ML Models
+  ML_ENABLED = "true"
+  ML_MODELS_DIR = "models"
+
+  # Performance & Reliability
+  MAX_WORKER_THREADS = "8"
+  ASYNC_IO_ENABLED = "true"
+  HEALTH_CHECK_INTERVAL_SECONDS = "15"
+
+  # Monitoring
+  PROMETHEUS_ENABLED = "true"
+  PROMETHEUS_PORT = "9108"
+  METRICS_ENDPOINT = "/metrics"
+  HEALTH_ENDPOINT = "/health"
+
+  # Heartbeat for 24/7 monitoring
+  HEARTBEAT_KEY = "bot:heartbeat"
+  HEARTBEAT_TTL_SEC = "60"
+
+# Deploy Configuration (Zero-downtime deployments)
+[deploy]
+  # release_command = "python scripts/preflight.py"  # Disabled for production
+  strategy = "rolling"  # Rolling updates for zero downtime
+
+# Graceful shutdown
+kill_signal = "SIGTERM"
+kill_timeout = "30s"  # Allow 30s for graceful shutdown
+
+# Process Configuration
+[processes]
+  app = "python -u production_engine.py --mode paper"
+
+# HTTP Service for Health Checks & Metrics
+[[services]]
+  processes = ["app"]
+  protocol = "tcp"
+  internal_port = 8080
+  auto_stop_machines = "off"  # Never auto-stop (24/7 operation) - explicit "off" per Fly.io docs
+  auto_start_machines = true
+  min_machines_running = 1    # Keep at least 1 instance running always
+
+  # Concurrency Settings
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 100
+    soft_limit = 80
+
+  # HTTP Ports
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  # TCP Health Check (every 15s as required)
+  [[services.tcp_checks]]
+    interval = "15s"        # Check every 15 seconds
+    timeout = "5s"          # Fail if no response in 5s
+    grace_period = "30s"    # Wait 30s on startup
+    restart_limit = 3       # Restart after 3 consecutive failures
+
+  # HTTP Health Check (every 15s as required)
+  [[services.http_checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/health"
+    protocol = "http"
+    restart_limit = 3
+
+    # Expected health response headers
+    [services.http_checks.headers]
+      X-Healthcheck-Source = "crypto-ai-bot"
+
+# Prometheus Metrics Service
+[[services]]
+  processes = ["app"]
+  protocol = "tcp"
+  internal_port = 9108
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 9108
+
+# VM Configuration (optimized for ML workload)
+[[vm]]
+  memory = '2gb'          # 2GB for ML models
+  cpu_kind = 'shared'
+  cpus = 2                # 2 CPUs for parallel processing
+
+# Scaling Configuration for 99.8% uptime
+[metrics]
+  port = 9108
+  path = "/metrics"
+
+# Auto-scaling rules (optional - for traffic spikes)
+# [autoscaling]
+#   min_count = 2
+#   max_count = 5
+
+# Experimental: Auto-rollback on failure
+[experimental]
+  auto_rollback = true
