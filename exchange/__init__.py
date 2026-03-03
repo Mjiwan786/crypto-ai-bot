@@ -36,6 +36,14 @@ from exchange.base_adapter import (
     OrderStatus,
 )
 from exchange.ccxt_adapter import CcxtAdapter
+from exchange.ccxt_pro_adapter import CcxtProWSAdapter
+from exchange.ws_adapter import (
+    BaseWSAdapter,
+    TickerUpdate,
+    OHLCVUpdate,
+    TradeUpdate,
+)
+from exchange.multi_exchange_streamer import MultiExchangeStreamer
 from exchange.exchange_factory import ExchangeFactory
 from exchange.exchange_registry import ExchangeRegistry, ExchangeConfig
 from exchange.errors import (
@@ -61,8 +69,15 @@ __all__ = [
     "OrderSide",
     "OrderType",
     "OrderStatus",
-    # Implementation
+    # REST Implementation
     "CcxtAdapter",
+    # WebSocket Implementation
+    "BaseWSAdapter",
+    "CcxtProWSAdapter",
+    "TickerUpdate",
+    "OHLCVUpdate",
+    "TradeUpdate",
+    "MultiExchangeStreamer",
     # Factory & Registry
     "ExchangeFactory",
     "ExchangeRegistry",
