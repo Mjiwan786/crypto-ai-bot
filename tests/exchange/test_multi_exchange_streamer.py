@@ -15,6 +15,7 @@ import pytest
 
 from exchange.multi_exchange_streamer import (
     MultiExchangeStreamer,
+    _NO_WATCH_OHLCV,
     _USDT_EXCHANGES,
 )
 from exchange.ws_adapter import OHLCVUpdate, TickerUpdate
@@ -91,19 +92,19 @@ class TestStreamOHLCV:
 
     @pytest.mark.asyncio
     async def test_publishes_to_correct_stream_key(self):
+        """WebSocket path: non-Coinbase exchanges use watch_ohlcv."""
         mock_redis = _make_mock_redis()
         streamer = MultiExchangeStreamer(
             redis_client=mock_redis,
-            exchanges=["coinbase"],
+            exchanges=["kraken"],
             pairs=["BTC/USD"],
         )
 
-        # Create a mock adapter that yields one candle then stops
         mock_adapter = MagicMock()
-        mock_adapter.exchange_id = "coinbase"
+        mock_adapter.exchange_id = "kraken"
 
         candle = OHLCVUpdate(
-            exchange="coinbase", symbol="BTC/USD", timeframe="1m",
+            exchange="kraken", symbol="BTC/USD", timeframe="1m",
             timestamp=datetime(2026, 3, 3, 12, 0, 0, tzinfo=timezone.utc),
             open=50000.0, high=50100.0, low=49900.0,
             close=50050.0, volume=100.0,
@@ -116,16 +117,74 @@ class TestStreamOHLCV:
 
         await streamer._stream_ohlcv(mock_adapter, "BTC/USD", "1m")
 
-        # Verify Redis xadd was called with correct stream key
+        mock_redis.xadd.assert_awaited_once()
+        call_args = mock_redis.xadd.call_args
+        assert call_args[0][0] == "kraken:ohlc:1m:BTC-USD"
+
+        data = call_args[0][1]
+        assert data["exchange"] == "kraken"
+        assert data["symbol"] == "BTC/USD"
+        assert data["close"] == "50050.0"
+        assert data["source"] == "websocket"
+
+    @pytest.mark.asyncio
+    async def test_coinbase_uses_rest_polling(self):
+        """REST path: Coinbase falls back to fetch_ohlcv polling."""
+        mock_redis = _make_mock_redis()
+        streamer = MultiExchangeStreamer(
+            redis_client=mock_redis,
+            exchanges=["coinbase"],
+            pairs=["BTC/USD"],
+        )
+
+        mock_adapter = MagicMock()
+        mock_adapter.exchange_id = "coinbase"
+        mock_adapter._exchange = AsyncMock()
+
+        # fetch_ohlcv returns data, then triggers shutdown
+        async def fetch_then_stop(*args, **kwargs):
+            streamer._shutdown.set()
+            return [[1709467200000, 50000.0, 50100.0, 49900.0, 50050.0, 100.0]]
+
+        mock_adapter._exchange.fetch_ohlcv = AsyncMock(side_effect=fetch_then_stop)
+
+        await streamer._stream_ohlcv(mock_adapter, "BTC/USD", "1m")
+
         mock_redis.xadd.assert_awaited_once()
         call_args = mock_redis.xadd.call_args
         assert call_args[0][0] == "coinbase:ohlc:1m:BTC-USD"
-
-        # Verify data fields
         data = call_args[0][1]
         assert data["exchange"] == "coinbase"
-        assert data["symbol"] == "BTC/USD"
         assert data["close"] == "50050.0"
+        assert data["source"] == "rest_poll"
+
+    @pytest.mark.asyncio
+    async def test_rest_poll_skips_duplicate_timestamps(self):
+        """REST polling deduplicates by timestamp."""
+        mock_redis = _make_mock_redis()
+        streamer = MultiExchangeStreamer(
+            redis_client=mock_redis,
+            exchanges=["coinbase"],
+            pairs=["BTC/USD"],
+        )
+
+        mock_adapter = MagicMock()
+        mock_adapter.exchange_id = "coinbase"
+        mock_adapter._exchange = AsyncMock()
+
+        async def fetch_dupes(*args, **kwargs):
+            streamer._shutdown.set()
+            return [
+                [1709467200000, 50000.0, 50100.0, 49900.0, 50050.0, 100.0],
+                [1709467200000, 50000.0, 50100.0, 49900.0, 50060.0, 110.0],
+            ]
+
+        mock_adapter._exchange.fetch_ohlcv = AsyncMock(side_effect=fetch_dupes)
+
+        await streamer._stream_ohlcv(mock_adapter, "BTC/USD", "1m")
+
+        # Only one candle published (second is duplicate)
+        assert mock_redis.xadd.await_count == 1
 
     @pytest.mark.asyncio
     async def test_increments_message_count(self):

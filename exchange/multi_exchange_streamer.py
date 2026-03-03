@@ -32,11 +32,26 @@ from datetime import datetime, timezone
 from typing import Any
 
 from exchange.ccxt_pro_adapter import CcxtProWSAdapter
+from exchange.ws_adapter import OHLCVUpdate
 
 logger = logging.getLogger(__name__)
 
 # USDT exchanges — pairs are converted from BTC/USD -> BTC/USDT, etc.
 _USDT_EXCHANGES = frozenset({"binance", "bybit", "okx", "kucoin", "gateio"})
+
+# Exchanges that do NOT support watchOHLCV() in CCXT Pro — use REST polling
+_NO_WATCH_OHLCV = frozenset({"coinbase"})
+
+# REST polling intervals per timeframe (seconds)
+_POLL_INTERVALS = {
+    "1m": 15,
+    "5m": 60,
+    "15m": 120,
+    "1h": 300,
+}
+
+# Max reconnect/retry delay (seconds)
+_MAX_BACKOFF = 30
 
 # Redis stream size caps
 _OHLCV_MAXLEN = 5000
@@ -186,44 +201,125 @@ class MultiExchangeStreamer:
     async def _stream_ohlcv(
         self, adapter: CcxtProWSAdapter, symbol: str, timeframe: str
     ) -> None:
-        """Stream OHLCV data and publish to Redis."""
+        """Stream OHLCV data — WebSocket if supported, REST polling otherwise."""
         safe_symbol = symbol.replace("/", "-")
         stream_key = f"{adapter.exchange_id}:ohlc:{timeframe}:{safe_symbol}"
-        logger.info(
-            "[%s] Streaming OHLCV %s %s -> %s",
-            adapter.exchange_id, symbol, timeframe, stream_key,
-        )
 
-        async for candle in adapter.watch_ohlcv(symbol, timeframe):
+        if adapter.exchange_id in _NO_WATCH_OHLCV:
+            logger.info(
+                "[%s] OHLCV via REST polling: %s %s -> %s",
+                adapter.exchange_id, symbol, timeframe, stream_key,
+            )
+            await self._poll_ohlcv_rest(adapter, symbol, timeframe, stream_key)
+        else:
+            logger.info(
+                "[%s] OHLCV via WebSocket: %s %s -> %s",
+                adapter.exchange_id, symbol, timeframe, stream_key,
+            )
+            async for candle in adapter.watch_ohlcv(symbol, timeframe):
+                await self._publish_ohlcv(
+                    stream_key, adapter.exchange_id, symbol, timeframe,
+                    candle, source="websocket",
+                )
+
+    async def _poll_ohlcv_rest(
+        self,
+        adapter: CcxtProWSAdapter,
+        symbol: str,
+        timeframe: str,
+        stream_key: str,
+    ) -> None:
+        """REST polling fallback for exchanges without watchOHLCV()."""
+        interval = _POLL_INTERVALS.get(timeframe, 60)
+        last_timestamp: float | None = None
+        backoff = 1
+
+        while not self._shutdown.is_set():
             try:
-                data = {
-                    "exchange": adapter.exchange_id,
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "timestamp": candle.timestamp.isoformat(),
-                    "open": str(candle.open),
-                    "high": str(candle.high),
-                    "low": str(candle.low),
-                    "close": str(candle.close),
-                    "volume": str(candle.volume),
-                    "published_at": datetime.now(timezone.utc).isoformat(),
-                }
-                await self.redis.xadd(
-                    stream_key, data,
-                    maxlen=_OHLCV_MAXLEN, approximate=True,
+                # fetch_ohlcv returns [[ts, o, h, l, c, v], ...]
+                raw_candles = await adapter._exchange.fetch_ohlcv(
+                    symbol, timeframe, limit=5,
                 )
-                self.message_counts[adapter.exchange_id] = (
-                    self.message_counts.get(adapter.exchange_id, 0) + 1
-                )
-                self.last_message_time[adapter.exchange_id] = time.time()
+                backoff = 1  # reset on success
+
+                for candle in raw_candles:
+                    ts_ms = candle[0]
+                    if last_timestamp is not None and ts_ms <= last_timestamp:
+                        continue  # skip duplicates
+                    last_timestamp = ts_ms
+
+                    update = OHLCVUpdate(
+                        exchange=adapter.exchange_id,
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        timestamp=datetime.fromtimestamp(
+                            ts_ms / 1000, tz=timezone.utc
+                        ),
+                        open=float(candle[1]),
+                        high=float(candle[2]),
+                        low=float(candle[3]),
+                        close=float(candle[4]),
+                        volume=float(candle[5]),
+                    )
+                    await self._publish_ohlcv(
+                        stream_key, adapter.exchange_id, symbol, timeframe,
+                        update, source="rest_poll",
+                    )
+
             except Exception as exc:
-                logger.error(
-                    "[%s] Redis publish error for %s: %s",
-                    adapter.exchange_id, symbol, exc,
+                logger.warning(
+                    "[%s] REST OHLCV poll error %s/%s: %s — retry in %ds",
+                    adapter.exchange_id, symbol, timeframe, exc, backoff,
                 )
                 self.error_counts[adapter.exchange_id] = (
                     self.error_counts.get(adapter.exchange_id, 0) + 1
                 )
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, _MAX_BACKOFF)
+                continue
+
+            await asyncio.sleep(interval)
+
+    async def _publish_ohlcv(
+        self,
+        stream_key: str,
+        exchange_id: str,
+        symbol: str,
+        timeframe: str,
+        candle: OHLCVUpdate,
+        source: str = "websocket",
+    ) -> None:
+        """Publish a single OHLCV candle to Redis stream."""
+        try:
+            data = {
+                "exchange": exchange_id,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "timestamp": candle.timestamp.isoformat(),
+                "open": str(candle.open),
+                "high": str(candle.high),
+                "low": str(candle.low),
+                "close": str(candle.close),
+                "volume": str(candle.volume),
+                "source": source,
+                "published_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await self.redis.xadd(
+                stream_key, data,
+                maxlen=_OHLCV_MAXLEN, approximate=True,
+            )
+            self.message_counts[exchange_id] = (
+                self.message_counts.get(exchange_id, 0) + 1
+            )
+            self.last_message_time[exchange_id] = time.time()
+        except Exception as exc:
+            logger.error(
+                "[%s] Redis publish error for %s: %s",
+                exchange_id, symbol, exc,
+            )
+            self.error_counts[exchange_id] = (
+                self.error_counts.get(exchange_id, 0) + 1
+            )
 
     async def _stream_ticker(
         self, adapter: CcxtProWSAdapter, symbol: str
