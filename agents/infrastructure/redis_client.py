@@ -94,8 +94,12 @@ class RedisCloudConfig(BaseModel):
     base_delay: float = Field(default=0.5, ge=0.1, le=5.0)
     max_delay: float = Field(default=30.0, ge=5.0, le=300.0)
 
-    # Connection pool settings
-    max_connections: int = Field(default=20, ge=1, le=100)
+    # Connection pool settings — read from REDIS_MAX_CONNECTIONS env var
+    max_connections: int = Field(
+        default_factory=lambda: int(os.getenv("REDIS_MAX_CONNECTIONS", "10")),
+        ge=1,
+        le=100,
+    )
     retry_on_timeout: bool = Field(default=True)
     health_check_interval: int = Field(default=15, ge=5, le=300)
 
@@ -382,6 +386,28 @@ class RedisCloudClient:
             finally:
                 self._client = None
                 self._is_connected = False
+
+    def is_connected(self) -> bool:
+        """Return True if the client currently has an active Redis connection.
+
+        Returns:
+            True if connected, False otherwise
+        """
+        return self._is_connected and self._client is not None
+
+    @property
+    def client(self) -> "redis.Redis[str]":
+        """Return the underlying raw redis.asyncio.Redis client.
+
+        Use this when you need direct access to Redis commands (xadd, xread,
+        smembers, etc.) without going through the wrapper's __getattr__.
+
+        Raises:
+            RuntimeError: If not connected — call connect() first
+        """
+        if self._client is None:
+            raise RuntimeError("Redis client not connected. Call connect() first.")
+        return self._client
 
     async def health_check(self) -> RedisHealthResult:
         """Perform health check using integrated health checker.

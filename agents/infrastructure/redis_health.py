@@ -219,6 +219,9 @@ class RedisHealthChecker:
             "socket_connect_timeout": self.config.connect_timeout,
             "decode_responses": self.config.decode_responses,
             "socket_keepalive": self.config.keepalive,
+            # Health checks open a single-use connection — cap pool at 1 to
+            # avoid exhausting the Redis Cloud connection limit.
+            "max_connections": 1,
         }
 
         # TLS for rediss://
