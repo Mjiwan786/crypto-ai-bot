@@ -34,18 +34,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from agents.infrastructure.redis_client import RedisCloudClient, RedisCloudConfig
+from agents.multi_exchange_signal_generator import MultiExchangeSignalGenerator
 from exchange.multi_exchange_streamer import MultiExchangeStreamer
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(
-            Path(__file__).parent / "logs" / "multi_exchange.log",
-            mode="a",
-        ),
-    ],
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 
@@ -89,11 +84,25 @@ async def main(args: argparse.Namespace) -> None:
         timeframes=timeframes,
     )
 
+    signal_gen = MultiExchangeSignalGenerator(
+        redis_client=redis_client.client,
+        exchanges=exchanges,
+        pairs=pairs,
+        mode=args.mode,
+        poll_interval=30,
+    )
+
     try:
-        await streamer.start()
+        # Run streamer (WebSocket → Redis) and signal generator (Redis → signals)
+        # concurrently. Streamer feeds OHLCV data, signal gen reads it and publishes signals.
+        await asyncio.gather(
+            streamer.start(),
+            signal_gen.run(),
+        )
     except KeyboardInterrupt:
         logger.info("Shutting down...")
     finally:
+        await signal_gen.stop()
         await streamer.stop()
         await redis_client.disconnect()
 
@@ -116,6 +125,11 @@ if __name__ == "__main__":
         "--timeframes",
         default=os.getenv("STREAM_TIMEFRAMES", DEFAULT_TIMEFRAMES),
         help="Comma-separated OHLCV timeframes",
+    )
+    parser.add_argument(
+        "--mode",
+        default=os.getenv("ENGINE_MODE", "paper"),
+        help="Signal mode: paper or live",
     )
     args = parser.parse_args()
     asyncio.run(main(args))
