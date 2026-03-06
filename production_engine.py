@@ -95,6 +95,8 @@ from config.trading_pairs import (
 import numpy as np
 import pandas as pd
 from collections import deque
+from market_data.ohlcv_aggregator import OHLCVAggregator, get_aggregator
+from exchange.rate_limiter import ExchangeRateLimiter
 
 # Configure logging
 logging.basicConfig(
@@ -155,6 +157,15 @@ class EngineConfig:
 
     # Initial balance for PnL tracking
     initial_balance: float = 10000.0
+
+    # Feed staleness detection
+    feed_staleness_multiplier: float = float(os.getenv("FEED_STALENESS_MULTIPLIER", "2.5"))
+    feed_staleness_enabled: bool = os.getenv("FEED_STALENESS_ENABLED", "true").lower() == "true"
+
+    # Per-exchange rate limiting
+    rate_limit_tokens_per_exchange: int = int(os.getenv("RATE_LIMIT_TOKENS_PER_EXCHANGE", "10"))
+    rate_limit_refill_per_second: float = float(os.getenv("RATE_LIMIT_REFILL_PER_SECOND", "1.0"))
+    rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
 
     # Safety
     live_trading_confirmation: str = field(
@@ -277,6 +288,16 @@ class ProductionEngine:
         self._last_signal_time: Dict[str, float] = {}
         self._signal_cooldown_seconds = 300  # 5 minutes between signals per pair
 
+        # OHLCV aggregator for feed health tracking
+        self._aggregator = get_aggregator()
+
+        # Per-exchange rate limiter
+        self._rate_limiter = ExchangeRateLimiter(
+            capacity=self.config.rate_limit_tokens_per_exchange,
+            refill_per_second=self.config.rate_limit_refill_per_second,
+            enabled=self.config.rate_limit_enabled,
+        )
+
     async def _fetch_live_price(self, pair: str) -> float:
         """Fetch live price from Kraken API with caching"""
         now = time.time()
@@ -291,6 +312,12 @@ class ProductionEngine:
         kraken_pair = self.KRAKEN_PAIR_MAP.get(pair)
         if not kraken_pair:
             kraken_pair = pair.replace("/", "")
+
+        # Rate limit gate — skip API call if budget exhausted
+        if not await self._rate_limiter.acquire("kraken"):
+            if pair in self._price_cache:
+                return self._price_cache[pair][0]
+            raise Exception(f"Rate limit exhausted for kraken, no cached price for {pair}")
 
         # Fetch from Kraken
         try:
@@ -418,13 +445,21 @@ class ProductionEngine:
         if not self.redis_client:
             return
 
+        # Include feed health and rate limit headroom in heartbeat
+        feed_health = self._aggregator.get_feed_health_summary()
+        stale_feeds = self._aggregator.get_stale_feeds()
+        rate_headroom = self._rate_limiter.get_all_headroom()
+
         heartbeat = {
             "timestamp": str(time.time()),
             "timestamp_iso": datetime.now(timezone.utc).isoformat(),
             "mode": self.config.mode,
-            "status": "healthy",
+            "status": "healthy" if not stale_feeds else "degraded",
             "uptime_seconds": str(time.time() - self._start_time),
             "kraken_ws_running": str(getattr(self.kraken_ws, 'running', False) if self.kraken_ws else False),
+            "stale_feeds": str(len(stale_feeds)),
+            "tracked_feeds": str(len(feed_health)),
+            "rate_limit_headroom": str(rate_headroom),
         }
 
         # Publish to stream
@@ -585,12 +620,24 @@ class ProductionEngine:
         if now - last_signal < self._signal_cooldown_seconds:
             return
 
+        # Feed staleness gate — suppress signals from stale feeds
+        if self.config.feed_staleness_enabled:
+            exchange = "kraken"  # production_engine.py uses Kraken
+            if self._aggregator.is_feed_stale(exchange, pair, timeframe_s=60):
+                logger.warning(
+                    f"Feed stale for {exchange}:{pair}, suppressing signal generation"
+                )
+                return
+
         # Fetch LIVE price from Kraken
         try:
             entry = await self._fetch_live_price(pair)
         except Exception as e:
             logger.warning(f"Could not fetch live price for {pair}: {e}")
             return
+
+        # Feed tick to aggregator for health tracking
+        self._aggregator.process_tick("kraken", pair, price=entry)
 
         # Add price to history
         if pair not in self._price_history:
@@ -779,8 +826,13 @@ async def create_health_app(engine: ProductionEngine) -> web.Application:
         # TODO: Implement Prometheus metrics format
         return web.Response(text="# Metrics endpoint\n")
 
+    async def healthz_handler(request):
+        """Minimal liveness check — always returns 200 if process is running."""
+        return web.json_response({"status": "ok"})
+
     app = web.Application()
     app.router.add_get("/health", health_handler)
+    app.router.add_get("/healthz", healthz_handler)
     app.router.add_get("/metrics", metrics_handler)
 
     return app
@@ -792,6 +844,8 @@ async def create_health_app(engine: ProductionEngine) -> web.Application:
 
 async def main(args) -> None:
     """Main entry point"""
+    import signal
+
     # Load environment
     load_dotenv()
 
@@ -811,6 +865,19 @@ async def main(args) -> None:
 
     # Create engine
     engine = ProductionEngine(config)
+
+    # Register SIGTERM handler for graceful shutdown (Fly.io sends SIGTERM)
+    # add_signal_handler is only available on Unix (Linux/macOS)
+    if sys.platform != "win32":
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(
+                sig,
+                lambda s=sig: (
+                    logger.info(f"Received {signal.Signals(s).name}, requesting shutdown"),
+                    setattr(engine, '_shutdown_requested', True),
+                ),
+            )
 
     # Start health endpoint
     health_app = await create_health_app(engine)

@@ -395,6 +395,16 @@ class RedisCloudClient:
         """
         return self._is_connected and self._client is not None
 
+    async def is_healthy(self) -> bool:
+        """Quick health check — wraps PING with 2s timeout, returns False on any error."""
+        if self._client is None or not self._is_connected:
+            return False
+        try:
+            result = await asyncio.wait_for(self._client.ping(), timeout=2.0)
+            return bool(result)
+        except Exception:
+            return False
+
     @property
     def client(self) -> "redis.Redis[str]":
         """Return the underlying raw redis.asyncio.Redis client.

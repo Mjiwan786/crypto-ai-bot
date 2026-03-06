@@ -142,6 +142,10 @@ kill_timeout = "30s"  # Allow 30s for graceful shutdown
   [[services.ports]]
     port = 9108
 
+# Machine restart policy — CRITICAL for 24/7 operation
+[restart]
+  policy = "always"     # Always restart all processes (app + streamer)
+
 # VM Configuration (optimized for ML workload)
 [[vm]]
   memory = '2gb'          # 2GB for ML models

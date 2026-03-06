@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -6,6 +7,7 @@ from mcp.redis_manager import RedisManager
 from mcp.schemas import SignalScore
 from config.config_loader import load_settings
 from exchange.exchange_factory import ExchangeFactory
+from exchange.rate_limiter import ExchangeRateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,7 @@ class ExecutionAgent:
         self.min_confidence = (
             self.settings.get("entry_conditions", {}).get("min_confidence", 0.75)
         )
+        self._rate_limiter = ExchangeRateLimiter()
 
     def fetch_signals(self) -> list[SignalScore]:
         raw = self.redis.get("mcp:signal_scores")
@@ -70,6 +73,16 @@ class ExecutionAgent:
             return 0
 
     def execute_trade(self, symbol: str, score: float) -> None:
+        # Rate limit gate — prevent REST API exhaustion
+        if not asyncio.get_event_loop().run_until_complete(
+            self._rate_limiter.acquire(self.exchange_id)
+        ):
+            logger.warning(
+                "Rate limit budget exhausted for %s, skipping %s",
+                self.exchange_id, symbol,
+            )
+            return
+
         quote_currency = symbol.split("/")[1]
         balance = self.get_balance(quote_currency)
         position_size = min(
