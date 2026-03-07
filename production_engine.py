@@ -97,6 +97,9 @@ import pandas as pd
 from collections import deque
 from market_data.ohlcv_aggregator import OHLCVAggregator, get_aggregator
 from exchange.rate_limiter import ExchangeRateLimiter
+from signals.ohlcv_reader import read_ohlcv_candles
+from signals.volume_scoring import compute_volume_ratio, apply_volume_multiplier, should_suppress_for_volume
+from signals.consensus_gate import evaluate_consensus
 
 # Configure logging
 logging.basicConfig(
@@ -161,11 +164,44 @@ class EngineConfig:
     # Feed staleness detection
     feed_staleness_multiplier: float = float(os.getenv("FEED_STALENESS_MULTIPLIER", "2.5"))
     feed_staleness_enabled: bool = os.getenv("FEED_STALENESS_ENABLED", "true").lower() == "true"
+    feed_staleness_warmup_seconds: float = float(os.getenv("FEED_STALENESS_WARMUP_SECONDS", "300"))
 
     # Per-exchange rate limiting
     rate_limit_tokens_per_exchange: int = int(os.getenv("RATE_LIMIT_TOKENS_PER_EXCHANGE", "10"))
     rate_limit_refill_per_second: float = float(os.getenv("RATE_LIMIT_REFILL_PER_SECOND", "1.0"))
     rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+
+    # ── Sprint 1: Signal Foundation ──────────────────────────
+    # Feature flags (all default ON so deploy activates them;
+    # set env var to "false" to roll back without redeploy)
+    use_ohlcv_for_signals: bool = field(
+        default_factory=lambda: os.getenv("USE_OHLCV_FOR_SIGNALS", "true").lower() == "true"
+    )
+    consensus_gate_enabled: bool = field(
+        default_factory=lambda: os.getenv("CONSENSUS_GATE_ENABLED", "true").lower() == "true"
+    )
+    volume_confirmation_enabled: bool = field(
+        default_factory=lambda: os.getenv("VOLUME_CONFIRMATION_ENABLED", "true").lower() == "true"
+    )
+
+    # Timeframe: 1-minute candles (was 15s / 10s spot polling)
+    primary_timeframe_s: int = int(os.getenv("PRIMARY_TIMEFRAME_S", "60"))
+    signal_candle_lookback: int = int(os.getenv("SIGNAL_CANDLE_LOOKBACK", "50"))
+
+    # TP/SL recalibrated for real Kraken fees (52 bps fee + 5 bps slippage = 57 bps RT)
+    # Math: at 45% WR with 3:1 ratio -> EV = 0.45*(220-57) + 0.55*(-75-57) = +0.75 bps
+    default_tp_bps: float = float(os.getenv("DEFAULT_TP_BPS", "220.0"))
+    default_sl_bps: float = float(os.getenv("DEFAULT_SL_BPS", "75.0"))
+    breakeven_cost_bps: float = float(os.getenv("BREAKEVEN_COST_BPS", "57.0"))
+
+    # Consensus gate
+    min_consensus_families: int = int(os.getenv("MIN_CONSENSUS_FAMILIES", "2"))
+
+    # Volume gate
+    min_volume_ratio: float = float(os.getenv("MIN_VOLUME_RATIO", "0.5"))
+
+    # Minimum confidence to publish (was effectively 0)
+    min_signal_confidence: float = float(os.getenv("MIN_SIGNAL_CONFIDENCE", "0.65"))
 
     # Safety
     live_trading_confirmation: str = field(
@@ -217,6 +253,19 @@ SYMBOL_MAP_TO_KRAKEN = {
 }
 
 SYMBOL_MAP_FROM_KRAKEN = {v: k for k, v in SYMBOL_MAP_TO_KRAKEN.items()}
+
+
+def _compute_rsi(closes: np.ndarray, period: int = 14) -> float:
+    """Compute RSI from close prices."""
+    if len(closes) < period + 1:
+        return 50.0
+    deltas = np.diff(closes[-(period + 1):])
+    gains = np.where(deltas > 0, deltas, 0.0)
+    losses = np.where(deltas < 0, -deltas, 0.0)
+    avg_gain = np.mean(gains)
+    avg_loss = max(np.mean(losses), 1e-10)
+    rs = avg_gain / avg_loss
+    return float(100.0 - (100.0 / (1.0 + rs)))
 
 
 def normalize_pair(pair: str) -> str:
@@ -600,6 +649,88 @@ class ProductionEngine:
             "volatility": volatility,
         }
 
+    async def _generate_signal_v2(self, pair: str) -> Optional[Dict[str, Any]]:
+        """
+        Sprint 1 signal generation using OHLCV candles + consensus gate.
+
+        Replaces _analyze_momentum() when USE_OHLCV_FOR_SIGNALS=true.
+        Falls back to legacy if OHLCV data unavailable.
+        """
+        # Read OHLCV candles from Redis
+        ohlcv = await read_ohlcv_candles(
+            redis_client=self.redis_client,
+            exchange="kraken",
+            pair=pair,
+            timeframe_s=self.config.primary_timeframe_s,
+            lookback=self.config.signal_candle_lookback,
+        )
+
+        if ohlcv is None:
+            logger.debug("%s: No OHLCV data, falling back to legacy", pair)
+            return None  # caller will fall back to _analyze_momentum
+
+        # Volume gate
+        if self.config.volume_confirmation_enabled:
+            vol_ratio = compute_volume_ratio(ohlcv[:, 4], lookback=20)
+            if should_suppress_for_volume(vol_ratio, self.config.min_volume_ratio):
+                return {"signal": None, "reason": "volume_too_low", "volume_ratio": vol_ratio}
+        else:
+            vol_ratio = 1.0
+
+        # Consensus gate
+        if self.config.consensus_gate_enabled:
+            result = evaluate_consensus(
+                ohlcv, min_families=self.config.min_consensus_families,
+            )
+            logger.info(
+                "Consensus: %d families, direction=%s, published=%s [%s]",
+                result.families_agreeing, result.direction,
+                result.published, pair,
+            )
+            if not result.published:
+                return {"signal": None, "reason": result.reason, "volume_ratio": vol_ratio}
+
+            direction = result.direction
+            confidence = result.confidence
+        else:
+            # Fallback: use old _analyze_momentum on close prices
+            analysis = self._analyze_momentum(list(ohlcv[:, 3]))
+            if analysis.get("signal") is None:
+                return analysis
+            direction = "long" if analysis["signal"] == "buy" else "short"
+            confidence = analysis["confidence"]
+
+        # Volume multiplier on confidence
+        if self.config.volume_confirmation_enabled:
+            confidence = apply_volume_multiplier(confidence, vol_ratio)
+
+        # Minimum confidence gate
+        if confidence < self.config.min_signal_confidence:
+            return {
+                "signal": None,
+                "reason": f"confidence_too_low ({confidence:.2f} < {self.config.min_signal_confidence})",
+                "volume_ratio": vol_ratio,
+            }
+
+        # Compute indicators from OHLCV for signal metadata
+        closes = ohlcv[:, 3]
+        volatility = float(np.std(closes[-20:]) / np.mean(closes[-20:])) if len(closes) >= 20 else 0.02
+        rsi = _compute_rsi(closes)
+        roc = float((closes[-1] - closes[-11]) / closes[-11] * 100) if len(closes) >= 11 else 0.0
+
+        return {
+            "signal": "buy" if direction == "long" else "sell",
+            "confidence": confidence,
+            "rsi": rsi,
+            "roc": roc,
+            "volatility": volatility,
+            "volume_ratio": vol_ratio,
+            "sma_short": float(np.mean(closes[-10:])),
+            "sma_long": float(np.mean(closes[-30:])) if len(closes) >= 30 else float(np.mean(closes)),
+            "source": "ohlcv_consensus",
+            "families_agreeing": result.families_agreeing if self.config.consensus_gate_enabled else 0,
+        }
+
     async def generate_and_publish_signal(self, pair: str) -> None:
         """
         Generate and publish a trading signal using LIVE Kraken prices
@@ -620,70 +751,71 @@ class ProductionEngine:
         if now - last_signal < self._signal_cooldown_seconds:
             return
 
-        # Feed staleness gate — suppress signals from stale feeds
-        if self.config.feed_staleness_enabled:
-            exchange = "kraken"  # production_engine.py uses Kraken
-            if self._aggregator.is_feed_stale(exchange, pair, timeframe_s=60):
-                logger.warning(
-                    f"Feed stale for {exchange}:{pair}, suppressing signal generation"
-                )
+        # ── Sprint 1: OHLCV + Consensus path ───────────────────
+        analysis = None
+        if self.config.use_ohlcv_for_signals:
+            try:
+                analysis = await self._generate_signal_v2(pair)
+            except Exception as e:
+                logger.warning("OHLCV signal gen failed for %s: %s, falling back", pair, e)
+                analysis = None
+
+        # ── Legacy fallback: REST spot prices ──────────────────
+        if analysis is None:
+            # Fetch LIVE price from Kraken (original path)
+            try:
+                entry = await self._fetch_live_price(pair)
+            except Exception as e:
+                logger.warning(f"Could not fetch live price for {pair}: {e}")
                 return
 
-        # Fetch LIVE price from Kraken
+            self._aggregator.process_tick("kraken", pair, price=entry)
+
+            # Feed staleness gate
+            uptime = now - self._start_time
+            if self.config.feed_staleness_enabled and uptime > self.config.feed_staleness_warmup_seconds:
+                if self._aggregator.is_feed_stale("kraken", pair, timeframe_s=60):
+                    logger.warning("Feed stale for kraken:%s, suppressing signal", pair)
+                    return
+
+            if pair not in self._price_history:
+                self._price_history[pair] = deque(maxlen=100)
+            self._price_history[pair].append(entry)
+
+            if len(self._price_history[pair]) < 30:
+                return
+
+            analysis = self._analyze_momentum(list(self._price_history[pair]))
+
+        if analysis.get("signal") is None:
+            logger.debug("%s: No signal - %s", pair, analysis.get("reason", "unknown"))
+            return
+
+        side = analysis["signal"]
+        confidence = analysis["confidence"]
+
+        # Fetch entry price (v2 path may not have fetched it yet)
         try:
             entry = await self._fetch_live_price(pair)
         except Exception as e:
             logger.warning(f"Could not fetch live price for {pair}: {e}")
             return
 
-        # Feed tick to aggregator for health tracking
-        self._aggregator.process_tick("kraken", pair, price=entry)
-
-        # Add price to history
-        if pair not in self._price_history:
-            self._price_history[pair] = deque(maxlen=100)
-        self._price_history[pair].append(entry)
-
-        # Need at least 30 prices for analysis
-        if len(self._price_history[pair]) < 30:
-            logger.debug(f"{pair}: Building price history ({len(self._price_history[pair])}/30)")
-            return
-
-        # Analyze momentum
-        analysis = self._analyze_momentum(list(self._price_history[pair]))
-
-        if analysis.get("signal") is None:
-            logger.debug(f"{pair}: No signal - {analysis.get('reason', 'unknown')}")
-            return
-
-        side = analysis["signal"]
-        confidence = analysis["confidence"]
-
-        # Calculate SL and TP based on volatility
-        volatility = analysis.get("volatility", 0.02)
-        risk_multiplier = max(1.0, min(2.0, volatility * 50))  # Scale with volatility
-
-        volatility_map = {
-            "BTC/USD": 0.015,
-            "ETH/USD": 0.02,
-            "SOL/USD": 0.025,
-            "ADA/USD": 0.03,
-            "AVAX/USD": 0.03,
-            "DOT/USD": 0.03,
-            "LINK/USD": 0.025,
-        }
-        base_volatility = volatility_map.get(pair, 0.02)
+        # ── TP/SL from config (fee-aware) ──────────────────────
+        tp_bps = self.config.default_tp_bps
+        sl_bps = self.config.default_sl_bps
 
         if side == "buy":
-            sl = entry * (1 - base_volatility * 1.5 * risk_multiplier)
-            tp = entry * (1 + base_volatility * 2.0 * risk_multiplier)
+            sl = entry * (1 - sl_bps / 10000)
+            tp = entry * (1 + tp_bps / 10000)
             prd_side = "LONG"
         else:
-            sl = entry * (1 + base_volatility * 1.5 * risk_multiplier)
-            tp = entry * (1 - base_volatility * 2.0 * risk_multiplier)
+            sl = entry * (1 + sl_bps / 10000)
+            tp = entry * (1 - tp_bps / 10000)
             prd_side = "SHORT"
 
         # Determine regime based on analysis
+        volatility = analysis.get("volatility", 0.02)
         rsi = analysis.get("rsi", 50)
         roc = analysis.get("roc", 0)
         if abs(roc) > 1.0:
@@ -708,15 +840,16 @@ class ProductionEngine:
                 "rsi_14": analysis.get("rsi", 50),
                 "macd_signal": "BULLISH" if prd_side == "LONG" else "BEARISH",
                 "atr_14": entry * volatility,
-                "volume_ratio": 1.0,
+                "volume_ratio": analysis.get("volume_ratio", 1.0),
             },
             metadata={
-                "model_version": "v2.1.0",
-                "backtest_sharpe": 1.65,
+                "model_version": "v3.0.0-sprint1",
+                "source": analysis.get("source", "legacy_momentum"),
                 "latency_ms": int((time.time() - now) * 1000),
-                "strategy_tag": "Momentum SMA/RSI",
+                "strategy_tag": "OHLCV Consensus" if analysis.get("source") == "ohlcv_consensus" else "Legacy Momentum",
                 "mode": self.config.mode,
-                "timeframe": "5m",
+                "timeframe": f"{self.config.primary_timeframe_s}s",
+                "consensus_families": analysis.get("families_agreeing", 0) if isinstance(analysis, dict) else 0,
             },
         )
 
@@ -727,9 +860,11 @@ class ProductionEngine:
         self._last_signal_time[pair] = now
 
         logger.info(
-            f"PRD-001 Signal published: {pair} {prd_side} @ ${entry:,.2f} "
-            f"(confidence={confidence:.2f}, RSI={analysis.get('rsi', 0):.1f}, "
-            f"ROC={analysis.get('roc', 0):.2f}%, regime={regime})"
+            "PRD-001 Signal published: %s %s @ $%,.2f "
+            "(confidence=%.2f, RSI=%.1f, ROC=%.2f%%, regime=%s, source=%s)",
+            pair, prd_side, entry, confidence,
+            analysis.get("rsi", 0), analysis.get("roc", 0),
+            regime, analysis.get("source", "legacy"),
         )
 
     async def run(self) -> None:
@@ -738,8 +873,8 @@ class ProductionEngine:
         logger.info(f"Collecting price history for {len(self.config.trading_pairs)} pairs...")
         logger.info("Signals will be generated after collecting 30+ price samples per pair")
 
-        price_collection_interval = 10  # Collect price every 10 seconds
-        last_price_collection = 0.0
+        signal_interval = self.config.primary_timeframe_s  # 60s for 1-min candles
+        last_signal_check = 0.0
 
         # Main loop
         while not self._shutdown_requested:
@@ -758,9 +893,9 @@ class ProductionEngine:
                 if current_time - self._last_pnl_update >= self.config.pnl_update_interval_sec:
                     await self.update_pnl()
 
-                # Collect prices and analyze for signals every 10 seconds
-                if current_time - last_price_collection >= price_collection_interval:
-                    last_price_collection = current_time
+                # Collect prices and analyze for signals at candle interval
+                if current_time - last_signal_check >= signal_interval:
+                    last_signal_check = current_time
 
                     # Process each trading pair
                     for pair in self.config.trading_pairs:
