@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 # Default: all exchanges EXCEPT Kraken (handled by production_engine.py)
 DEFAULT_EXCHANGES = "coinbase,binance,bybit,okx,kucoin,gateio,bitfinex"
-DEFAULT_PAIRS = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"
+DEFAULT_PAIRS = "BTC/USD,ETH/USD,SOL/USD,LINK/USD,ALGO/USD"
 DEFAULT_TIMEFRAMES = "1m,5m,15m,1h"
 
 

@@ -26,7 +26,7 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   TRADING_MODE = "paper"  # Change to "live" for real trading
   BOT_MODE = "PAPER"
   ENABLE_TRADING = "false"
-  TRADING_PAIRS = "BTC/USD,ETH/USD,SOL/USD"
+  TRADING_PAIRS = "BTC/USD,ETH/USD,SOL/USD,ALGO/USD"
 
   # Kraken WebSocket
   KRAKEN_WS_URL = "wss://ws.kraken.com"

@@ -412,3 +412,98 @@ class TestTPSLMath:
         wr = 0.45
         ev = wr * (self.TP_BPS - self.COST_BPS) + (1 - wr) * (-self.SL_BPS - self.COST_BPS)
         assert abs(ev - 0.75) < 1.0, f"EV={ev:.2f} should be ~0.75 bps"
+
+
+# ═══════════════════════════════════════════════════════════
+# 5. Regression: ALGO/USD pair whitelist coverage
+#    Root cause: fly.toml TRADING_PAIRS and run_multi_exchange.py
+#    DEFAULT_PAIRS excluded ALGO/USD, so no OHLCV data was ever
+#    streamed/subscribed for it → zero signals.
+# ═══════════════════════════════════════════════════════════
+
+class TestAlgoUsdPairCoverage:
+    """
+    Regression tests for BUG-2: ALGO/USD bot produces zero signals.
+
+    The root cause was ALGO/USD missing from the TRADING_PAIRS env-var
+    configured in fly.toml (only BTC/USD,ETH/USD,SOL/USD) and from the
+    DEFAULT_PAIRS fallback in run_multi_exchange.py (only 4 pairs).
+    Without the pair being in either list, the Kraken WS never subscribes
+    to ALGO/USD OHLCV, the multi-exchange streamer never streams it, and
+    ohlcv_reader finds no candles → _generate_signal_v2 returns None →
+    the legacy REST path has no price history either → no signal published.
+    """
+
+    def test_algo_usd_in_canonical_enabled_pairs(self):
+        """ALGO/USD must appear in the canonical enabled pairs list."""
+        from config.trading_pairs import get_enabled_pairs, is_enabled_pair
+        symbols = [p.symbol for p in get_enabled_pairs()]
+        assert "ALGO/USD" in symbols, (
+            "ALGO/USD is missing from ENABLED trading pairs in config/trading_pairs.py"
+        )
+        assert is_enabled_pair("ALGO/USD"), "ALGO/USD is not enabled"
+
+    def test_algo_usd_kraken_symbol_correct(self):
+        """Kraken symbol for ALGO/USD must be ALGOUSD (not a blank or wrong mapping)."""
+        from config.trading_pairs import symbol_to_kraken
+        kraken_sym = symbol_to_kraken("ALGO/USD")
+        assert kraken_sym == "ALGOUSD", (
+            f"Expected ALGOUSD, got {kraken_sym!r}. "
+            "Kraken WS will reject subscriptions with wrong symbol format."
+        )
+
+    def test_algo_usd_stream_symbol_correct(self):
+        """Stream format for ALGO/USD must be ALGO-USD (dash, not slash)."""
+        from config.trading_pairs import get_pair_by_symbol
+        pair = get_pair_by_symbol("ALGO/USD")
+        assert pair is not None
+        assert pair.stream_symbol == "ALGO-USD", (
+            f"Expected ALGO-USD, got {pair.stream_symbol!r}. "
+            "ohlcv_reader uses the dash format for Redis key construction."
+        )
+
+    def test_fly_toml_trading_pairs_includes_algo(self):
+        """
+        fly.toml TRADING_PAIRS must include ALGO/USD.
+
+        This env var overrides the canonical list for both production_engine.py
+        and run_multi_exchange.py.  If ALGO/USD is absent here, the Kraken WS
+        never subscribes and the streamer never publishes OHLCV for it.
+        """
+        from pathlib import Path
+        fly_toml = Path(__file__).parent.parent / "fly.toml"
+        assert fly_toml.exists(), "fly.toml not found at project root"
+        content = fly_toml.read_text()
+        # Find the TRADING_PAIRS line and assert ALGO/USD is present
+        trading_pairs_line = next(
+            (line for line in content.splitlines() if "TRADING_PAIRS" in line and "=" in line),
+            None,
+        )
+        assert trading_pairs_line is not None, "TRADING_PAIRS not found in fly.toml"
+        assert "ALGO/USD" in trading_pairs_line, (
+            f"ALGO/USD missing from fly.toml TRADING_PAIRS.\n"
+            f"Found: {trading_pairs_line.strip()}\n"
+            "Fix: add ALGO/USD to the comma-separated list."
+        )
+
+    def test_run_multi_exchange_default_pairs_includes_algo(self):
+        """
+        run_multi_exchange.py DEFAULT_PAIRS must include ALGO/USD.
+
+        This is the fallback used when TRADING_PAIRS env var is not set.
+        It controls what the multi-exchange streamer (ams process) subscribes to.
+        """
+        from pathlib import Path
+        src = Path(__file__).parent.parent / "run_multi_exchange.py"
+        assert src.exists(), "run_multi_exchange.py not found at project root"
+        content = src.read_text()
+        default_pairs_line = next(
+            (line for line in content.splitlines() if "DEFAULT_PAIRS" in line and "=" in line),
+            None,
+        )
+        assert default_pairs_line is not None, "DEFAULT_PAIRS not found in run_multi_exchange.py"
+        assert "ALGO/USD" in default_pairs_line, (
+            f"ALGO/USD missing from run_multi_exchange.py DEFAULT_PAIRS.\n"
+            f"Found: {default_pairs_line.strip()}\n"
+            "Fix: add ALGO/USD to DEFAULT_PAIRS."
+        )
