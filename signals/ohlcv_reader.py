@@ -34,11 +34,28 @@ async def read_ohlcv_candles(
         or None if insufficient data.
     """
     dash_pair = pair.replace("/", "-")
+
+    # Build human-readable timeframe label matching the streamer's key format.
+    # MultiExchangeStreamer writes: {exchange}:ohlc:{label}:{dash_pair}
+    # where label is the CCXT-style string ("15s", "1m", "5m", "1h"), NOT an integer.
+    _TF_LABEL: dict = {15: "15s", 60: "1m", 300: "5m", 900: "15m", 3600: "1h"}
+    tf_label = _TF_LABEL.get(timeframe_s)
+
     keys_to_try = [
+        # Aggregator format (ohlcv_aggregator.py) — per-exchange and cross-exchange
         f"ohlc:{timeframe_s}:{exchange}:{pair}",
         f"ohlc:{timeframe_s}:any:{pair}",
-        f"{exchange}:ohlc:{timeframe_s // 60 if timeframe_s >= 60 else timeframe_s}:{dash_pair}",
     ]
+
+    if tf_label:
+        # Streamer format: {exchange}:ohlc:{label}:{dash_pair}  (e.g. kraken:ohlc:1m:BTC-USD)
+        keys_to_try.append(f"{exchange}:ohlc:{tf_label}:{dash_pair}")
+        # Cross-exchange aggregator with label (e.g. ohlc:1m:any:BTC-USD)
+        keys_to_try.append(f"ohlc:{tf_label}:any:{dash_pair}")
+
+    # Legacy fallback: integer-minutes format that was used before label convention
+    legacy_tf = timeframe_s // 60 if timeframe_s >= 60 else timeframe_s
+    keys_to_try.append(f"{exchange}:ohlc:{legacy_tf}:{dash_pair}")
 
     for key in keys_to_try:
         try:
@@ -46,8 +63,9 @@ async def read_ohlcv_candles(
             if raw and len(raw) >= 20:
                 arr = _parse_ohlcv(raw)
                 if arr is not None and len(arr) >= 20:
-                    logger.debug(
-                        "OHLCV read: key=%s candles=%d", key, len(arr)
+                    logger.info(
+                        "OHLCV read: exchange=%s pair=%s tf=%ds key=%s candles=%d",
+                        exchange, pair, timeframe_s, key, len(arr),
                     )
                     return arr
         except Exception as e:

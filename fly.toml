@@ -26,7 +26,7 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   TRADING_MODE = "paper"  # Change to "live" for real trading
   BOT_MODE = "PAPER"
   ENABLE_TRADING = "false"
-  TRADING_PAIRS = "BTC/USD,ETH/USD,SOL/USD,ALGO/USD"
+  TRADING_PAIRS = "BTC/USD,ETH/USD,SOL/USD,ALGO/USD,LINK/USD,XRP/USD,ADA/USD,DOGE/USD,AVAX/USD,DOT/USD,LTC/USD,UNI/USD,ATOM/USD,NEAR/USD,ARB/USD"
 
   # Kraken WebSocket
   KRAKEN_WS_URL = "wss://ws.kraken.com"
@@ -38,7 +38,7 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   # Redis Cloud Configuration (non-sensitive)
   REDIS_SSL = "true"
   REDIS_CA_CERT = "/app/config/certs/redis_ca.pem"
-  REDIS_MAX_CONNECTIONS = "100"
+  REDIS_MAX_CONNECTIONS = "150"
   REDIS_SOCKET_TIMEOUT = "10"
   REDIS_RETRY_ATTEMPTS = "3"
   REDIS_DECODE_RESPONSES = "true"
