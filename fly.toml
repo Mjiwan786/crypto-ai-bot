@@ -38,7 +38,7 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   # Redis Cloud Configuration (non-sensitive)
   REDIS_SSL = "true"
   REDIS_CA_CERT = "/app/config/certs/redis_ca.pem"
-  REDIS_MAX_CONNECTIONS = "30"
+  REDIS_MAX_CONNECTIONS = "100"
   REDIS_SOCKET_TIMEOUT = "10"
   REDIS_RETRY_ATTEMPTS = "3"
   REDIS_DECODE_RESPONSES = "true"
