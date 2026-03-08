@@ -290,36 +290,41 @@ class MultiExchangeStreamer:
         source: str = "websocket",
     ) -> None:
         """Publish a single OHLCV candle to Redis stream."""
-        try:
-            data = {
-                "exchange": exchange_id,
-                "symbol": symbol,
-                "timeframe": timeframe,
-                "timestamp": candle.timestamp.isoformat(),
-                "open": str(candle.open),
-                "high": str(candle.high),
-                "low": str(candle.low),
-                "close": str(candle.close),
-                "volume": str(candle.volume),
-                "source": source,
-                "published_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await self.redis.xadd(
-                stream_key, data,
-                maxlen=_OHLCV_MAXLEN, approximate=True,
-            )
-            self.message_counts[exchange_id] = (
-                self.message_counts.get(exchange_id, 0) + 1
-            )
-            self.last_message_time[exchange_id] = time.time()
-        except Exception as exc:
-            logger.error(
-                "[%s] Redis publish error for %s: %s",
-                exchange_id, symbol, exc,
-            )
-            self.error_counts[exchange_id] = (
-                self.error_counts.get(exchange_id, 0) + 1
-            )
+        data = {
+            "exchange": exchange_id,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "timestamp": candle.timestamp.isoformat(),
+            "open": str(candle.open),
+            "high": str(candle.high),
+            "low": str(candle.low),
+            "close": str(candle.close),
+            "volume": str(candle.volume),
+            "source": source,
+            "published_at": datetime.now(timezone.utc).isoformat(),
+        }
+        for attempt in range(2):
+            try:
+                await self.redis.xadd(
+                    stream_key, data,
+                    maxlen=_OHLCV_MAXLEN, approximate=True,
+                )
+                self.message_counts[exchange_id] = (
+                    self.message_counts.get(exchange_id, 0) + 1
+                )
+                self.last_message_time[exchange_id] = time.time()
+                return
+            except Exception as exc:
+                if attempt == 0 and "connect" in str(exc).lower():
+                    await asyncio.sleep(0.05)
+                    continue
+                logger.error(
+                    "[%s] Redis publish error for %s (attempt %d): %s",
+                    exchange_id, symbol, attempt + 1, exc,
+                )
+                self.error_counts[exchange_id] = (
+                    self.error_counts.get(exchange_id, 0) + 1
+                )
 
     async def _stream_ticker(
         self, adapter: CcxtProWSAdapter, symbol: str
