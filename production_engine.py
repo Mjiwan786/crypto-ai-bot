@@ -100,6 +100,8 @@ from exchange.rate_limiter import ExchangeRateLimiter
 from signals.ohlcv_reader import read_ohlcv_candles
 from signals.volume_scoring import compute_volume_ratio, apply_volume_multiplier, should_suppress_for_volume
 from signals.consensus_gate import evaluate_consensus
+from signals.signal_generator import SignalGenerator
+from indicators.rsi import compute_rsi as compute_rsi_array
 
 # Configure logging
 logging.basicConfig(
@@ -651,10 +653,10 @@ class ProductionEngine:
 
     async def _generate_signal_v2(self, pair: str) -> Optional[Dict[str, Any]]:
         """
-        Sprint 1 signal generation using OHLCV candles + consensus gate.
+        Sprint 2 signal generation using 8 real TA strategies + consensus gate.
 
-        Replaces _analyze_momentum() when USE_OHLCV_FOR_SIGNALS=true.
-        Falls back to legacy if OHLCV data unavailable.
+        Pipeline: OHLCV → 8 strategies → consensus (2+ families) → signal.
+        This is the ONLY signal generation path. No fallback to legacy momentum.
         """
         # Read OHLCV candles from Redis
         ohlcv = await read_ohlcv_candles(
@@ -666,10 +668,10 @@ class ProductionEngine:
         )
 
         if ohlcv is None:
-            logger.debug("%s: No OHLCV data, falling back to legacy", pair)
-            return None  # caller will fall back to _analyze_momentum
+            logger.debug("%s: No OHLCV data available, skipping signal generation", pair)
+            return {"signal": None, "reason": "no_ohlcv_data"}
 
-        # Volume gate
+        # Volume gate (pre-filter before running strategies)
         if self.config.volume_confirmation_enabled:
             vol_ratio = compute_volume_ratio(ohlcv[:, 4], lookback=20)
             if should_suppress_for_volume(vol_ratio, self.config.min_volume_ratio):
@@ -677,28 +679,38 @@ class ProductionEngine:
         else:
             vol_ratio = 1.0
 
-        # Consensus gate
-        if self.config.consensus_gate_enabled:
-            result = evaluate_consensus(
-                ohlcv, min_families=self.config.min_consensus_families,
-            )
-            logger.info(
-                "Consensus: %d families, direction=%s, published=%s [%s]",
-                result.families_agreeing, result.direction,
-                result.published, pair,
-            )
-            if not result.published:
-                return {"signal": None, "reason": result.reason, "volume_ratio": vol_ratio}
+        # ── 8-Strategy Consensus Pipeline (mandatory) ────────────
+        signal_gen = SignalGenerator()
+        trading_signal = await signal_gen.generate("kraken", pair, ohlcv)
 
-            direction = result.direction
-            confidence = result.confidence
-        else:
-            # Fallback: use old _analyze_momentum on close prices
-            analysis = self._analyze_momentum(list(ohlcv[:, 3]))
-            if analysis.get("signal") is None:
-                return analysis
-            direction = "long" if analysis["signal"] == "buy" else "short"
-            confidence = analysis["confidence"]
+        if trading_signal is None:
+            # Log strategy-level details for debugging
+            indicators = signal_gen._compute_features(ohlcv)
+            from strategies import ALL_STRATEGIES, FAMILY_MAP
+            votes = []
+            for s in ALL_STRATEGIES:
+                try:
+                    r = s.compute_signal(ohlcv, indicators)
+                    if r.direction != "neutral":
+                        votes.append(f"{s.name}={r.direction}({r.confidence:.0f})")
+                except Exception:
+                    pass
+            logger.info(
+                "8-strategy consensus NOT MET [%s]: votes=[%s]",
+                pair, ", ".join(votes) if votes else "none",
+            )
+            return {"signal": None, "reason": "consensus_not_met", "volume_ratio": vol_ratio}
+
+        direction = trading_signal.direction
+        confidence = trading_signal.confidence / 100.0  # normalize to 0-1 for downstream
+        families_agreeing = trading_signal.metadata.get("families_agreeing", 0)
+        strategies_agreeing = trading_signal.metadata.get("strategies_agreeing", [])
+
+        logger.info(
+            "8-strategy consensus MET [%s]: %s, conf=%.2f, families=%d, strategies=%s",
+            pair, direction, confidence, families_agreeing,
+            ",".join(strategies_agreeing),
+        )
 
         # Volume multiplier on confidence
         if self.config.volume_confirmation_enabled:
@@ -712,13 +724,14 @@ class ProductionEngine:
                 "volume_ratio": vol_ratio,
             }
 
-        # Compute indicators from OHLCV for signal metadata
+        # Compute indicator snapshots for signal metadata
         closes = ohlcv[:, 3]
         volatility = float(np.std(closes[-20:]) / np.mean(closes[-20:])) if len(closes) >= 20 else 0.02
-        rsi = _compute_rsi(closes)
+        rsi_arr = compute_rsi_array(closes, 14)
+        rsi = float(rsi_arr[-1]) if not np.isnan(rsi_arr[-1]) else 50.0
         roc = float((closes[-1] - closes[-11]) / closes[-11] * 100) if len(closes) >= 11 else 0.0
 
-        return {
+        result = {
             "signal": "buy" if direction == "long" else "sell",
             "confidence": confidence,
             "rsi": rsi,
@@ -727,20 +740,22 @@ class ProductionEngine:
             "volume_ratio": vol_ratio,
             "sma_short": float(np.mean(closes[-10:])),
             "sma_long": float(np.mean(closes[-30:])) if len(closes) >= 30 else float(np.mean(closes)),
-            "source": "ohlcv_consensus",
-            "families_agreeing": result.families_agreeing if self.config.consensus_gate_enabled else 0,
+            "source": "ohlcv_8strategy",
+            "families_agreeing": families_agreeing,
         }
+
+        # Attach full strategy metadata
+        if trading_signal:
+            result["strategy_metadata"] = trading_signal.metadata
+
+        return result
 
     async def generate_and_publish_signal(self, pair: str) -> None:
         """
-        Generate and publish a trading signal using LIVE Kraken prices
-        and real momentum-based strategy analysis.
-
-        Uses:
-        - SMA crossover (10/30)
-        - RSI (14-period simplified)
-        - Rate of Change momentum
-        - Volatility-adjusted position sizing
+        Generate and publish a trading signal using the 8-strategy
+        consensus pipeline. ALL signals must pass through the consensus
+        gate (2+ independent indicator families agreeing). No legacy
+        momentum fallback.
         """
         if not self.signal_publisher:
             return
@@ -751,41 +766,15 @@ class ProductionEngine:
         if now - last_signal < self._signal_cooldown_seconds:
             return
 
-        # ── Sprint 1: OHLCV + Consensus path ───────────────────
-        analysis = None
-        if self.config.use_ohlcv_for_signals:
-            try:
-                analysis = await self._generate_signal_v2(pair)
-            except Exception as e:
-                logger.warning("OHLCV signal gen failed for %s: %s, falling back", pair, e)
-                analysis = None
+        # ── 8-Strategy Consensus Pipeline (no legacy fallback) ──
+        try:
+            analysis = await self._generate_signal_v2(pair)
+        except Exception as e:
+            logger.warning("Signal generation failed for %s: %s", pair, e)
+            return
 
-        # ── Legacy fallback: REST spot prices ──────────────────
         if analysis is None:
-            # Fetch LIVE price from Kraken (original path)
-            try:
-                entry = await self._fetch_live_price(pair)
-            except Exception as e:
-                logger.warning(f"Could not fetch live price for {pair}: {e}")
-                return
-
-            self._aggregator.process_tick("kraken", pair, price=entry)
-
-            # Feed staleness gate
-            uptime = now - self._start_time
-            if self.config.feed_staleness_enabled and uptime > self.config.feed_staleness_warmup_seconds:
-                if self._aggregator.is_feed_stale("kraken", pair, timeframe_s=60):
-                    logger.warning("Feed stale for kraken:%s, suppressing signal", pair)
-                    return
-
-            if pair not in self._price_history:
-                self._price_history[pair] = deque(maxlen=100)
-            self._price_history[pair].append(entry)
-
-            if len(self._price_history[pair]) < 30:
-                return
-
-            analysis = self._analyze_momentum(list(self._price_history[pair]))
+            return
 
         if analysis.get("signal") is None:
             logger.debug("%s: No signal - %s", pair, analysis.get("reason", "unknown"))
@@ -841,12 +830,16 @@ class ProductionEngine:
                 "macd_signal": "BULLISH" if prd_side == "LONG" else "BEARISH",
                 "atr_14": entry * volatility,
                 "volume_ratio": analysis.get("volume_ratio", 1.0),
+                "families_agreeing": analysis.get("families_agreeing", 0),
+                "sma_short": analysis.get("sma_short", 0),
+                "sma_long": analysis.get("sma_long", 0),
+                "roc": analysis.get("roc", 0),
             },
             metadata={
-                "model_version": "v3.0.0-sprint1",
-                "source": analysis.get("source", "legacy_momentum"),
+                "model_version": "v3.2.0-sprint2",
+                "source": analysis.get("source", "ohlcv_8strategy"),
                 "latency_ms": int((time.time() - now) * 1000),
-                "strategy_tag": "OHLCV Consensus" if analysis.get("source") == "ohlcv_consensus" else "Legacy Momentum",
+                "strategy_tag": "8-Strategy Consensus",
                 "mode": self.config.mode,
                 "timeframe": f"{self.config.primary_timeframe_s}s",
                 "consensus_families": analysis.get("families_agreeing", 0) if isinstance(analysis, dict) else 0,
@@ -864,14 +857,14 @@ class ProductionEngine:
             "(confidence=%.2f, RSI=%.1f, ROC=%.2f%%, regime=%s, source=%s)",
             pair, prd_side, entry, confidence,
             analysis.get("rsi", 0), analysis.get("roc", 0),
-            regime, analysis.get("source", "legacy"),
+            regime, analysis.get("source", "ohlcv_8strategy"),
         )
 
     async def run(self) -> None:
         """Main engine loop with real strategy-based signal generation"""
         logger.info("Starting main engine loop...")
-        logger.info(f"Collecting price history for {len(self.config.trading_pairs)} pairs...")
-        logger.info("Signals will be generated after collecting 30+ price samples per pair")
+        logger.info(f"Processing {len(self.config.trading_pairs)} pairs via 8-strategy consensus pipeline")
+        logger.info("Signals require 2+ indicator families agreeing (no legacy fallback)")
 
         signal_interval = self.config.primary_timeframe_s  # 60s for 1-min candles
         last_signal_check = 0.0
