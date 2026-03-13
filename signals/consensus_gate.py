@@ -5,26 +5,38 @@ Requires signals from 2+ INDEPENDENT indicator families to agree
 on direction before publishing. Prevents single-indicator noise.
 
 Families:
-  A (momentum): RSI, MACD, ROC-based signals
-  B (trend):    EMA crossover, SMA crossover, trend strength
+  A (momentum):  RSI, MACD, ROC-based signals
+  B (trend):     EMA crossover, SMA crossover, trend strength
   C (structure): Bollinger Band reversion, support/resistance breakout
+  D (onchain):   Open interest + long/short ratio (optional, cached from Redis)
+
+Sprint 2 changes:
+  - Relaxed thresholds: moderate signals now vote at lower confidence
+  - min_families configurable via MIN_CONSENSUS_FAMILIES env var
+  - Family D (on-chain) optional — abstains if disabled or data unavailable
+  - Per-vote logging for observability
 """
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Default from env var; can be overridden per-call
+_DEFAULT_MIN_FAMILIES = int(os.getenv("MIN_CONSENSUS_FAMILIES", "2"))
 
 
 class Family(str, Enum):
     MOMENTUM = "momentum"
     TREND = "trend"
     STRUCTURE = "structure"
+    ONCHAIN = "onchain"
 
 
 @dataclass
@@ -50,18 +62,25 @@ class ConsensusResult:
 
 def evaluate_consensus(
     ohlcv: np.ndarray,
-    min_families: int = 2,
+    min_families: Optional[int] = None,
+    pair: str = "",
+    redis_client: Any = None,
 ) -> ConsensusResult:
     """
     Run all indicator families on OHLCV data and evaluate consensus.
 
     Args:
         ohlcv: numpy array shape (N, 5) -> [open, high, low, close, volume]
-        min_families: minimum number of agreeing families to publish
+        min_families: minimum agreeing families to publish (None = read env var)
+        pair: trading pair for logging (e.g. "BTC/USD")
+        redis_client: optional RedisCloudClient for on-chain family D
 
     Returns:
         ConsensusResult with direction, confidence, and publish decision.
     """
+    if min_families is None:
+        min_families = _DEFAULT_MIN_FAMILIES
+
     if ohlcv is None or len(ohlcv) < 30:
         return ConsensusResult(
             direction=None, families_agreeing=0, total_families_voting=0,
@@ -90,6 +109,25 @@ def evaluate_consensus(
     if structure_vote:
         votes.append(structure_vote)
 
+    # -- Family D: On-chain (optional) --
+    onchain_enabled = os.getenv("ONCHAIN_FAMILY_ENABLED", "false").lower() == "true"
+    if onchain_enabled and redis_client is not None:
+        onchain_vote = _evaluate_onchain(pair, redis_client)
+        if onchain_vote:
+            votes.append(onchain_vote)
+
+    # -- Build vote summary string for logging --
+    vote_strs = []
+    for fam in [Family.MOMENTUM, Family.TREND, Family.STRUCTURE, Family.ONCHAIN]:
+        fam_votes = [v for v in votes if v.family == fam]
+        if fam_votes:
+            v = fam_votes[0]
+            vote_strs.append(f"{fam.value}={v.direction}({v.confidence:.2f})")
+        else:
+            if fam == Family.ONCHAIN and not onchain_enabled:
+                continue  # Don't log disabled family
+            vote_strs.append(f"{fam.value}=abstain")
+
     # -- Tally votes by direction --
     long_families = set()
     short_families = set()
@@ -112,11 +150,16 @@ def evaluate_consensus(
     else:
         direction = None
         families_agreeing = max(n_long, n_short)
+        vote_summary = ", ".join(vote_strs)
         reason = (
             f"consensus_not_met: long={n_long} short={n_short} "
             f"need={min_families}"
         )
-        logger.debug("Consensus: %s", reason)
+        logger.info(
+            "[CONSENSUS] %s: %s -> NO SIGNAL (%d/%d need %d)",
+            pair or "?", vote_summary,
+            families_agreeing, total_voting, min_families,
+        )
         return ConsensusResult(
             direction=None, families_agreeing=families_agreeing,
             total_families_voting=total_voting, confidence=0.0,
@@ -125,7 +168,7 @@ def evaluate_consensus(
 
     # -- Aggregate confidence --
     agreeing_votes = [v for v in votes if v.direction == direction]
-    base_confidence = np.mean([v.confidence for v in agreeing_votes])
+    base_confidence = float(np.mean([v.confidence for v in agreeing_votes]))
 
     # Consensus boost
     if families_agreeing >= 3:
@@ -134,10 +177,15 @@ def evaluate_consensus(
         base_confidence *= 1.05
     base_confidence = min(base_confidence, 0.95)
 
+    vote_summary = ", ".join(vote_strs)
     reason = (
         f"consensus_met: {families_agreeing}/{total_voting} families -> {direction}"
     )
-    logger.info("Consensus: %s (confidence=%.2f)", reason, base_confidence)
+    logger.info(
+        "[CONSENSUS] %s: %s -> %s (%d/%d, conf=%.2f)",
+        pair or "?", vote_summary,
+        direction.upper(), families_agreeing, total_voting, base_confidence,
+    )
 
     return ConsensusResult(
         direction=direction,
@@ -155,11 +203,18 @@ def evaluate_consensus(
 # =================================================================
 
 def _evaluate_momentum(closes: np.ndarray) -> Optional[StrategyVote]:
-    """RSI + ROC momentum assessment."""
+    """
+    RSI + ROC momentum assessment.
+
+    Relaxed thresholds (Sprint 2):
+      - Moderate RSI (30-40 / 60-70) votes at lower confidence (0.52)
+      - Moderate ROC (±0.5-0.8%) votes at lower confidence (0.53)
+      - Extreme levels keep original higher confidence
+    """
     if len(closes) < 15:
         return None
 
-    # RSI (14-period, proper Wilder smoothing)
+    # RSI (14-period)
     deltas = np.diff(closes[-15:])
     gains = np.where(deltas > 0, deltas, 0.0)
     losses = np.where(deltas < 0, -deltas, 0.0)
@@ -174,24 +229,39 @@ def _evaluate_momentum(closes: np.ndarray) -> Optional[StrategyVote]:
     else:
         roc = 0.0
 
-    # Direction decision
     direction = None
     confidence = 0.5
 
+    # ── Extreme RSI (original thresholds, higher confidence) ──
     if rsi < 30 and roc > -0.5:
         direction = "long"
-        confidence = 0.65 + (30 - rsi) / 100  # stronger as more oversold
+        confidence = 0.65 + (30 - rsi) / 100
     elif rsi > 70 and roc < 0.5:
         direction = "short"
         confidence = 0.65 + (rsi - 70) / 100
+    # ── Moderate RSI (new relaxed band) ──
+    elif rsi < 40 and roc > -0.3:
+        direction = "long"
+        confidence = 0.52 + (40 - rsi) / 200  # 0.52-0.57
+    elif rsi > 60 and roc < 0.3:
+        direction = "short"
+        confidence = 0.52 + (rsi - 60) / 200  # 0.52-0.57
+    # ── Strong ROC (original) ──
     elif roc > 0.8:
         direction = "long"
         confidence = 0.55 + min(roc / 10, 0.2)
     elif roc < -0.8:
         direction = "short"
         confidence = 0.55 + min(abs(roc) / 10, 0.2)
+    # ── Moderate ROC (new relaxed band) ──
+    elif roc > 0.5:
+        direction = "long"
+        confidence = 0.53
+    elif roc < -0.5:
+        direction = "short"
+        confidence = 0.53
     else:
-        return None  # no clear momentum signal
+        return None
 
     return StrategyVote(
         family=Family.MOMENTUM, direction=direction,
@@ -200,11 +270,16 @@ def _evaluate_momentum(closes: np.ndarray) -> Optional[StrategyVote]:
 
 
 def _evaluate_trend(closes: np.ndarray) -> Optional[StrategyVote]:
-    """EMA crossover trend assessment."""
+    """
+    EMA crossover trend assessment.
+
+    Relaxed thresholds (Sprint 2):
+      - Moderate spread (0.03-0.05%) votes at lower confidence (0.55)
+      - Strong spread (>0.05%) keeps original confidence (0.60+)
+    """
     if len(closes) < 26:
         return None
 
-    # EMA-9 and EMA-21
     ema_fast = _ema(closes, 9)
     ema_slow = _ema(closes, 21)
 
@@ -213,8 +288,8 @@ def _evaluate_trend(closes: np.ndarray) -> Optional[StrategyVote]:
 
     spread = (ema_fast - ema_slow) / ema_slow * 100  # as percentage
 
-    # Need a meaningful spread (not just noise)
-    if abs(spread) < 0.05:
+    # Need at least a minimal spread (reduced from 0.05% to 0.03%)
+    if abs(spread) < 0.03:
         return None
 
     # Check EMA slope (last 3 candles)
@@ -226,12 +301,20 @@ def _evaluate_trend(closes: np.ndarray) -> Optional[StrategyVote]:
     direction = None
     confidence = 0.5
 
+    # ── Strong spread (original thresholds) ──
     if spread > 0.05 and slope > 0:
         direction = "long"
         confidence = 0.60 + min(spread / 5, 0.25)
     elif spread < -0.05 and slope < 0:
         direction = "short"
         confidence = 0.60 + min(abs(spread) / 5, 0.25)
+    # ── Moderate spread (new relaxed band: 0.03-0.05%) ──
+    elif spread > 0.03 and slope > 0:
+        direction = "long"
+        confidence = 0.55
+    elif spread < -0.03 and slope < 0:
+        direction = "short"
+        confidence = 0.55
     else:
         return None
 
@@ -244,11 +327,16 @@ def _evaluate_trend(closes: np.ndarray) -> Optional[StrategyVote]:
 def _evaluate_structure(
     closes: np.ndarray, highs: np.ndarray, lows: np.ndarray
 ) -> Optional[StrategyVote]:
-    """Bollinger Band + support/resistance structure assessment."""
+    """
+    Bollinger Band structure assessment.
+
+    Relaxed thresholds (Sprint 2):
+      - Moderate BB position (10-20% / 80-90%) votes at lower confidence (0.53)
+      - Extreme BB position (<10% / >90%) keeps original confidence (0.60+)
+    """
     if len(closes) < 20:
         return None
 
-    # Bollinger Bands (20-period, 2 std dev)
     sma20 = np.mean(closes[-20:])
     std20 = np.std(closes[-20:])
     if std20 == 0:
@@ -258,7 +346,6 @@ def _evaluate_structure(
     lower_bb = sma20 - 2 * std20
     current = closes[-1]
 
-    # How far price is from the band (as fraction of band width)
     bb_width = upper_bb - lower_bb
     if bb_width == 0:
         return None
@@ -268,14 +355,20 @@ def _evaluate_structure(
     direction = None
     confidence = 0.5
 
+    # ── Extreme BB position (original thresholds) ──
     if position_in_bb < 0.1:
-        # Price at/below lower band -- mean reversion long
         direction = "long"
         confidence = 0.60 + (0.1 - position_in_bb) * 2
     elif position_in_bb > 0.9:
-        # Price at/above upper band -- mean reversion short
         direction = "short"
         confidence = 0.60 + (position_in_bb - 0.9) * 2
+    # ── Moderate BB position (new relaxed band: 10-20% / 80-90%) ──
+    elif position_in_bb < 0.2:
+        direction = "long"
+        confidence = 0.53 + (0.2 - position_in_bb) * 0.5  # 0.53-0.58
+    elif position_in_bb > 0.8:
+        direction = "short"
+        confidence = 0.53 + (position_in_bb - 0.8) * 0.5  # 0.53-0.58
     else:
         return None
 
@@ -283,6 +376,86 @@ def _evaluate_structure(
         family=Family.STRUCTURE, direction=direction,
         confidence=min(confidence, 0.85), name="bb_reversion",
     )
+
+
+def _evaluate_onchain(pair: str, redis_client: Any) -> Optional[StrategyVote]:
+    """
+    On-chain data family (Family D).
+
+    Reads CACHED data from Redis (never makes HTTP calls inline).
+    The CoinglassClient background task refreshes the cache.
+
+    Voting logic:
+      LONG if: OI increasing (>2%) AND long/short ratio < 0.85
+      SHORT if: OI increasing (>2%) AND long/short ratio > 1.3
+      Abstain otherwise
+    """
+    if redis_client is None:
+        return None
+
+    try:
+        import json as _json
+        import asyncio
+        import inspect
+
+        # Read cached on-chain data
+        base = pair.split("/")[0] if "/" in pair else "BTC"
+
+        client = redis_client.client if hasattr(redis_client, 'client') else redis_client
+
+        # These are cached STRING keys written by CoinglassClient
+        oi_key = f"onchain:{base}:oi"
+        ls_key = f"onchain:{base}:ls_ratio"
+
+        # We're called from a sync context (evaluate_consensus is sync),
+        # so we need a sync Redis client. Skip if client.get is async.
+        oi_raw = None
+        ls_raw = None
+
+        try:
+            get_method = getattr(client, 'get', None)
+            if get_method is None:
+                return None
+            if inspect.iscoroutinefunction(get_method):
+                # Async client — can't call from sync context, skip
+                return None
+            oi_raw = client.get(oi_key)
+            ls_raw = client.get(ls_key)
+        except Exception:
+            return None
+
+        if oi_raw is None or ls_raw is None:
+            return None
+
+        oi_data = _json.loads(oi_raw) if isinstance(oi_raw, str) else _json.loads(oi_raw.decode())
+        ls_data = _json.loads(ls_raw) if isinstance(ls_raw, str) else _json.loads(ls_raw.decode())
+
+        oi_change = oi_data.get("change_24h_pct", 0.0)
+        ls_ratio = ls_data.get("ratio", 1.0)
+        data_ts = max(oi_data.get("timestamp", 0), ls_data.get("timestamp", 0))
+
+        # Stale check: >10 min old
+        import time
+        if time.time() - data_ts > 600:
+            return None
+
+        # Voting logic
+        if oi_change > 2.0 and ls_ratio < 0.85:
+            return StrategyVote(
+                family=Family.ONCHAIN, direction="long",
+                confidence=0.55, name="oi_ls_ratio",
+            )
+        elif oi_change > 2.0 and ls_ratio > 1.3:
+            return StrategyVote(
+                family=Family.ONCHAIN, direction="short",
+                confidence=0.55, name="oi_ls_ratio",
+            )
+
+        return None  # Inconclusive
+
+    except Exception as e:
+        logger.debug("[CONSENSUS] On-chain family error: %s", e)
+        return None
 
 
 def _ema(data: np.ndarray, period: int) -> Optional[float]:

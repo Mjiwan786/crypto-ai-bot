@@ -391,8 +391,9 @@ class PnLTracker:
             equity_key = f"pnl:{self.mode}:equity_curve"
             ts_key = f"pnl:{self.mode}:last_update_ts"
 
-            # 1. Update pnl:{mode}:summary (STRING)
+            # 1. Update pnl:{mode}:summary (STRING) + pnl:{mode}:latest (alias for signals-api fast path)
             await self.redis_client.set(summary_key, summary_json)
+            await self.redis_client.set(f"pnl:{self.mode}:latest", summary_json)
 
             # 2. Add to pnl:{mode}:equity_curve (STREAM)
             equity_event = {

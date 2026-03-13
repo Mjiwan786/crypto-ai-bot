@@ -51,6 +51,15 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   PNL_STREAM_LIVE = "pnl:live"
   ACTIVE_SIGNALS_STREAM = "signals:paper"
 
+  # Sprint 2: Strategy Orchestrator + Paper Trader
+  STRATEGY_ORCHESTRATOR_ENABLED = "true"
+  REGIME_WRITER_ENABLED = "true"
+  SIGNAL_COOLDOWN_SECONDS = "60"
+  MIN_SIGNAL_CONFIDENCE = "0.55"
+  MIN_CONSENSUS_FAMILIES = "2"
+  PAPER_TRADER_ENABLED = "true"
+  ONCHAIN_FAMILY_ENABLED = "false"
+
   # ML Models
   ML_ENABLED = "true"
   ML_MODELS_DIR = "models"
@@ -83,6 +92,7 @@ kill_timeout = "30s"  # Allow 30s for graceful shutdown
 [processes]
   app = "python -u production_engine.py --mode paper"
   streamer = "python -u run_multi_exchange.py --mode paper"
+  paper_trader = "python -u paper/paper_trader.py"
 
 # HTTP Service for Health Checks & Metrics
 [[services]]

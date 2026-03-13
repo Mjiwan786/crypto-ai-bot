@@ -57,6 +57,18 @@ async def read_ohlcv_candles(
     legacy_tf = timeframe_s // 60 if timeframe_s >= 60 else timeframe_s
     keys_to_try.append(f"{exchange}:ohlc:{legacy_tf}:{dash_pair}")
 
+    # Cross-exchange fallback: if primary exchange has no OHLCV data,
+    # try other exchanges that carry the same quote currency.
+    # USD pairs → coinbase, bitfinex; USDT pairs → binance, okx, bybit
+    _USD_FALLBACKS = ["coinbase", "bitfinex"]
+    _USDT_FALLBACKS = ["binance", "okx", "bybit"]
+    is_usd = dash_pair.endswith("-USD")
+    fallback_exchanges = _USD_FALLBACKS if is_usd else _USDT_FALLBACKS
+    if tf_label:
+        for fb_ex in fallback_exchanges:
+            if fb_ex != exchange:
+                keys_to_try.append(f"{fb_ex}:ohlc:{tf_label}:{dash_pair}")
+
     for key in keys_to_try:
         try:
             raw = await _read_stream(redis_client, key, lookback)
@@ -72,7 +84,7 @@ async def read_ohlcv_candles(
             logger.debug("OHLCV read failed key=%s: %s", key, e)
             continue
 
-    logger.debug("No OHLCV data for %s:%s tf=%ds", exchange, pair, timeframe_s)
+    logger.debug("No OHLCV data for %s:%s tf=%ds (tried %d keys)", exchange, pair, timeframe_s, len(keys_to_try))
     return None
 
 

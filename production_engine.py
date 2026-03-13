@@ -101,6 +101,9 @@ from signals.ohlcv_reader import read_ohlcv_candles
 from signals.volume_scoring import compute_volume_ratio, apply_volume_multiplier, should_suppress_for_volume
 from signals.consensus_gate import evaluate_consensus
 from signals.signal_generator import SignalGenerator
+from signals.strategy_orchestrator import StrategyOrchestrator
+from ai_engine.regime_detector.regime_writer import RegimeWriter
+from market_data.onchain.coinglass_client import CoinglassClient
 from indicators.rsi import compute_rsi as compute_rsi_array
 
 # Configure logging
@@ -202,8 +205,26 @@ class EngineConfig:
     # Volume gate
     min_volume_ratio: float = float(os.getenv("MIN_VOLUME_RATIO", "0.5"))
 
-    # Minimum confidence to publish (was effectively 0)
-    min_signal_confidence: float = float(os.getenv("MIN_SIGNAL_CONFIDENCE", "0.65"))
+    # Minimum confidence to publish (was 0.65, lowered for Sprint 2 orchestrator)
+    min_signal_confidence: float = float(os.getenv("MIN_SIGNAL_CONFIDENCE", "0.55"))
+
+    # Signal cooldown (was hardcoded 300, now configurable)
+    signal_cooldown_seconds: int = int(os.getenv("SIGNAL_COOLDOWN_SECONDS", "60"))
+
+    # Strategy Orchestrator (Sprint 2 Tier 2)
+    strategy_orchestrator_enabled: bool = field(
+        default_factory=lambda: os.getenv("STRATEGY_ORCHESTRATOR_ENABLED", "true").lower() == "true"
+    )
+
+    # Regime Writer (Sprint 2 background task)
+    regime_writer_enabled: bool = field(
+        default_factory=lambda: os.getenv("REGIME_WRITER_ENABLED", "true").lower() == "true"
+    )
+
+    # On-chain Family D (Sprint 2 P1-B, default OFF until validated)
+    onchain_family_enabled: bool = field(
+        default_factory=lambda: os.getenv("ONCHAIN_FAMILY_ENABLED", "false").lower() == "true"
+    )
 
     # Safety
     live_trading_confirmation: str = field(
@@ -337,7 +358,18 @@ class ProductionEngine:
             pair: deque(maxlen=100) for pair in self.config.trading_pairs
         }
         self._last_signal_time: Dict[str, float] = {}
-        self._signal_cooldown_seconds = 300  # 5 minutes between signals per pair
+        self._signal_cooldown_seconds = self.config.signal_cooldown_seconds
+
+        # Sprint 2: Strategy Orchestrator (Tier 2)
+        self._orchestrator = StrategyOrchestrator(
+            enabled=self.config.strategy_orchestrator_enabled,
+        )
+
+        # Sprint 2: Regime Writer (background task, initialized in connect())
+        self._regime_writer: Optional[RegimeWriter] = None
+
+        # Sprint 2: On-chain data client (background task, initialized in connect())
+        self._coinglass_client: Optional[CoinglassClient] = None
 
         # OHLCV aggregator for feed health tracking
         self._aggregator = get_aggregator()
@@ -459,6 +491,33 @@ class ProductionEngine:
         logger.info(f"     Subscribing to: {', '.join(self.config.trading_pairs)}")
         logger.info(f"     Timeframes: {', '.join(map(str, self.config.ohlcv_timeframes))}")
 
+        # 5. Start Regime Writer background task (Sprint 2)
+        if self.config.regime_writer_enabled:
+            logger.info("[5/5] Starting Regime Writer background task...")
+            self._regime_writer = RegimeWriter(
+                redis_client=self.redis_client,
+                pairs=self.config.trading_pairs,
+                interval_s=60,
+                enabled=True,
+            )
+            await self._regime_writer.start()
+            logger.info("[OK] Regime Writer started")
+        else:
+            logger.info("[5/5] Regime Writer disabled via REGIME_WRITER_ENABLED=false")
+
+        # 6. Start CoinGlass on-chain data client (Sprint 2 P1-B)
+        if self.config.onchain_family_enabled:
+            logger.info("[6/6] Starting CoinGlass on-chain client...")
+            self._coinglass_client = CoinglassClient(
+                redis_client=self.redis_client,
+                pairs=self.config.trading_pairs,
+                enabled=True,
+            )
+            await self._coinglass_client.start()
+            logger.info("[OK] CoinGlass on-chain client started")
+        else:
+            logger.info("[6/6] On-chain family disabled via ONCHAIN_FAMILY_ENABLED=false")
+
         logger.info("=" * 80)
         logger.info("[READY] Production Engine Ready")
         logger.info("=" * 80)
@@ -466,6 +525,14 @@ class ProductionEngine:
     async def disconnect(self) -> None:
         """Disconnect all components"""
         logger.info("Shutting down production engine...")
+
+        # Stop CoinGlass client
+        if self._coinglass_client:
+            await self._coinglass_client.stop()
+
+        # Stop Regime Writer
+        if self._regime_writer:
+            await self._regime_writer.stop()
 
         # Close HTTP session for price fetching
         if self._http_session:
@@ -752,10 +819,15 @@ class ProductionEngine:
 
     async def generate_and_publish_signal(self, pair: str) -> None:
         """
-        Generate and publish a trading signal using the 8-strategy
-        consensus pipeline. ALL signals must pass through the consensus
-        gate (2+ independent indicator families agreeing). No legacy
-        momentum fallback.
+        Generate and publish a trading signal using a 3-tier pipeline:
+
+        Tier 1: 8-Strategy Consensus (SignalGenerator) — strictest gate
+        Tier 2: Strategy Orchestrator — regime-routed strategies (Sprint 2)
+        Tier 3: Legacy Momentum — inline SMA/RSI fallback
+
+        CRITICAL FIX: If Tier 1 returns {"signal": None}, Tier 2 STILL runs.
+        The old code checked `analysis is not None` which was True even when
+        signal was None, blocking all fallbacks.
         """
         if not self.signal_publisher:
             return
@@ -766,18 +838,62 @@ class ProductionEngine:
         if now - last_signal < self._signal_cooldown_seconds:
             return
 
-        # ── 8-Strategy Consensus Pipeline (no legacy fallback) ──
+        analysis = None
+
+        # ── Tier 1: 8-Strategy Consensus Pipeline ──
         try:
-            analysis = await self._generate_signal_v2(pair)
+            tier1 = await self._generate_signal_v2(pair)
+            if tier1 and tier1.get("signal") is not None:
+                analysis = tier1
+                logger.debug("%s: Tier 1 (8-strategy) produced signal", pair)
         except Exception as e:
-            logger.warning("Signal generation failed for %s: %s", pair, e)
-            return
+            logger.warning("Tier 1 signal generation failed for %s: %s", pair, e)
+
+        # ── Tier 2: Strategy Orchestrator (regime-routed) ──
+        if analysis is None and self.config.strategy_orchestrator_enabled:
+            try:
+                ohlcv = await read_ohlcv_candles(
+                    redis_client=self.redis_client,
+                    exchange="kraken",
+                    pair=pair,
+                    timeframe_s=self.config.primary_timeframe_s,
+                    lookback=self.config.signal_candle_lookback,
+                )
+                if ohlcv is not None and len(ohlcv) >= 30:
+                    tier2 = await self._orchestrator.generate_signal(ohlcv, pair=pair)
+                    if tier2 and tier2.get("signal") is not None:
+                        conf = tier2.get("confidence", 0.5)
+                        if conf >= self.config.min_signal_confidence:
+                            analysis = tier2
+                            logger.debug("%s: Tier 2 (orchestrator) produced signal", pair)
+                        else:
+                            logger.debug(
+                                "%s: Tier 2 confidence too low (%.2f < %.2f)",
+                                pair, conf, self.config.min_signal_confidence,
+                            )
+            except Exception as e:
+                logger.warning("Tier 2 signal generation failed for %s: %s", pair, e)
+
+        # ── Tier 3: Legacy Momentum ──
+        if analysis is None:
+            try:
+                prices = list(self._price_history.get(pair, []))
+                if len(prices) >= 30:
+                    tier3 = self._analyze_momentum(prices)
+                    if tier3 and tier3.get("signal") is not None:
+                        conf = tier3.get("confidence", 0.5)
+                        if conf >= self.config.min_signal_confidence:
+                            tier3["source"] = "legacy_momentum"
+                            analysis = tier3
+                            logger.debug("%s: Tier 3 (legacy momentum) produced signal", pair)
+            except Exception as e:
+                logger.warning("Tier 3 signal generation failed for %s: %s", pair, e)
 
         if analysis is None:
+            logger.debug("%s: No signal from any tier", pair)
             return
 
         if analysis.get("signal") is None:
-            logger.debug("%s: No signal - %s", pair, analysis.get("reason", "unknown"))
             return
 
         side = analysis["signal"]
@@ -789,6 +905,10 @@ class ProductionEngine:
         except Exception as e:
             logger.warning(f"Could not fetch live price for {pair}: {e}")
             return
+
+        # Feed Tier 3 price history (so legacy momentum has data on next cycle)
+        if pair in self._price_history:
+            self._price_history[pair].append(entry)
 
         # ── TP/SL from config (fee-aware) ──────────────────────
         tp_bps = self.config.default_tp_bps
@@ -863,8 +983,9 @@ class ProductionEngine:
     async def run(self) -> None:
         """Main engine loop with real strategy-based signal generation"""
         logger.info("Starting main engine loop...")
-        logger.info(f"Processing {len(self.config.trading_pairs)} pairs via 8-strategy consensus pipeline")
-        logger.info("Signals require 2+ indicator families agreeing (no legacy fallback)")
+        logger.info(f"Processing {len(self.config.trading_pairs)} pairs via 3-tier pipeline")
+        logger.info("Tier 1: 8-strategy consensus | Tier 2: orchestrator | Tier 3: legacy momentum")
+        logger.info(f"Cooldown={self._signal_cooldown_seconds}s, MinConfidence={self.config.min_signal_confidence}")
 
         signal_interval = self.config.primary_timeframe_s  # 60s for 1-min candles
         last_signal_check = 0.0
