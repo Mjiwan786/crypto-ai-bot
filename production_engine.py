@@ -210,8 +210,18 @@ class EngineConfig:
     # Minimum confidence to publish (was 0.65, lowered for Sprint 2 orchestrator)
     min_signal_confidence: float = float(os.getenv("MIN_SIGNAL_CONFIDENCE", "0.55"))
 
-    # Signal cooldown (was hardcoded 300, now configurable)
-    signal_cooldown_seconds: int = int(os.getenv("SIGNAL_COOLDOWN_SECONDS", "60"))
+    # Signal cooldown (was hardcoded 300, now configurable; 180s prevents within-candle flips)
+    signal_cooldown_seconds: int = int(os.getenv("SIGNAL_COOLDOWN_SECONDS", "180"))
+
+    # ── Sprint 3A: ATR-based TP/SL ──────────────────────────
+    atr_tp_sl_enabled: bool = field(
+        default_factory=lambda: os.getenv("ATR_TP_SL_ENABLED", "true").lower() == "true"
+    )
+
+    # ── Sprint 3B: Trend filter ──────────────────────────────
+    trend_filter_enabled: bool = field(
+        default_factory=lambda: os.getenv("TREND_FILTER_ENABLED", "true").lower() == "true"
+    )
 
     # Strategy Orchestrator (Sprint 2 Tier 2)
     strategy_orchestrator_enabled: bool = field(
@@ -964,6 +974,27 @@ class ProductionEngine:
         side = analysis["signal"]
         confidence = analysis["confidence"]
 
+        # ── Sprint 3B: Trend filter ──────────────────────────
+        if self.config.trend_filter_enabled:
+            try:
+                from signals.trend_filter import check_trend_alignment
+                tf_ohlcv = await read_ohlcv_candles(
+                    redis_client=self.redis_client,
+                    exchange="kraken",
+                    pair=pair,
+                    timeframe_s=self.config.primary_timeframe_s,
+                    lookback=self.config.signal_candle_lookback,
+                )
+                if tf_ohlcv is not None and len(tf_ohlcv) >= 36:
+                    alignment = check_trend_alignment(tf_ohlcv, pair, side)
+                    if alignment["filter_active"] and not alignment["aligned"]:
+                        logger.info(
+                            f"{pair}: Trend filter vetoed {side} signal (HTF={alignment['htf_direction']})"
+                        )
+                        return
+            except Exception as e:
+                logger.warning(f"{pair}: Trend filter error, skipping filter: {e}")
+
         # Fetch entry price (v2 path may not have fetched it yet)
         try:
             entry = await self._fetch_live_price(pair)
@@ -975,18 +1006,45 @@ class ProductionEngine:
         if pair in self._price_history:
             self._price_history[pair].append(entry)
 
-        # ── TP/SL from config (fee-aware) ──────────────────────
-        tp_bps = self.config.default_tp_bps
-        sl_bps = self.config.default_sl_bps
+        # ── TP/SL: ATR-based (Sprint 3A) or static fallback ──
+        atr_result = None
+        if self.config.atr_tp_sl_enabled:
+            try:
+                from signals.atr_levels import compute_atr_levels
+                atr_ohlcv = await read_ohlcv_candles(
+                    redis_client=self.redis_client,
+                    exchange="kraken",
+                    pair=pair,
+                    timeframe_s=self.config.primary_timeframe_s,
+                    lookback=self.config.signal_candle_lookback,
+                )
+                if atr_ohlcv is not None and len(atr_ohlcv) >= 15:
+                    atr_result = compute_atr_levels(
+                        ohlcv=atr_ohlcv,
+                        entry_price=entry,
+                        side=side,
+                        pair=pair,
+                    )
+                    if atr_result is None:
+                        logger.info(f"{pair}: Fee-floor guard vetoed signal (insufficient volatility)")
+                        return
+            except Exception as e:
+                logger.warning(f"{pair}: ATR computation failed, falling back to static: {e}")
 
-        if side == "buy":
-            sl = entry * (1 - sl_bps / 10000)
-            tp = entry * (1 + tp_bps / 10000)
-            prd_side = "LONG"
+        if atr_result is not None:
+            sl = atr_result["stop_loss"]
+            tp = atr_result["take_profit"]
         else:
-            sl = entry * (1 + sl_bps / 10000)
-            tp = entry * (1 - tp_bps / 10000)
-            prd_side = "SHORT"
+            tp_bps = self.config.default_tp_bps
+            sl_bps = self.config.default_sl_bps
+            if side == "buy":
+                sl = entry * (1 - sl_bps / 10000)
+                tp = entry * (1 + tp_bps / 10000)
+            else:
+                sl = entry * (1 + sl_bps / 10000)
+                tp = entry * (1 - tp_bps / 10000)
+
+        prd_side = "LONG" if side == "buy" else "SHORT"
 
         # Determine regime based on analysis
         volatility = analysis.get("volatility", 0.02)
@@ -1013,7 +1071,10 @@ class ProductionEngine:
             indicators={
                 "rsi_14": analysis.get("rsi", 50),
                 "macd_signal": "BULLISH" if prd_side == "LONG" else "BEARISH",
-                "atr_14": entry * volatility,
+                "atr_14": atr_result["atr_value"] if atr_result else entry * volatility,
+                "sl_distance_bps": atr_result["sl_distance_bps"] if atr_result else self.config.default_sl_bps,
+                "tp_distance_bps": atr_result["tp_distance_bps"] if atr_result else self.config.default_tp_bps,
+                "volatility_tier": atr_result["volatility_tier"] if atr_result else "unknown",
                 "volume_ratio": analysis.get("volume_ratio", 1.0),
                 "families_agreeing": analysis.get("families_agreeing", 0),
                 "sma_short": analysis.get("sma_short", 0),
@@ -1021,7 +1082,7 @@ class ProductionEngine:
                 "roc": analysis.get("roc", 0),
             },
             metadata={
-                "model_version": "v3.2.0-sprint2",
+                "model_version": "v3.3.0-sprint3a",
                 "source": analysis.get("source", "ohlcv_8strategy"),
                 "latency_ms": int((time.time() - now) * 1000),
                 "strategy_tag": "8-Strategy Consensus",

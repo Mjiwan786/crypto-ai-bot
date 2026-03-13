@@ -13,6 +13,7 @@ from paper.paper_trader import (
     ROUND_TRIP_FEE_BPS,
     CONSUMER_GROUP,
 )
+from signals.exit_manager import ExitManager
 
 
 # ── Mock Redis ───────────────────────────────────────────────────────
@@ -93,6 +94,8 @@ def _make_trader() -> tuple:
     trader._mode = "paper"
     trader._pairs = ["BTC/USD"]
     trader._initial_balance = 10000.0
+    trader._exit_manager = ExitManager(fee_bps=52.0)
+    trader._pending_flip_signals = {}
     return trader, mock
 
 
@@ -104,6 +107,7 @@ def _signal_fields(
     sl: float = 67490.0,
     size: float = 100.0,
     ts: str = "",
+    confidence: float = 0.85,
 ) -> dict:
     if not ts:
         ts = datetime.now(timezone.utc).isoformat()
@@ -115,6 +119,7 @@ def _signal_fields(
         "take_profit": str(tp),
         "stop_loss": str(sl),
         "position_size_usd": str(size),
+        "confidence": str(confidence),
         "timestamp": ts,
     }
 

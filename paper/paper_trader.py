@@ -50,6 +50,7 @@ if sys.platform == "win32":
 from agents.infrastructure.redis_client import RedisCloudClient, RedisCloudConfig
 from pnl.rolling_pnl import PnLTracker
 from config.trading_pairs import DEFAULT_TRADING_PAIRS_CSV
+from signals.exit_manager import ExitManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,6 +90,10 @@ class OpenPosition:
     quantity: float
     open_time: float    # unix timestamp
     position_size_usd: float
+    atr_value: float = 0.0
+    highest_since_entry: float = 0.0
+    lowest_since_entry: float = float("inf")
+    confidence: float = 0.5
 
 
 # ── Paper Trader ─────────────────────────────────────────────────────
@@ -126,6 +131,12 @@ class PaperTrader:
 
         # Price cache: pair → (price, timestamp)
         self._price_cache: Dict[str, tuple] = {}
+
+        # Exit manager (Sprint 3B)
+        self._exit_manager = ExitManager(fee_bps=ROUND_TRIP_FEE_BPS)
+
+        # Pending opposing signals: pair → signal dict (for ExitManager evaluation)
+        self._pending_flip_signals: Dict[str, Dict] = {}
 
         # State
         self._running = False
@@ -316,9 +327,18 @@ class PaperTrader:
             if pair in self._positions:
                 existing = self._positions[pair]
                 if existing.side != side:
-                    price = await self._get_current_price(pair)
-                    if price:
-                        await self._close_position(pair, price, "signal_flip")
+                    conf = float(signal.get("confidence", 0.5))
+                    if conf >= self._exit_manager.signal_flip_min_confidence:
+                        price = await self._get_current_price(pair)
+                        if price:
+                            await self._close_position(pair, price, "signal_flip")
+                    else:
+                        logger.info(
+                            "[PAPER_TRADER] %s: Ignoring weak signal flip (conf=%.2f < %.2f)",
+                            pair, conf, self._exit_manager.signal_flip_min_confidence,
+                        )
+                        await self._ack(stream_key, msg_id)
+                        return
                 else:
                     # Same direction, already have position — skip
                     logger.debug(
@@ -343,6 +363,18 @@ class PaperTrader:
             position_size_usd = float(signal.get("position_size_usd", 100.0))
             quantity = position_size_usd / entry_price
 
+            # Extract ATR from signal indicators (Sprint 3A populates this)
+            atr_value = 0.0
+            indicators_raw = signal.get("indicators", "")
+            if isinstance(indicators_raw, str) and indicators_raw:
+                try:
+                    ind = json.loads(indicators_raw)
+                    atr_value = float(ind.get("atr_14", 0))
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+            elif isinstance(indicators_raw, dict):
+                atr_value = float(indicators_raw.get("atr_14", 0))
+
             pos = OpenPosition(
                 signal_id=signal_id,
                 pair=pair,
@@ -353,6 +385,10 @@ class PaperTrader:
                 quantity=quantity,
                 open_time=time.time(),
                 position_size_usd=position_size_usd,
+                atr_value=atr_value,
+                highest_since_entry=entry_price,
+                lowest_since_entry=entry_price,
+                confidence=float(signal.get("confidence", 0.5)),
             )
             self._positions[pair] = pos
 
@@ -413,10 +449,9 @@ class PaperTrader:
 
     # ── Position monitoring ──────────────────────────────────────
     async def _monitor_positions(self) -> None:
-        """Every 5s, check open positions against TP/SL."""
+        """Every 5s, evaluate open positions via ExitManager hierarchy."""
         while self._running:
             try:
-                # Copy keys to avoid mutation during iteration
                 pairs_to_check = list(self._positions.keys())
                 for pair in pairs_to_check:
                     if pair not in self._positions:
@@ -426,26 +461,39 @@ class PaperTrader:
                     if price is None:
                         continue
 
-                    closed = False
-                    reason = ""
+                    # Update high/low watermarks
+                    if price > pos.highest_since_entry:
+                        pos.highest_since_entry = price
+                    if price < pos.lowest_since_entry:
+                        pos.lowest_since_entry = price
 
-                    if pos.side == "LONG":
-                        if pos.take_profit > 0 and price >= pos.take_profit:
-                            reason = "tp_hit"
-                            closed = True
-                        elif pos.stop_loss > 0 and price <= pos.stop_loss:
-                            reason = "sl_hit"
-                            closed = True
-                    else:  # SHORT
-                        if pos.take_profit > 0 and price <= pos.take_profit:
-                            reason = "tp_hit"
-                            closed = True
-                        elif pos.stop_loss > 0 and price >= pos.stop_loss:
-                            reason = "sl_hit"
-                            closed = True
+                    # Check for pending opposing signal
+                    pending_signal = self._pending_flip_signals.pop(pair, None)
 
-                    if closed:
-                        await self._close_position(pair, price, reason)
+                    # Build position dict for ExitManager
+                    pos_dict = {
+                        "side": pos.side,
+                        "entry_price": pos.entry_price,
+                        "stop_loss": pos.stop_loss,
+                        "take_profit": pos.take_profit,
+                        "atr_value": pos.atr_value,
+                        "open_time": pos.open_time,
+                        "pair": pair,
+                    }
+
+                    exit_decision = self._exit_manager.evaluate_exit(
+                        position=pos_dict,
+                        current_price=price,
+                        current_time=time.time(),
+                        highest_since_entry=pos.highest_since_entry,
+                        lowest_since_entry=pos.lowest_since_entry,
+                        new_signal=pending_signal,
+                    )
+
+                    if exit_decision is not None:
+                        await self._close_position(
+                            pair, exit_decision["exit_price"], exit_decision["exit_reason"],
+                        )
 
             except asyncio.CancelledError:
                 break
