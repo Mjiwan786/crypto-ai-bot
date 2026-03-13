@@ -2209,13 +2209,6 @@ class KrakenWebSocketClient:
         """Handle incoming WebSocket messages with enhanced debugging and validation (PRD-001 Section 1.3)"""
         message_start_time = time.time()
 
-        # Check backpressure before processing (PRD-001 Section 1.5)
-        # If queue too deep, oldest messages will be dropped
-        self.check_backpressure()
-
-        # Add to message queue for backpressure tracking
-        self.message_queue.append(message_start_time)
-
         try:
             data = json.loads(message)
             self.stats["messages_received"] += 1
@@ -2268,6 +2261,13 @@ class KrakenWebSocketClient:
 
                 # Log the message type for debugging
                 self.logger.debug(f"📊 Received {channel} data for {pair} (items: {len(payload) if isinstance(payload, list) else 'dict'})")
+
+                # Backpressure tracking — only count signal-relevant channels
+                # (trade, ticker, ohlc). Spread and book flood the counter
+                # without contributing to signal generation.
+                if not channel.startswith("spread") and not channel.startswith("book"):
+                    self.message_queue.append(message_start_time)
+                    self.check_backpressure()
 
                 # Route to appropriate handler with circuit breaker protection
                 try:

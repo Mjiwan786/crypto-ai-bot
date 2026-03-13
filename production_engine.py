@@ -973,11 +973,10 @@ class ProductionEngine:
         self._last_signal_time[pair] = now
 
         logger.info(
-            "PRD-001 Signal published: %s %s @ $%,.2f "
-            "(confidence=%.2f, RSI=%.1f, ROC=%.2f%%, regime=%s, source=%s)",
-            pair, prd_side, entry, confidence,
-            analysis.get("rsi", 0), analysis.get("roc", 0),
-            regime, analysis.get("source", "ohlcv_8strategy"),
+            f"PRD-001 Signal published: {pair} {prd_side} @ ${entry:,.2f} "
+            f"(confidence={confidence:.2f}, RSI={analysis.get('rsi', 0):.1f}, "
+            f"ROC={analysis.get('roc', 0):.2f}%, regime={regime}, "
+            f"source={analysis.get('source', 'ohlcv_8strategy')})"
         )
 
     async def run(self) -> None:
