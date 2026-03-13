@@ -1,7 +1,8 @@
 """
 Tests for on-chain Family D (consensus gate) and CoinglassClient.
 
-Tests the cached Redis read path (not live HTTP).
+Sprint 3 update: Family D now reads pre-computed signals from Redis
+(written by signal_computer.py), not raw OI/LS data directly.
 """
 import json
 import os
@@ -11,42 +12,22 @@ import numpy as np
 import pytest
 
 from signals.consensus_gate import (
-    _evaluate_onchain,
-    evaluate_consensus,
+    _evaluate_onchain_family,
+    evaluate_consensus as _evaluate_consensus_async,
     Family,
 )
 from market_data.onchain.coinglass_client import CoinglassClient
 
 
-# ── Mock Redis for on-chain reads ────────────────────────────────────
-
-class SyncMockRedis:
-    """Sync mock Redis for _evaluate_onchain (which reads synchronously)."""
-
-    def __init__(self):
-        self.data = {}
-
-    def get(self, key):
-        return self.data.get(key)
-
-    def set(self, key, value):
-        self.data[key] = value
-
-    def expire(self, key, ttl):
-        pass
+def evaluate_consensus(*args, **kwargs):
+    """Sync wrapper for tests."""
+    return asyncio.run(_evaluate_consensus_async(*args, **kwargs))
 
 
-class SyncMockRedisClient:
-    def __init__(self):
-        self._inner = SyncMockRedis()
-
-    @property
-    def client(self):
-        return self._inner
-
+# ── Mock Redis for on-chain reads (async, Sprint 3) ───────────────
 
 class AsyncMockRedis:
-    """Async mock for CoinglassClient tests."""
+    """Async mock Redis for Family D tests."""
 
     def __init__(self):
         self.data = {}
@@ -54,7 +35,7 @@ class AsyncMockRedis:
     async def get(self, key):
         return self.data.get(key)
 
-    async def set(self, key, value):
+    async def set(self, key, value, ex=None):
         self.data[key] = value
 
     async def expire(self, key, ttl):
@@ -70,120 +51,114 @@ class AsyncMockRedisClient:
         return self._inner
 
 
-# ── _evaluate_onchain Tests ──────────────────────────────────────────
+# ── _evaluate_onchain_family Tests ────────────────────────────────
 
 class TestOnchainVoting:
-    def test_long_vote_low_ls_ratio(self):
-        """OI increasing + low L/S ratio → LONG vote."""
-        mock = SyncMockRedisClient()
-        now = time.time()
-        mock._inner.data["onchain:BTC:oi"] = json.dumps({
-            "change_24h_pct": 5.0,   # >2% = OI increasing
-            "timestamp": now,
-        })
-        mock._inner.data["onchain:BTC:ls_ratio"] = json.dumps({
-            "ratio": 0.7,  # <0.85 = shorts overextended
-            "timestamp": now,
+    def test_long_signal_from_redis(self):
+        """Pre-computed long signal in Redis → LONG vote."""
+        mock = AsyncMockRedisClient()
+        mock._inner.data["onchain:BTC:signal"] = json.dumps({
+            "direction": "long",
+            "confidence": 0.65,
+            "reasons": ["funding_bullish"],
         })
 
-        vote = _evaluate_onchain("BTC/USD", mock)
+        vote = asyncio.run(
+            _evaluate_onchain_family("BTC/USD", mock)
+        )
         assert vote is not None
         assert vote.direction == "long"
         assert vote.family == Family.ONCHAIN
-        assert vote.confidence == pytest.approx(0.55, abs=0.01)
+        assert vote.confidence == pytest.approx(0.65, abs=0.01)
+        assert vote.name == "onchain_derivatives"
 
-    def test_short_vote_high_ls_ratio(self):
-        """OI increasing + high L/S ratio → SHORT vote."""
-        mock = SyncMockRedisClient()
-        now = time.time()
-        mock._inner.data["onchain:BTC:oi"] = json.dumps({
-            "change_24h_pct": 3.5,
-            "timestamp": now,
-        })
-        mock._inner.data["onchain:BTC:ls_ratio"] = json.dumps({
-            "ratio": 1.5,  # >1.3 = longs overextended
-            "timestamp": now,
+    def test_short_signal_from_redis(self):
+        """Pre-computed short signal in Redis → SHORT vote."""
+        mock = AsyncMockRedisClient()
+        mock._inner.data["onchain:BTC:signal"] = json.dumps({
+            "direction": "short",
+            "confidence": 0.70,
+            "reasons": ["ls_crowded_longs"],
         })
 
-        vote = _evaluate_onchain("BTC/USD", mock)
+        vote = asyncio.run(
+            _evaluate_onchain_family("BTC/USD", mock)
+        )
         assert vote is not None
         assert vote.direction == "short"
-        assert vote.confidence == pytest.approx(0.55, abs=0.01)
+        assert vote.confidence == pytest.approx(0.70, abs=0.01)
 
-    def test_abstain_low_oi_change(self):
-        """Low OI change (<2%) → abstain."""
-        mock = SyncMockRedisClient()
-        now = time.time()
-        mock._inner.data["onchain:BTC:oi"] = json.dumps({
-            "change_24h_pct": 1.0,  # <2%
-            "timestamp": now,
-        })
-        mock._inner.data["onchain:BTC:ls_ratio"] = json.dumps({
-            "ratio": 0.7,
-            "timestamp": now,
+    def test_abstain_low_confidence(self):
+        """Signal with confidence < 0.40 → abstain."""
+        mock = AsyncMockRedisClient()
+        mock._inner.data["onchain:BTC:signal"] = json.dumps({
+            "direction": "long",
+            "confidence": 0.30,
+            "reasons": ["weak"],
         })
 
-        vote = _evaluate_onchain("BTC/USD", mock)
+        vote = asyncio.run(
+            _evaluate_onchain_family("BTC/USD", mock)
+        )
         assert vote is None
 
-    def test_abstain_neutral_ls_ratio(self):
-        """Neutral L/S ratio (0.85-1.3) → abstain even with high OI."""
-        mock = SyncMockRedisClient()
-        now = time.time()
-        mock._inner.data["onchain:BTC:oi"] = json.dumps({
-            "change_24h_pct": 5.0,
-            "timestamp": now,
-        })
-        mock._inner.data["onchain:BTC:ls_ratio"] = json.dumps({
-            "ratio": 1.1,  # neutral zone
-            "timestamp": now,
+    def test_abstain_direction_none(self):
+        """Signal with direction=None → abstain."""
+        mock = AsyncMockRedisClient()
+        mock._inner.data["onchain:BTC:signal"] = json.dumps({
+            "direction": None,
+            "confidence": 0.0,
+            "reasons": ["abstain"],
         })
 
-        vote = _evaluate_onchain("BTC/USD", mock)
-        assert vote is None
-
-    def test_abstain_stale_data(self):
-        """Data older than 10 minutes → abstain."""
-        mock = SyncMockRedisClient()
-        old_ts = time.time() - 700  # 11+ minutes old
-        mock._inner.data["onchain:BTC:oi"] = json.dumps({
-            "change_24h_pct": 5.0,
-            "timestamp": old_ts,
-        })
-        mock._inner.data["onchain:BTC:ls_ratio"] = json.dumps({
-            "ratio": 0.7,
-            "timestamp": old_ts,
-        })
-
-        vote = _evaluate_onchain("BTC/USD", mock)
+        vote = asyncio.run(
+            _evaluate_onchain_family("BTC/USD", mock)
+        )
         assert vote is None
 
     def test_abstain_no_data(self):
         """No cached data → abstain."""
-        mock = SyncMockRedisClient()
-        vote = _evaluate_onchain("BTC/USD", mock)
+        mock = AsyncMockRedisClient()
+        vote = asyncio.run(
+            _evaluate_onchain_family("BTC/USD", mock)
+        )
         assert vote is None
 
     def test_abstain_no_redis(self):
         """No Redis client → abstain."""
-        vote = _evaluate_onchain("BTC/USD", None)
+        vote = asyncio.run(
+            _evaluate_onchain_family("BTC/USD", None)
+        )
         assert vote is None
 
+    def test_confidence_capped_at_080(self):
+        """Confidence capped at 0.80 even if signal says higher."""
+        mock = AsyncMockRedisClient()
+        mock._inner.data["onchain:BTC:signal"] = json.dumps({
+            "direction": "short",
+            "confidence": 0.95,
+            "reasons": ["extreme"],
+        })
 
-# ── Feature flag test ────────────────────────────────────────────────
+        vote = asyncio.run(
+            _evaluate_onchain_family("BTC/USD", mock)
+        )
+        assert vote is not None
+        assert vote.confidence <= 0.80
+
+
+# ── Feature flag test ────────────────────────────────────────────
 
 class TestOnchainFeatureFlag:
     def test_disabled_family_not_called(self, monkeypatch):
         """ONCHAIN_FAMILY_ENABLED=false → Family D never votes."""
         monkeypatch.setenv("ONCHAIN_FAMILY_ENABLED", "false")
 
-        mock = SyncMockRedisClient()
-        now = time.time()
-        mock._inner.data["onchain:BTC:oi"] = json.dumps({
-            "change_24h_pct": 5.0, "timestamp": now,
-        })
-        mock._inner.data["onchain:BTC:ls_ratio"] = json.dumps({
-            "ratio": 0.7, "timestamp": now,
+        mock = AsyncMockRedisClient()
+        mock._inner.data["onchain:BTC:signal"] = json.dumps({
+            "direction": "long",
+            "confidence": 0.65,
+            "reasons": ["funding_bullish"],
         })
 
         ohlcv = np.random.rand(50, 5) * 100 + 67000
@@ -191,7 +166,6 @@ class TestOnchainFeatureFlag:
         ohlcv[:, 2] = ohlcv[:, 3] - 50
 
         result = evaluate_consensus(ohlcv, pair="BTC/USD", redis_client=mock)
-        # Family D should not appear in votes
         onchain_votes = [v for v in result.votes if v.family == Family.ONCHAIN]
         assert len(onchain_votes) == 0
 
@@ -199,13 +173,11 @@ class TestOnchainFeatureFlag:
         """ONCHAIN_FAMILY_ENABLED=true → Family D can contribute."""
         monkeypatch.setenv("ONCHAIN_FAMILY_ENABLED", "true")
 
-        mock = SyncMockRedisClient()
-        now = time.time()
-        mock._inner.data["onchain:BTC:oi"] = json.dumps({
-            "change_24h_pct": 5.0, "timestamp": now,
-        })
-        mock._inner.data["onchain:BTC:ls_ratio"] = json.dumps({
-            "ratio": 0.7, "timestamp": now,
+        mock = AsyncMockRedisClient()
+        mock._inner.data["onchain:BTC:signal"] = json.dumps({
+            "direction": "long",
+            "confidence": 0.65,
+            "reasons": ["funding_bullish"],
         })
 
         # Use data that won't trigger other families, to isolate Family D
@@ -223,7 +195,7 @@ class TestOnchainFeatureFlag:
         assert onchain_votes[0].direction == "long"
 
 
-# ── CoinglassClient Tests ───────────────────────────────────────────
+# ── CoinglassClient Tests ───────────────────────────────────────
 
 class TestCoinglassClient:
     def test_disabled_does_not_start(self):

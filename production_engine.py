@@ -104,6 +104,8 @@ from signals.signal_generator import SignalGenerator
 from signals.strategy_orchestrator import StrategyOrchestrator
 from ai_engine.regime_detector.regime_writer import RegimeWriter
 from market_data.onchain.coinglass_client import CoinglassClient
+from market_data.onchain.data_fetcher import OnChainDataFetcher
+from market_data.onchain.signal_computer import OnChainSignalComputer
 from indicators.rsi import compute_rsi as compute_rsi_array
 
 # Configure logging
@@ -224,6 +226,14 @@ class EngineConfig:
     # On-chain Family D (Sprint 2 P1-B, default OFF until validated)
     onchain_family_enabled: bool = field(
         default_factory=lambda: os.getenv("ONCHAIN_FAMILY_ENABLED", "false").lower() == "true"
+    )
+
+    # ── Sprint 3: On-Chain Data Integration ──────────────────
+    onchain_family_mode: str = field(
+        default_factory=lambda: os.getenv("ONCHAIN_FAMILY_MODE", "shadow")
+    )
+    onchain_fetch_enabled: bool = field(
+        default_factory=lambda: os.getenv("ONCHAIN_FETCH_ENABLED", "true").lower() == "true"
     )
 
     # Safety
@@ -351,6 +361,9 @@ class ProductionEngine:
             "ohlcv_received": 0,
             "errors": 0,
             "uptime_seconds": 0,
+            "onchain_fetches": 0,
+            "onchain_fetch_errors": 0,
+            "onchain_signals_computed": 0,
         }
 
         # OHLCV price history for strategy analysis (rolling window per pair)
@@ -370,6 +383,12 @@ class ProductionEngine:
 
         # Sprint 2: On-chain data client (background task, initialized in connect())
         self._coinglass_client: Optional[CoinglassClient] = None
+
+        # Sprint 3: On-chain data fetcher + signal computer
+        self._onchain_fetcher: Optional[OnChainDataFetcher] = None
+        self._onchain_computer: Optional[OnChainSignalComputer] = None
+        self._onchain_fetch_task: Optional[asyncio.Task] = None
+        self._onchain_compute_task: Optional[asyncio.Task] = None
 
         # OHLCV aggregator for feed health tracking
         self._aggregator = get_aggregator()
@@ -507,7 +526,7 @@ class ProductionEngine:
 
         # 6. Start CoinGlass on-chain data client (Sprint 2 P1-B)
         if self.config.onchain_family_enabled:
-            logger.info("[6/6] Starting CoinGlass on-chain client...")
+            logger.info("[6/7] Starting CoinGlass on-chain client...")
             self._coinglass_client = CoinglassClient(
                 redis_client=self.redis_client,
                 pairs=self.config.trading_pairs,
@@ -516,7 +535,28 @@ class ProductionEngine:
             await self._coinglass_client.start()
             logger.info("[OK] CoinGlass on-chain client started")
         else:
-            logger.info("[6/6] On-chain family disabled via ONCHAIN_FAMILY_ENABLED=false")
+            logger.info("[6/7] On-chain family disabled via ONCHAIN_FAMILY_ENABLED=false")
+
+        # 7. Start on-chain data fetcher + signal computer (Sprint 3)
+        if self.config.onchain_fetch_enabled:
+            logger.info("[7/7] Starting on-chain data fetcher (Sprint 3)...")
+            self._onchain_fetcher = OnChainDataFetcher(
+                redis_client=self.redis_client,
+                trading_pairs=self.config.trading_pairs,
+            )
+            self._onchain_computer = OnChainSignalComputer(
+                redis_client=self.redis_client,
+                trading_pairs=self.config.trading_pairs,
+            )
+            self._onchain_fetch_task = asyncio.create_task(
+                self._onchain_fetcher.start(), name="onchain_fetch"
+            )
+            self._onchain_compute_task = asyncio.create_task(
+                self._onchain_computer.start(), name="onchain_compute"
+            )
+            logger.info("[OK] On-chain data fetcher started (mode=%s)", self.config.onchain_family_mode)
+        else:
+            logger.info("[7/7] On-chain data fetcher DISABLED via ONCHAIN_FETCH_ENABLED=false")
 
         logger.info("=" * 80)
         logger.info("[READY] Production Engine Ready")
@@ -525,6 +565,24 @@ class ProductionEngine:
     async def disconnect(self) -> None:
         """Disconnect all components"""
         logger.info("Shutting down production engine...")
+
+        # Stop Sprint 3 on-chain fetcher + computer
+        if self._onchain_fetcher:
+            await self._onchain_fetcher.stop()
+        if self._onchain_computer:
+            await self._onchain_computer.stop()
+        if self._onchain_fetch_task and not self._onchain_fetch_task.done():
+            self._onchain_fetch_task.cancel()
+            try:
+                await self._onchain_fetch_task
+            except asyncio.CancelledError:
+                pass
+        if self._onchain_compute_task and not self._onchain_compute_task.done():
+            self._onchain_compute_task.cancel()
+            try:
+                await self._onchain_compute_task
+            except asyncio.CancelledError:
+                pass
 
         # Stop CoinGlass client
         if self._coinglass_client:
@@ -596,6 +654,13 @@ class ProductionEngine:
             return
 
         self.metrics["uptime_seconds"] = time.time() - self._start_time
+
+        # Update on-chain metrics from fetcher/computer (Sprint 3)
+        if self._onchain_fetcher:
+            self.metrics["onchain_fetches"] = self._onchain_fetcher.fetches
+            self.metrics["onchain_fetch_errors"] = self._onchain_fetcher.fetch_errors
+        if self._onchain_computer:
+            self.metrics["onchain_signals_computed"] = self._onchain_computer.signals_computed
 
         metrics_data = {
             "timestamp": str(time.time()),

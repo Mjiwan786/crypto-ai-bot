@@ -9,6 +9,7 @@ Tests cover:
 """
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -25,7 +26,7 @@ from signals.volume_scoring import (
     should_suppress_for_volume,
 )
 from signals.consensus_gate import (
-    evaluate_consensus,
+    evaluate_consensus as _evaluate_consensus_async,
     Family,
     StrategyVote,
     ConsensusResult,
@@ -34,6 +35,11 @@ from signals.consensus_gate import (
     _evaluate_structure,
     _ema,
 )
+
+
+def evaluate_consensus(*args, **kwargs):
+    """Sync wrapper for tests."""
+    return asyncio.run(_evaluate_consensus_async(*args, **kwargs))
 from signals.ohlcv_reader import _parse_ohlcv
 
 

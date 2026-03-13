@@ -60,6 +60,10 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   PAPER_TRADER_ENABLED = "true"
   ONCHAIN_FAMILY_ENABLED = "false"
 
+  # Sprint 3: On-chain data (free APIs)
+  ONCHAIN_FETCH_ENABLED = "true"
+  ONCHAIN_FAMILY_MODE = "shadow"
+
   # ML Models
   ML_ENABLED = "true"
   ML_MODELS_DIR = "models"

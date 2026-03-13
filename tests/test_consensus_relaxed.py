@@ -4,17 +4,23 @@ Tests for relaxed consensus gate thresholds (Sprint 2 Task 1).
 Validates that moderate signals now produce votes at lower confidence,
 while extreme signals retain higher confidence.
 """
+import asyncio
 import os
 import numpy as np
 import pytest
 
 from signals.consensus_gate import (
-    evaluate_consensus,
+    evaluate_consensus as _evaluate_consensus_async,
     _evaluate_momentum,
     _evaluate_trend,
     _evaluate_structure,
     Family,
 )
+
+
+def evaluate_consensus(*args, **kwargs):
+    """Sync wrapper for tests."""
+    return asyncio.run(_evaluate_consensus_async(*args, **kwargs))
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

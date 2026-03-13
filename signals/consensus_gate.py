@@ -8,16 +8,22 @@ Families:
   A (momentum):  RSI, MACD, ROC-based signals
   B (trend):     EMA crossover, SMA crossover, trend strength
   C (structure): Bollinger Band reversion, support/resistance breakout
-  D (onchain):   Open interest + long/short ratio (optional, cached from Redis)
+  D (onchain):   Derivatives + positioning data (optional, cached from Redis)
 
 Sprint 2 changes:
   - Relaxed thresholds: moderate signals now vote at lower confidence
   - min_families configurable via MIN_CONSENSUS_FAMILIES env var
   - Family D (on-chain) optional — abstains if disabled or data unavailable
   - Per-vote logging for observability
+
+Sprint 3 changes:
+  - Family D upgraded: reads pre-computed signal from feature_pipeline via Redis
+  - evaluate_consensus() now async to support Redis reads for Family D
+  - New data sources: Coinalyze, Binance Futures, DefiLlama, Fear & Greed
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -60,7 +66,7 @@ class ConsensusResult:
     reason: str                     # human-readable explanation
 
 
-def evaluate_consensus(
+async def evaluate_consensus(
     ohlcv: np.ndarray,
     min_families: Optional[int] = None,
     pair: str = "",
@@ -112,7 +118,7 @@ def evaluate_consensus(
     # -- Family D: On-chain (optional) --
     onchain_enabled = os.getenv("ONCHAIN_FAMILY_ENABLED", "false").lower() == "true"
     if onchain_enabled and redis_client is not None:
-        onchain_vote = _evaluate_onchain(pair, redis_client)
+        onchain_vote = await _evaluate_onchain_family(pair, redis_client)
         if onchain_vote:
             votes.append(onchain_vote)
 
@@ -378,80 +384,42 @@ def _evaluate_structure(
     )
 
 
-def _evaluate_onchain(pair: str, redis_client: Any) -> Optional[StrategyVote]:
+async def _evaluate_onchain_family(pair: str, redis_client: Any) -> Optional[StrategyVote]:
     """
-    On-chain data family (Family D).
+    On-chain data family (Family D) — Sprint 3 upgrade.
 
-    Reads CACHED data from Redis (never makes HTTP calls inline).
-    The CoinglassClient background task refreshes the cache.
+    Reads PRE-COMPUTED signal from Redis (written by signal_computer.py).
+    The data_fetcher.py background task refreshes raw data from free APIs,
+    and signal_computer.py transforms it into a direction + confidence.
 
-    Voting logic:
-      LONG if: OI increasing (>2%) AND long/short ratio < 0.85
-      SHORT if: OI increasing (>2%) AND long/short ratio > 1.3
-      Abstain otherwise
+    Returns StrategyVote or None to abstain.
     """
     if redis_client is None:
         return None
 
     try:
-        import json as _json
-        import asyncio
-        import inspect
+        asset = pair.split("/")[0] if "/" in pair else "BTC"
+        key = f"onchain:{asset}:signal"
 
-        # Read cached on-chain data
-        base = pair.split("/")[0] if "/" in pair else "BTC"
+        client = redis_client.client if hasattr(redis_client, "client") else redis_client
+        raw = await client.get(key)
 
-        client = redis_client.client if hasattr(redis_client, 'client') else redis_client
-
-        # These are cached STRING keys written by CoinglassClient
-        oi_key = f"onchain:{base}:oi"
-        ls_key = f"onchain:{base}:ls_ratio"
-
-        # We're called from a sync context (evaluate_consensus is sync),
-        # so we need a sync Redis client. Skip if client.get is async.
-        oi_raw = None
-        ls_raw = None
-
-        try:
-            get_method = getattr(client, 'get', None)
-            if get_method is None:
-                return None
-            if inspect.iscoroutinefunction(get_method):
-                # Async client — can't call from sync context, skip
-                return None
-            oi_raw = client.get(oi_key)
-            ls_raw = client.get(ls_key)
-        except Exception:
+        if not raw:
             return None
 
-        if oi_raw is None or ls_raw is None:
+        signal = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+        direction = signal.get("direction")
+        confidence = signal.get("confidence", 0.0)
+
+        if direction not in ("long", "short") or confidence < 0.40:
             return None
 
-        oi_data = _json.loads(oi_raw) if isinstance(oi_raw, str) else _json.loads(oi_raw.decode())
-        ls_data = _json.loads(ls_raw) if isinstance(ls_raw, str) else _json.loads(ls_raw.decode())
-
-        oi_change = oi_data.get("change_24h_pct", 0.0)
-        ls_ratio = ls_data.get("ratio", 1.0)
-        data_ts = max(oi_data.get("timestamp", 0), ls_data.get("timestamp", 0))
-
-        # Stale check: >10 min old
-        import time
-        if time.time() - data_ts > 600:
-            return None
-
-        # Voting logic
-        if oi_change > 2.0 and ls_ratio < 0.85:
-            return StrategyVote(
-                family=Family.ONCHAIN, direction="long",
-                confidence=0.55, name="oi_ls_ratio",
-            )
-        elif oi_change > 2.0 and ls_ratio > 1.3:
-            return StrategyVote(
-                family=Family.ONCHAIN, direction="short",
-                confidence=0.55, name="oi_ls_ratio",
-            )
-
-        return None  # Inconclusive
+        return StrategyVote(
+            family=Family.ONCHAIN,
+            direction=direction,
+            confidence=min(confidence, 0.80),
+            name="onchain_derivatives",
+        )
 
     except Exception as e:
         logger.debug("[CONSENSUS] On-chain family error: %s", e)
