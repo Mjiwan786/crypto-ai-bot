@@ -426,6 +426,7 @@ class PaperTrader:
                 "position_size_usd": fields.get("position_size_usd", "100.0"),
                 "timestamp": fields.get("timestamp", datetime.now(timezone.utc).isoformat()),
                 "strategy": fields.get("strategy", "SCALPER"),
+                "indicators": fields.get("indicators", ""),
             }
 
         # Some publishers store as a JSON blob in "data" field
@@ -746,6 +747,8 @@ async def run_self_test() -> None:
     trader._mode = "paper"
     trader._pairs = ["BTC/USD"]
     trader._initial_balance = 10000.0
+    trader._exit_manager = ExitManager(fee_bps=ROUND_TRIP_FEE_BPS)
+    trader._pending_flip_signals = {}
 
     # ── Test 1: Parse signal ──────────────────────
     print("\nTest 1: Parse signal from flat fields")
@@ -856,7 +859,7 @@ async def run_self_test() -> None:
         ("mock-0", {"close": "68200.0"}),
     ]
 
-    # Now send SHORT signal → should close LONG, open SHORT
+    # Now send SHORT signal with high confidence → should close LONG, open SHORT
     short_fields = {
         "signal_id": "sig-003",
         "pair": "BTC-USD",
@@ -864,6 +867,7 @@ async def run_self_test() -> None:
         "entry_price": "68200.0",
         "take_profit": "66700.0",
         "stop_loss": "68710.0",
+        "confidence": "0.90",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "position_size_usd": "100.0",
     }

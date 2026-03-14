@@ -54,11 +54,12 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   # Sprint 2: Strategy Orchestrator + Paper Trader
   STRATEGY_ORCHESTRATOR_ENABLED = "true"
   REGIME_WRITER_ENABLED = "true"
-  SIGNAL_COOLDOWN_SECONDS = "60"
+  SIGNAL_COOLDOWN_SECONDS = "300"
   MIN_SIGNAL_CONFIDENCE = "0.55"
   MIN_CONSENSUS_FAMILIES = "2"
   PAPER_TRADER_ENABLED = "true"
   ONCHAIN_FAMILY_ENABLED = "false"
+  EXIT_SIGNAL_FLIP_MIN_CONFIDENCE = "0.90"
 
   # Sprint 3: On-chain data (free APIs)
   ONCHAIN_FETCH_ENABLED = "true"
