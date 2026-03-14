@@ -45,6 +45,13 @@ test-results/
 # Node (if used)
 node_modules/
 
+# ML model artifacts
+models/*.joblib
+models/*.pkl
+
+# Training data
+data/*.csv
+
 # OS-specific
 Thumbs.db
 Desktop.ini

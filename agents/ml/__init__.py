@@ -1,14 +1,12 @@
 """
-Machine‑learning agents for the crypto‑ai‑bot.
+Machine-learning agents for the crypto-ai-bot.
 
 The modules in this package implement model training, prediction
-and feature engineering.  They are intentionally kept lightweight
-for this exercise; real implementations might integrate with
-TensorFlow, PyTorch or other ML libraries.
+and feature engineering. Sprint 4B replaced the stub implementations
+with real wrappers around the trainer/ pipeline.
 """
 
-from .model_trainer import ModelTrainer
-from .predictor import Predictor
 from .feature_engineer import FeatureEngineer
+from .predictor import StrategyPredictor
 
-__all__ = ["ModelTrainer", "Predictor", "FeatureEngineer"]
+__all__ = ["FeatureEngineer", "StrategyPredictor"]

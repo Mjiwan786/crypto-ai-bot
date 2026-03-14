@@ -1,4 +1,19 @@
-# ml_models.yaml
+# ML Model Registry
+# Updated by trainer/train.py after each training run
+
+signal_scorer:
+  type: xgboost
+  version: "0.1.0"
+  path: "models/signal_scorer.joblib"
+  feature_count: 30
+  training_date: null        # Set by train.py
+  walk_forward_accuracy: null # Set by train.py
+  walk_forward_auc: null     # Set by train.py
+  walk_forward_pf: null      # Set by train.py
+  feature_flag: "ML_SCORER_ENABLED"
+  min_score: 0.60            # Signals below this get vetoed
+
+# Legacy entry (kept for backward compatibility)
 momentum_model:
   type: xgboost
   version: 2.3.0
@@ -6,4 +21,3 @@ momentum_model:
   rollback_version: 2.2.1
   version_control: true
   git_sha: a1b2c3d
-

@@ -100,6 +100,7 @@ from exchange.rate_limiter import ExchangeRateLimiter
 from signals.ohlcv_reader import read_ohlcv_candles
 from signals.volume_scoring import compute_volume_ratio, apply_volume_multiplier, should_suppress_for_volume
 from signals.consensus_gate import evaluate_consensus
+from signals.ml_scorer import MLScorer, MLScorerConfig
 from signals.signal_generator import SignalGenerator
 from signals.strategy_orchestrator import StrategyOrchestrator
 from ai_engine.regime_detector.regime_writer import RegimeWriter
@@ -216,6 +217,18 @@ class EngineConfig:
     # ── Sprint 3A: ATR-based TP/SL ──────────────────────────
     atr_tp_sl_enabled: bool = field(
         default_factory=lambda: os.getenv("ATR_TP_SL_ENABLED", "true").lower() == "true"
+    )
+
+    # ── Sprint 4B: ML Scorer ─────────────────────────────────
+    ml_scorer_enabled: bool = field(
+        default_factory=lambda: os.getenv("ML_SCORER_ENABLED", "false").lower() == "true"
+    )
+    ml_model_path: str = field(
+        default_factory=lambda: os.getenv("ML_MODEL_PATH", "models/signal_scorer.joblib")
+    )
+    ml_min_score: float = float(os.getenv("ML_MIN_SCORE", "0.60"))
+    ml_shadow_mode: bool = field(
+        default_factory=lambda: os.getenv("ML_SHADOW_MODE", "true").lower() == "true"
     )
 
     # ── Sprint 3B: Trend filter ──────────────────────────────
@@ -410,6 +423,14 @@ class ProductionEngine:
             enabled=self.config.rate_limit_enabled,
         )
 
+        # ML Scorer (Sprint 4B)
+        self._ml_scorer = MLScorer(MLScorerConfig(
+            enabled=self.config.ml_scorer_enabled,
+            model_path=self.config.ml_model_path,
+            min_score=self.config.ml_min_score,
+            shadow_mode=self.config.ml_shadow_mode,
+        ))
+
     async def _fetch_live_price(self, pair: str) -> float:
         """Fetch live price from Kraken API with caching"""
         now = time.time()
@@ -567,6 +588,9 @@ class ProductionEngine:
             logger.info("[OK] On-chain data fetcher started (mode=%s)", self.config.onchain_family_mode)
         else:
             logger.info("[7/7] On-chain data fetcher DISABLED via ONCHAIN_FETCH_ENABLED=false")
+
+        # 8. Load ML Scorer (Sprint 4B)
+        self._ml_scorer.load()
 
         logger.info("=" * 80)
         logger.info("[READY] Production Engine Ready")
@@ -866,6 +890,24 @@ class ProductionEngine:
                 "volume_ratio": vol_ratio,
             }
 
+        # ── Sprint 4B: ML Scorer pre-filter ──────────────────
+        if self.config.ml_scorer_enabled:
+            ml_pass, ml_score, ml_reason = self._ml_scorer.score_signal(
+                ohlcv=ohlcv, direction=direction, confidence=confidence,
+            )
+            if not ml_pass:
+                logger.info("ML Scorer vetoed %s signal for %s: %s", direction, pair, ml_reason)
+                return {
+                    "signal": None,
+                    "reason": f"ml_scorer_veto: {ml_reason}",
+                    "volume_ratio": vol_ratio,
+                    "ml_score": ml_score,
+                }
+            if ml_score >= 0:
+                logger.debug("ML Scorer passed %s for %s: %s", direction, pair, ml_reason)
+        else:
+            ml_score = -1.0
+
         # Compute indicator snapshots for signal metadata
         closes = ohlcv[:, 3]
         volatility = float(np.std(closes[-20:]) / np.mean(closes[-20:])) if len(closes) >= 20 else 0.02
@@ -884,6 +926,7 @@ class ProductionEngine:
             "sma_long": float(np.mean(closes[-30:])) if len(closes) >= 30 else float(np.mean(closes)),
             "source": "ohlcv_8strategy",
             "families_agreeing": families_agreeing,
+            "ml_score": ml_score,
         }
 
         # Attach full strategy metadata
@@ -1082,7 +1125,8 @@ class ProductionEngine:
                 "roc": analysis.get("roc", 0),
             },
             metadata={
-                "model_version": "v3.3.0-sprint3a",
+                "model_version": "v4.0.0-sprint4b",
+                "ml_score": analysis.get("ml_score", -1.0),
                 "source": analysis.get("source", "ohlcv_8strategy"),
                 "latency_ms": int((time.time() - now) * 1000),
                 "strategy_tag": "8-Strategy Consensus",
