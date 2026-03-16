@@ -24,6 +24,8 @@ signals/              — Signal pipeline (Sprint 1-4B)
   exit_manager.py     —   ExitManager: trailing stop, partial TP (Sprint 3B)
   trend_filter.py     —   EMA-cross trend filter (Sprint 3A)
   ml_scorer.py        —   XGBoost ML signal scorer (Sprint 4B)
+  exchange_scorer.py  —   Quality-scored exchange selection per pair/tf (Sprint 5)
+  price_provider.py   —   Two-price model: execution venue + cross-exchange reference (Sprint 5)
 trainer/              — Offline ML training pipeline (Sprint 4A)
   feature_builder.py  —   30-feature OHLCV feature engineering
   data_exporter.py    —   Redis→CSV export + candle labeling
@@ -107,6 +109,15 @@ conda run -n crypto-bot pytest shared_contracts/tests/ -v
 - `OHLCV_AGGREGATOR_TIMEFRAMES` — comma-separated seconds (default: `15,60,300`)
 - `OHLCV_AGGREGATOR_MAXLEN` — max candles per stream (default: 500)
 
+### Sprint 5: Exchange-Agnostic OHLCV
+- `EXCHANGE_SCORER_ENABLED` — `true`/`false` (default: true) — quality-scored exchange selection
+- `EXCHANGE_SCORER_CACHE_TTL` — seconds to cache exchange scores (default: 300)
+- `EXECUTION_VENUE` — exchange for live price (default: `kraken`)
+- `PRICE_CACHE_TTL_S` — ticker cache TTL seconds (default: 5.0)
+- `PRICE_STALE_THRESHOLD_S` — max ticker age before considered stale (default: 30.0)
+- `PRICE_ANOMALY_THRESHOLD_BPS` — warn if execution deviates from reference (default: 50.0)
+- `ATR_FEE_FLOOR_BPS` — minimum SL distance in bps to pass fee-floor guard (default: 55)
+
 ## Deploy
 
 ```bash
@@ -176,12 +187,23 @@ VM: 2GB RAM, 2 shared CPUs. Two processes: `app` (production_engine) + `streamer
 - [x] `model_version=v4.0.0-sprint4b` on all signals
 - [x] ML scorer default OFF (`ML_SCORER_ENABLED=false`), shadow mode default ON
 
+### Sprint 5 — COMPLETE (Exchange-Agnostic OHLCV + Profitability Fix, 27 tests)
+- [x] `signals/exchange_scorer.py` — Quality-scored exchange selection (freshness/continuity/spread/reliability)
+- [x] `signals/price_provider.py` — Two-price model: execution venue for live, cross-exchange median for paper
+- [x] `signals/ohlcv_reader.py` — Scorer-driven selection with legacy fallback
+- [x] `production_engine.py` — Removed Kraken as default (`KRAKEN_API_URL`, `KRAKEN_PAIR_MAP`, `_fetch_live_price` deleted)
+- [x] `ATR_FEE_FLOOR_BPS=55` — Fee-floor guard enforced in fly.toml (was 5 emergency, caused TP<fees)
+- [x] `PRIMARY_TIMEFRAME_S=300` — 5-min candles for better ATR stability
+- [x] `model_version=v5.0.0-sprint5`
+
 ## Signal Pipeline (production_engine.py → `_generate_signal_v2()`)
 
 ```
-OHLCV (Redis) → Volume Gate → Consensus Gate (2/3 families) → Confidence Check
-    → Trend Filter (EMA cross) → Fee-Floor Check (52 bps RT)
+ExchangeScorer selects best OHLCV source per pair (quality-ranked)
+    → OHLCV (Redis) → Volume Gate → Consensus Gate → Confidence Check
+    → Trend Filter (EMA cross) → Fee-Floor Check (55 bps ATR floor)
     → ML Scorer (if enabled) → ATR TP/SL → Publish to Redis stream
+PriceProvider: execution venue for live, cross-exchange median for paper
 ```
 
 Each gate can veto the signal. ML scorer in shadow mode logs but does not veto.

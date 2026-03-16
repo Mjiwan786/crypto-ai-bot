@@ -54,12 +54,18 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   # Sprint 2: Strategy Orchestrator + Paper Trader
   STRATEGY_ORCHESTRATOR_ENABLED = "true"
   REGIME_WRITER_ENABLED = "true"
-  SIGNAL_COOLDOWN_SECONDS = "300"
+  SIGNAL_COOLDOWN_SECONDS = "180"
   MIN_SIGNAL_CONFIDENCE = "0.55"
-  MIN_CONSENSUS_FAMILIES = "2"
+  MIN_CONSENSUS_FAMILIES = "1"
   PAPER_TRADER_ENABLED = "true"
   ONCHAIN_FAMILY_ENABLED = "false"
   EXIT_SIGNAL_FLIP_MIN_CONFIDENCE = "0.90"
+
+  # Sprint 5: Exchange-agnostic OHLCV + profitability fix
+  EXCHANGE_SCORER_ENABLED = "true"
+  EXECUTION_VENUE = "kraken"
+  ATR_FEE_FLOOR_BPS = "55"
+  PRIMARY_TIMEFRAME_S = "300"
 
   # Sprint 3: On-chain data (free APIs)
   ONCHAIN_FETCH_ENABLED = "true"

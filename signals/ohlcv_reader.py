@@ -1,17 +1,25 @@
 """
 Read OHLCV candles from Redis streams for signal generation.
 
-Replaces the REST spot price polling with proper candle data.
+Supports two modes:
+  1. Scorer-driven: ExchangeScorer ranks exchanges, reader fetches from best.
+  2. Legacy fallback: tries hardcoded key patterns (for backward compat).
 """
 from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from signals.exchange_scorer import ExchangeScorer
+
 logger = logging.getLogger(__name__)
+
+# Timeframe seconds → CCXT-style label
+_TF_LABEL: dict = {15: "15s", 60: "1m", 300: "5m", 900: "15m", 3600: "1h"}
 
 
 async def read_ohlcv_candles(
@@ -20,26 +28,54 @@ async def read_ohlcv_candles(
     pair: str,
     timeframe_s: int = 60,
     lookback: int = 50,
+    scorer: Optional["ExchangeScorer"] = None,
 ) -> Optional[np.ndarray]:
     """
     Read recent OHLCV candles from Redis stream.
 
-    Tries keys in order:
-      1. ohlc:{tf}:{exchange}:{pair}     (per-exchange)
-      2. ohlc:{tf}:any:{pair}            (cross-exchange aggregate)
-      3. {exchange}:ohlc:{tf}:{dash_pair} (legacy format)
+    When scorer is provided, uses quality-scored exchange selection.
+    When scorer is None, falls back to legacy key scanning.
 
     Returns:
         numpy array shape (N, 5) with columns [open, high, low, close, volume]
         or None if insufficient data.
     """
-    dash_pair = pair.replace("/", "-")
-
-    # Build human-readable timeframe label matching the streamer's key format.
-    # MultiExchangeStreamer writes: {exchange}:ohlc:{label}:{dash_pair}
-    # where label is the CCXT-style string ("15s", "1m", "5m", "1h"), NOT an integer.
-    _TF_LABEL: dict = {15: "15s", 60: "1m", 300: "5m", 900: "15m", 3600: "1h"}
+    # Convert timeframe_s to label
     tf_label = _TF_LABEL.get(timeframe_s)
+    if tf_label is None:
+        if timeframe_s >= 3600:
+            tf_label = f"{timeframe_s // 3600}h"
+        elif timeframe_s >= 60:
+            tf_label = f"{timeframe_s // 60}m"
+        else:
+            tf_label = f"{timeframe_s}s"
+
+    # ── Scorer-driven selection ──
+    if scorer is not None:
+        ranked = await scorer.score_all(redis_client, pair, tf_label, lookback)
+        for ex, score in ranked:
+            if not score.available:
+                continue
+            dash_pair = pair.replace("/", "-")
+            keys = scorer._build_key_candidates(ex, pair, dash_pair, tf_label)
+            for key in keys:
+                try:
+                    raw = await _read_stream(redis_client, key, lookback)
+                    if raw and len(raw) >= 20:
+                        arr = _parse_ohlcv(raw)
+                        if arr is not None and len(arr) >= 20:
+                            logger.info(
+                                "OHLCV read: exchange=%s pair=%s tf=%s key=%s candles=%d (score=%.2f)",
+                                ex, pair, tf_label, key, len(arr), score.total_score,
+                            )
+                            return arr
+                except Exception:
+                    continue
+        logger.warning("OHLCV: No data from any scored exchange for %s %s", pair, tf_label)
+        return None
+
+    # ── Legacy fallback (scorer=None) ──
+    dash_pair = pair.replace("/", "-")
 
     keys_to_try = [
         # Aggregator format (ohlcv_aggregator.py) — per-exchange and cross-exchange
@@ -48,25 +84,23 @@ async def read_ohlcv_candles(
     ]
 
     if tf_label:
-        # Streamer format: {exchange}:ohlc:{label}:{dash_pair}  (e.g. kraken:ohlc:1m:BTC-USD)
+        # Streamer format: {exchange}:ohlc:{label}:{dash_pair}
         keys_to_try.append(f"{exchange}:ohlc:{tf_label}:{dash_pair}")
-        # Cross-exchange aggregator with label (e.g. ohlc:1m:any:BTC-USD)
+        # Cross-exchange aggregator with label
         keys_to_try.append(f"ohlc:{tf_label}:any:{dash_pair}")
 
-    # Legacy fallback: integer-minutes format that was used before label convention
+    # Legacy fallback: integer-minutes format
     legacy_tf = timeframe_s // 60 if timeframe_s >= 60 else timeframe_s
     keys_to_try.append(f"{exchange}:ohlc:{legacy_tf}:{dash_pair}")
 
-    # Cross-exchange fallback: if primary exchange has no OHLCV data,
-    # try other exchanges that carry the same quote currency.
-    # USD pairs → coinbase, bitfinex; USDT pairs → binance, okx, bybit
+    # Cross-exchange fallback
     _USD_FALLBACKS = ["coinbase", "bitfinex"]
     _USDT_FALLBACKS = ["binance", "okx", "bybit"]
     is_usd = dash_pair.endswith("-USD")
     fallback_exchanges = _USD_FALLBACKS if is_usd else _USDT_FALLBACKS
-    if tf_label:
-        for fb_ex in fallback_exchanges:
-            if fb_ex != exchange:
+    for fb_ex in fallback_exchanges:
+        if fb_ex != exchange:
+            if tf_label:
                 keys_to_try.append(f"{fb_ex}:ohlc:{tf_label}:{dash_pair}")
 
     for key in keys_to_try:

@@ -103,6 +103,8 @@ from signals.consensus_gate import evaluate_consensus
 from signals.ml_scorer import MLScorer, MLScorerConfig
 from signals.signal_generator import SignalGenerator
 from signals.strategy_orchestrator import StrategyOrchestrator
+from signals.exchange_scorer import ExchangeScorer
+from signals.price_provider import PriceProvider
 from ai_engine.regime_detector.regime_writer import RegimeWriter
 from market_data.onchain.coinglass_client import CoinglassClient
 from market_data.onchain.data_fetcher import OnChainDataFetcher
@@ -236,6 +238,11 @@ class EngineConfig:
         default_factory=lambda: os.getenv("TREND_FILTER_ENABLED", "true").lower() == "true"
     )
 
+    # ── Sprint 5: Exchange-agnostic OHLCV ──────────────────
+    exchange_scorer_enabled: bool = field(
+        default_factory=lambda: os.getenv("EXCHANGE_SCORER_ENABLED", "true").lower() == "true"
+    )
+
     # Strategy Orchestrator (Sprint 2 Tier 2)
     strategy_orchestrator_enabled: bool = field(
         default_factory=lambda: os.getenv("STRATEGY_ORCHESTRATOR_ENABLED", "true").lower() == "true"
@@ -347,20 +354,6 @@ class ProductionEngine:
     - Metrics and heartbeat
     """
 
-    # Kraken API configuration for live prices
-    KRAKEN_API_URL = "https://api.kraken.com/0/public/Ticker"
-    KRAKEN_PAIR_MAP = {
-        "BTC/USD": "XXBTZUSD",
-        "ETH/USD": "XETHZUSD",
-        "SOL/USD": "SOLUSD",
-        "ADA/USD": "ADAUSD",
-        "MATIC/USD": "MATICUSD",
-        "LINK/USD": "LINKUSD",
-        "DOT/USD": "DOTUSD",
-        "AVAX/USD": "AVAXUSD",
-    }
-    PRICE_CACHE_TTL = 5.0  # Cache prices for 5 seconds
-
     def __init__(self, config: EngineConfig):
         self.config = config
         self.redis_client: Optional[RedisCloudClient] = None
@@ -374,9 +367,13 @@ class ProductionEngine:
         self._last_metrics = 0.0
         self._last_pnl_update = 0.0
 
-        # Live price fetching
+        # Sprint 5: Exchange-agnostic price and OHLCV
+        self._exchange_scorer = ExchangeScorer(
+            cache_ttl_s=int(os.getenv("EXCHANGE_SCORER_CACHE_TTL", "300"))
+        )
+        # PriceProvider initialized in connect() after Redis is ready
+        self._price_provider: Optional[PriceProvider] = None
         self._http_session: Optional[aiohttp.ClientSession] = None
-        self._price_cache: Dict[str, tuple] = {}  # {pair: (price, timestamp)}
 
         # Metrics
         self.metrics = {
@@ -431,59 +428,11 @@ class ProductionEngine:
             shadow_mode=self.config.ml_shadow_mode,
         ))
 
-    async def _fetch_live_price(self, pair: str) -> float:
-        """Fetch live price from Kraken API with caching"""
-        now = time.time()
-
-        # Check cache
-        if pair in self._price_cache:
-            cached_price, cached_time = self._price_cache[pair]
-            if now - cached_time < self.PRICE_CACHE_TTL:
-                return cached_price
-
-        # Get Kraken pair name
-        kraken_pair = self.KRAKEN_PAIR_MAP.get(pair)
-        if not kraken_pair:
-            kraken_pair = pair.replace("/", "")
-
-        # Rate limit gate — skip API call if budget exhausted
-        if not await self._rate_limiter.acquire("kraken"):
-            if pair in self._price_cache:
-                return self._price_cache[pair][0]
-            raise Exception(f"Rate limit exhausted for kraken, no cached price for {pair}")
-
-        # Fetch from Kraken
-        try:
-            if not self._http_session:
-                self._http_session = aiohttp.ClientSession(
-                    timeout=aiohttp.ClientTimeout(total=10)
-                )
-
-            url = f"{self.KRAKEN_API_URL}?pair={kraken_pair}"
-            async with self._http_session.get(url) as response:
-                if response.status != 200:
-                    raise Exception(f"Kraken API returned {response.status}")
-
-                data = await response.json()
-
-                if data.get("error"):
-                    raise Exception(f"Kraken API error: {data['error']}")
-
-                result = data.get("result", {})
-                if not result:
-                    raise Exception("Empty result from Kraken")
-
-                pair_data = list(result.values())[0]
-                price = float(pair_data["c"][0])
-
-                self._price_cache[pair] = (price, now)
-                return price
-
-        except Exception as e:
-            logger.warning(f"Error fetching price for {pair}: {e}")
-            if pair in self._price_cache:
-                return self._price_cache[pair][0]
-            raise
+    async def _get_price(self, pair: str) -> Optional[float]:
+        """Get price via PriceProvider (exchange-agnostic, reads Redis ticker/OHLCV streams)."""
+        if self._price_provider:
+            return await self._price_provider.get_price(pair)
+        return None
 
     async def connect(self) -> None:
         """Connect all components"""
@@ -504,6 +453,13 @@ class ProductionEngine:
         self.redis_client = RedisCloudClient(redis_config)
         await self.redis_client.connect()
         logger.info("[OK] Redis Cloud connected")
+
+        # 1b. Initialize PriceProvider (Sprint 5)
+        self._price_provider = PriceProvider(
+            redis_client=self.redis_client,
+            mode=self.config.mode,
+        )
+        logger.info("[OK] PriceProvider ready (mode=%s, venue=%s)", self.config.mode, os.getenv("EXECUTION_VENUE", "kraken"))
 
         # 2. Initialize PRD-001 compliant signal publisher
         logger.info("[2/4] Initializing PRD-001 signal publisher...")
@@ -824,13 +780,14 @@ class ProductionEngine:
         Pipeline: OHLCV → 8 strategies → consensus (2+ families) → signal.
         This is the ONLY signal generation path. No fallback to legacy momentum.
         """
-        # Read OHLCV candles from Redis
+        # Read OHLCV candles from Redis (scorer-driven or legacy fallback)
         ohlcv = await read_ohlcv_candles(
             redis_client=self.redis_client,
-            exchange="kraken",
+            exchange="any",
             pair=pair,
             timeframe_s=self.config.primary_timeframe_s,
             lookback=self.config.signal_candle_lookback,
+            scorer=self._exchange_scorer if self.config.exchange_scorer_enabled else None,
         )
 
         if ohlcv is None:
@@ -972,10 +929,11 @@ class ProductionEngine:
             try:
                 ohlcv = await read_ohlcv_candles(
                     redis_client=self.redis_client,
-                    exchange="kraken",
+                    exchange="any",
                     pair=pair,
                     timeframe_s=self.config.primary_timeframe_s,
                     lookback=self.config.signal_candle_lookback,
+                    scorer=self._exchange_scorer if self.config.exchange_scorer_enabled else None,
                 )
                 if ohlcv is not None and len(ohlcv) >= 30:
                     tier2 = await self._orchestrator.generate_signal(ohlcv, pair=pair)
@@ -1023,10 +981,11 @@ class ProductionEngine:
                 from signals.trend_filter import check_trend_alignment
                 tf_ohlcv = await read_ohlcv_candles(
                     redis_client=self.redis_client,
-                    exchange="kraken",
+                    exchange="any",
                     pair=pair,
                     timeframe_s=self.config.primary_timeframe_s,
                     lookback=self.config.signal_candle_lookback,
+                    scorer=self._exchange_scorer if self.config.exchange_scorer_enabled else None,
                 )
                 if tf_ohlcv is not None and len(tf_ohlcv) >= 36:
                     alignment = check_trend_alignment(tf_ohlcv, pair, side)
@@ -1038,11 +997,10 @@ class ProductionEngine:
             except Exception as e:
                 logger.warning(f"{pair}: Trend filter error, skipping filter: {e}")
 
-        # Fetch entry price (v2 path may not have fetched it yet)
-        try:
-            entry = await self._fetch_live_price(pair)
-        except Exception as e:
-            logger.warning(f"Could not fetch live price for {pair}: {e}")
+        # Fetch entry price via PriceProvider (exchange-agnostic)
+        entry = await self._get_price(pair)
+        if entry is None:
+            logger.warning("%s: No price available from any exchange", pair)
             return
 
         # Feed Tier 3 price history (so legacy momentum has data on next cycle)
@@ -1056,10 +1014,11 @@ class ProductionEngine:
                 from signals.atr_levels import compute_atr_levels
                 atr_ohlcv = await read_ohlcv_candles(
                     redis_client=self.redis_client,
-                    exchange="kraken",
+                    exchange="any",
                     pair=pair,
                     timeframe_s=self.config.primary_timeframe_s,
                     lookback=self.config.signal_candle_lookback,
+                    scorer=self._exchange_scorer if self.config.exchange_scorer_enabled else None,
                 )
                 if atr_ohlcv is not None and len(atr_ohlcv) >= 15:
                     atr_result = compute_atr_levels(
@@ -1125,7 +1084,7 @@ class ProductionEngine:
                 "roc": analysis.get("roc", 0),
             },
             metadata={
-                "model_version": "v4.0.0-sprint4b",
+                "model_version": "v5.0.0-sprint5",
                 "ml_score": analysis.get("ml_score", -1.0),
                 "source": analysis.get("source", "ohlcv_8strategy"),
                 "latency_ms": int((time.time() - now) * 1000),
