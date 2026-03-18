@@ -98,6 +98,7 @@ from collections import deque
 from market_data.ohlcv_aggregator import OHLCVAggregator, get_aggregator
 from exchange.rate_limiter import ExchangeRateLimiter
 from signals.ohlcv_reader import read_ohlcv_candles
+from signals.squeeze_momentum import compute_squeeze_features, should_skip_trade
 from signals.volume_scoring import compute_volume_ratio, apply_volume_multiplier, should_suppress_for_volume
 from signals.consensus_gate import evaluate_consensus
 from signals.ml_scorer import MLScorer, MLScorerConfig
@@ -236,6 +237,14 @@ class EngineConfig:
     # ── Sprint 3B: Trend filter ──────────────────────────────
     trend_filter_enabled: bool = field(
         default_factory=lambda: os.getenv("TREND_FILTER_ENABLED", "true").lower() == "true"
+    )
+
+    # ── Phase 1: Squeeze Momentum (ML feature generator) ───
+    squeeze_momentum_enabled: bool = field(
+        default_factory=lambda: os.getenv("SQUEEZE_MOMENTUM_ENABLED", "true").lower() == "true"
+    )
+    squeeze_filter_enabled: bool = field(
+        default_factory=lambda: os.getenv("SQUEEZE_FILTER_ENABLED", "true").lower() == "true"
     )
 
     # ── Sprint 5: Exchange-agnostic OHLCV ──────────────────
@@ -794,6 +803,19 @@ class ProductionEngine:
             logger.debug("%s: No OHLCV data available, skipping signal generation", pair)
             return {"signal": None, "reason": "no_ohlcv_data"}
 
+        # ── Phase 1: Squeeze Momentum (ML features + pre-filter) ──
+        squeeze_features = None
+        if self.config.squeeze_momentum_enabled and ohlcv is not None:
+            squeeze_features = compute_squeeze_features(ohlcv)
+
+            # Pre-filter: skip trades during squeeze compression
+            if self.config.squeeze_filter_enabled and should_skip_trade(squeeze_features):
+                logger.info(
+                    "%s: Squeeze filter — in compression (duration=%d bars), skipping",
+                    pair, squeeze_features.get("squeeze_duration", 0) if squeeze_features else 0,
+                )
+                return {"signal": None, "reason": "squeeze_compression"}
+
         # Volume gate (pre-filter before running strategies)
         if self.config.volume_confirmation_enabled:
             vol_ratio = compute_volume_ratio(ohlcv[:, 4], lookback=20)
@@ -889,6 +911,10 @@ class ProductionEngine:
         # Attach full strategy metadata
         if trading_signal:
             result["strategy_metadata"] = trading_signal.metadata
+
+        # Attach squeeze features for downstream indicator publishing
+        if squeeze_features:
+            result["squeeze_features"] = squeeze_features
 
         return result
 
@@ -1082,9 +1108,24 @@ class ProductionEngine:
                 "sma_short": analysis.get("sma_short", 0),
                 "sma_long": analysis.get("sma_long", 0),
                 "roc": analysis.get("roc", 0),
+                # Phase 1: Squeeze Momentum features (for ML feature builder)
+                **(
+                    {
+                        "squeeze_on": str(analysis["squeeze_features"]["squeeze_on"]),
+                        "squeeze_duration": str(analysis["squeeze_features"]["squeeze_duration"]),
+                        "squeeze_momentum": f"{analysis['squeeze_features']['squeeze_momentum']:.6f}",
+                        "squeeze_direction": str(analysis["squeeze_features"]["squeeze_momentum_direction"]),
+                        "squeeze_acceleration": f"{analysis['squeeze_features']['squeeze_momentum_acceleration']:.6f}",
+                        "squeeze_fired": str(analysis["squeeze_features"]["squeeze_fired_recently"]),
+                        "bb_width_pct": f"{analysis['squeeze_features']['bb_width_pct']:.4f}",
+                        "kc_width_pct": f"{analysis['squeeze_features']['kc_width_pct']:.4f}",
+                    }
+                    if analysis.get("squeeze_features")
+                    else {}
+                ),
             },
             metadata={
-                "model_version": "v5.0.0-sprint5",
+                "model_version": "v5.1.0-phase1-squeeze",
                 "ml_score": analysis.get("ml_score", -1.0),
                 "source": analysis.get("source", "ohlcv_8strategy"),
                 "latency_ms": int((time.time() - now) * 1000),

@@ -15,20 +15,20 @@ class TestFeatureEngineerV2:
         ohlcv = generate_synthetic_ohlcv(n_candles=50)
         df = self.fe.from_ohlcv(ohlcv)
         assert isinstance(df, pd.DataFrame)
-        assert df.shape == (50, 30)
+        assert df.shape == (50, 35)
 
     def test_from_ohlcv_single(self) -> None:
         ohlcv = generate_synthetic_ohlcv(n_candles=50)
         result = self.fe.from_ohlcv_single(ohlcv)
         assert result is not None
-        assert result.shape == (30,)
+        assert result.shape == (35,)
 
     def test_from_ohlcv_single_insufficient(self) -> None:
         ohlcv = generate_synthetic_ohlcv(n_candles=10)
         assert self.fe.from_ohlcv_single(ohlcv) is None
 
     def test_feature_names(self) -> None:
-        assert len(self.fe.feature_names) == 30
+        assert len(self.fe.feature_names) == 35
 
     def test_from_trade_logs(self) -> None:
         df = pd.DataFrame({
@@ -37,7 +37,7 @@ class TestFeatureEngineerV2:
             "pnl": [5.0, -5.0],
             "quantity": [1.0, 1.0],
             "timestamp": ["2026-01-01", "2026-01-02"],
-            "duration_sec": [300, 600],
+            "duration_sec": [350, 600],
         })
         result = self.fe.from_trade_logs(df)
         assert "pnl_pct" in result.columns

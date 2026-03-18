@@ -61,6 +61,10 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   ONCHAIN_FAMILY_ENABLED = "false"
   EXIT_SIGNAL_FLIP_MIN_CONFIDENCE = "0.90"
 
+  # Phase 1: Squeeze Momentum (ML feature generator)
+  SQUEEZE_MOMENTUM_ENABLED = "true"
+  SQUEEZE_FILTER_ENABLED = "true"
+
   # Sprint 5: Exchange-agnostic OHLCV + profitability fix
   EXCHANGE_SCORER_ENABLED = "true"
   EXECUTION_VENUE = "kraken"

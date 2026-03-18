@@ -24,10 +24,11 @@ signals/              — Signal pipeline (Sprint 1-4B)
   exit_manager.py     —   ExitManager: trailing stop, partial TP (Sprint 3B)
   trend_filter.py     —   EMA-cross trend filter (Sprint 3A)
   ml_scorer.py        —   XGBoost ML signal scorer (Sprint 4B)
+  squeeze_momentum.py —   Squeeze Momentum: BB-inside-KC detector, ML features (Phase 1)
   exchange_scorer.py  —   Quality-scored exchange selection per pair/tf (Sprint 5)
   price_provider.py   —   Two-price model: execution venue + cross-exchange reference (Sprint 5)
 trainer/              — Offline ML training pipeline (Sprint 4A)
-  feature_builder.py  —   30-feature OHLCV feature engineering
+  feature_builder.py  —   35-feature OHLCV feature engineering (30 base + 5 squeeze)
   data_exporter.py    —   Redis→CSV export + candle labeling
   models/xgboost_signal.py — XGBoost binary classifier
   evaluation/walk_forward.py — Walk-forward validation with purge gap
@@ -103,6 +104,14 @@ conda run -n crypto-bot pytest shared_contracts/tests/ -v
 - `ML_MODEL_PATH` — path to .joblib model file (default: `models/signal_model.joblib`)
 - `ML_MIN_SCORE` — minimum ML score to pass (default: 0.55)
 - `ML_SHADOW_MODE` — `true`/`false` (default: true) — log scores without vetoing
+
+### Phase 1: Squeeze Momentum
+- `SQUEEZE_MOMENTUM_ENABLED` — `true`/`false` (default: true) — compute squeeze features
+- `SQUEEZE_FILTER_ENABLED` — `true`/`false` (default: true) — skip trades during squeeze compression
+- `SQUEEZE_BB_LENGTH` — BB period (default: 20)
+- `SQUEEZE_KC_LENGTH` — KC period (default: 20)
+- `SQUEEZE_KC_MULT` — KC ATR multiplier (default: 1.5)
+- `SQUEEZE_MOM_LENGTH` — Momentum linear regression length (default: 20)
 
 ### OHLCV Aggregator
 - `OHLCV_AGGREGATOR_ENABLED` — `true`/`false` (default: true)
@@ -200,9 +209,11 @@ VM: 2GB RAM, 2 shared CPUs. Two processes: `app` (production_engine) + `streamer
 
 ```
 ExchangeScorer selects best OHLCV source per pair (quality-ranked)
-    → OHLCV (Redis) → Volume Gate → Consensus Gate → Confidence Check
+    → OHLCV (Redis) → Squeeze Filter (skip during compression)
+    → Volume Gate → Consensus Gate → Confidence Check
     → Trend Filter (EMA cross) → Fee-Floor Check (55 bps ATR floor)
     → ML Scorer (if enabled) → ATR TP/SL → Publish to Redis stream
+Squeeze features (8) flow into signal indicators for ML feature builder (35 features total)
 PriceProvider: execution venue for live, cross-exchange median for paper
 ```
 

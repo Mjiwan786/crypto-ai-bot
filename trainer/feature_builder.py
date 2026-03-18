@@ -7,7 +7,7 @@ gate simulations. The consensus gate features reuse the exact same logic as
 signals/consensus_gate.py to ensure training/inference parity.
 
 Input format: numpy array shape (N, 5) = [open, high, low, close, volume]
-Output: pandas DataFrame with 30 columns or single numpy vector (30,).
+Output: pandas DataFrame with 35 columns or single numpy vector (35,).
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from utils.logger import get_logger
 # Import consensus gate evaluators directly for feature parity.
 # These are module-level functions; Python doesn't enforce _ privacy.
 from signals.consensus_gate import _evaluate_momentum, _evaluate_trend, _evaluate_structure
+from signals.squeeze_momentum import compute_squeeze_features
 
 logger = get_logger(__name__)
 
@@ -62,6 +63,12 @@ class FeatureBuilder:
         "momentum_vote",
         "trend_vote",
         "structure_vote",
+        # Group 4 — Squeeze Momentum (5) — Phase 1 ML features
+        "squeeze_on",
+        "squeeze_duration",
+        "squeeze_momentum",
+        "squeeze_direction",
+        "squeeze_acceleration",
     ]
 
     def build_features(self, ohlcv: np.ndarray) -> pd.DataFrame:
@@ -82,7 +89,7 @@ class FeatureBuilder:
         closes = ohlcv[:, 3]
         volumes = ohlcv[:, 4]
 
-        result = np.full((n, 30), np.nan, dtype=np.float64)
+        result = np.full((n, 35), np.nan, dtype=np.float64)
 
         # Pre-compute rolling arrays
         ema9 = self._ema_series(closes, 9)
@@ -96,8 +103,26 @@ class FeatureBuilder:
         # OBV
         obv = self._obv_series(closes, volumes)
 
+        # Pre-compute squeeze features for entire series
+        squeeze_on_arr = np.full(n, np.nan)
+        squeeze_dur_arr = np.full(n, np.nan)
+        squeeze_mom_arr = np.full(n, np.nan)
+        squeeze_dir_arr = np.full(n, np.nan)
+        squeeze_acc_arr = np.full(n, np.nan)
+
+        min_squeeze_bars = 25  # min_bars for squeeze computation
+        for si in range(min_squeeze_bars, n + 1):
+            sf = compute_squeeze_features(ohlcv[:si])
+            if sf is not None:
+                idx = si - 1
+                squeeze_on_arr[idx] = 1.0 if sf["squeeze_on"] else 0.0
+                squeeze_dur_arr[idx] = float(sf["squeeze_duration"])
+                squeeze_mom_arr[idx] = sf["squeeze_momentum"]
+                squeeze_dir_arr[idx] = float(sf["squeeze_momentum_direction"])
+                squeeze_acc_arr[idx] = sf["squeeze_momentum_acceleration"]
+
         for i in range(n):
-            row = np.full(30, np.nan)
+            row = np.full(35, np.nan)
 
             # --- Group 1: Technical Analysis ---
             # RSI 14 (needs 15 data points)
@@ -220,6 +245,13 @@ class FeatureBuilder:
                 sv = _evaluate_structure(slice_closes, slice_highs, slice_lows)
                 row[29] = self._vote_to_numeric(sv)
 
+            # --- Group 4: Squeeze Momentum ---
+            row[30] = squeeze_on_arr[i]
+            row[31] = squeeze_dur_arr[i]
+            row[32] = squeeze_mom_arr[i]
+            row[33] = squeeze_dir_arr[i]
+            row[34] = squeeze_acc_arr[i]
+
             result[i] = row
 
         return pd.DataFrame(result, columns=self.FEATURE_NAMES)
@@ -236,7 +268,7 @@ class FeatureBuilder:
             ohlcv: numpy array shape (N, 5) — needs at least 30 candles.
 
         Returns:
-            1D numpy array of shape (30,) or None if insufficient data.
+            1D numpy array of shape (35,) or None if insufficient data.
         """
         if ohlcv is None or len(ohlcv) < 30:
             return None
@@ -249,7 +281,7 @@ class FeatureBuilder:
         closes = ohlcv[:, 3]
         volumes = ohlcv[:, 4]
 
-        row = np.full(30, np.nan)
+        row = np.full(35, np.nan)
 
         # RSI 14
         row[0] = self._rsi(closes, 14)
@@ -351,6 +383,15 @@ class FeatureBuilder:
         row[28] = self._vote_to_numeric(tv)
         sv = _evaluate_structure(closes, highs, lows)
         row[29] = self._vote_to_numeric(sv)
+
+        # Squeeze Momentum features
+        sf = compute_squeeze_features(ohlcv)
+        if sf is not None:
+            row[30] = 1.0 if sf["squeeze_on"] else 0.0
+            row[31] = float(sf["squeeze_duration"])
+            row[32] = sf["squeeze_momentum"]
+            row[33] = float(sf["squeeze_momentum_direction"])
+            row[34] = sf["squeeze_momentum_acceleration"]
 
         if np.isnan(row).all():
             return None
