@@ -42,14 +42,24 @@ from exchange.errors import (
 logger = logging.getLogger(__name__)
 
 # Exchanges for which CCXT has a class
-_SUPPORTED_EXCHANGES: set[str] = {"kraken", "coinbase", "binance", "bybit"}
+_SUPPORTED_EXCHANGES: set[str] = {
+    "kraken",
+    "coinbase",
+    "binance",
+    "bybit",
+    "okx",
+    "kucoin",
+    "gateio",
+    "bitfinex",
+}
 
 # Sandbox / testnet overrides.
 # Only exchanges that have a CCXT sandbox URL are listed here.
-# Kraken and Coinbase do NOT have testnet URLs in CCXT.
+# Kraken, Coinbase, Bitfinex, KuCoin, and Gate.io do NOT have sandbox URLs in CCXT.
 _SANDBOX_OVERRIDES: dict[str, dict[str, Any]] = {
     "binance": {"sandbox": True},
     "bybit": {"sandbox": True},
+    "okx": {"sandbox": True},
 }
 
 # ---------------------------------------------------------------------------

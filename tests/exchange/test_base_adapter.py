@@ -254,4 +254,4 @@ class TestRegistryLoadsConfigs:
         registry = ExchangeRegistry()
         pairs = registry.get_pairs_for_exchange("binance")
         assert len(pairs) > 0
-        assert "BTC/USD" in pairs
+        assert "BTC/USDT" in pairs

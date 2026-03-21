@@ -1,0 +1,248 @@
+# =============================================================================
+# CRYPTO-AI-BOT: Binance Exchange Configuration (Phase 1B - Data Only)
+# =============================================================================
+# Market data ingestion only. No trading operations in this phase.
+# =============================================================================
+
+exchange:
+  name: "binance"
+  display_name: "Binance"
+  exchange_id: "BNCE"
+  api_version: "v3"
+  region: "global"
+
+  environment:
+    environment_var: "${ENVIRONMENT:prod}"
+    sandbox: "${BINANCE_SANDBOX:false}"
+
+  endpoints:
+    rest:
+      base_url: "${BINANCE_API_URL:https://api.binance.com}"
+      sandbox_url: "${BINANCE_API_SANDBOX:https://testnet.binance.vision}"
+      timeout_seconds: 30
+      max_retries: 3
+    websocket:
+      # Binance spot streams
+      public_url: "wss://stream.binance.com:9443/ws"
+      combined_url: "wss://stream.binance.com:9443/stream"
+      sandbox_public_url: "${BINANCE_WS_SANDBOX:wss://testnet.binance.vision/ws}"
+      heartbeat_interval: 30
+      reconnect_delay: 5
+      max_reconnects: 10
+      ping_interval: 180  # Binance requires ping every 3 minutes
+
+  timing:
+    clock_skew_tolerance_ms: 1000
+    sync_check_interval_seconds: 3600
+
+  health_check:
+    ping_path: "/api/v3/ping"
+    time_path: "/api/v3/time"
+    interval_seconds: 60
+    timeout_seconds: 10
+
+# =============================================================================
+# AUTH & SECURITY (Data-only - keys optional for public endpoints)
+# =============================================================================
+auth:
+  credentials:
+    key_env: "BINANCE_API_KEY"
+    secret_env: "BINANCE_API_SECRET"
+
+  rate_limits:
+    # Binance rate limits
+    requests_per_minute: 1200
+    orders_per_second: 10
+    orders_per_day: 200000
+    weight_per_minute: 1200
+
+# =============================================================================
+# SYMBOLS (MAPPING & NORMALIZATION)
+# =============================================================================
+symbols:
+  delimiter_internal: "/"
+  delimiter_stream: "-"
+
+  # Internal format -> Binance format
+  # Binance uses concatenated format without delimiter (BTCUSDT)
+  # For USD pairs, Binance uses USDT as the quote (stablecoin)
+  normalize:
+    "BTC/USD": "BTCUSDT"
+    "BTC/USDT": "BTCUSDT"
+    "ETH/USD": "ETHUSDT"
+    "ETH/USDT": "ETHUSDT"
+    "SOL/USD": "SOLUSDT"
+    "SOL/USDT": "SOLUSDT"
+    "LINK/USD": "LINKUSDT"
+    "LINK/USDT": "LINKUSDT"
+    "BNB/USD": "BNBUSDT"
+    "BNB/USDT": "BNBUSDT"
+
+  # Binance format -> Internal format
+  denormalize:
+    "BTCUSDT": "BTC/USDT"
+    "ETHUSDT": "ETH/USDT"
+    "SOLUSDT": "SOL/USDT"
+    "LINKUSDT": "LINK/USDT"
+    "BNBUSDT": "BNB/USDT"
+
+  # WebSocket stream name format (lowercase for Binance)
+  ws_format: "lowercase"  # btcusdt@trade, btcusdt@kline_1m
+
+  categories:
+    majors: ["BTCUSDT", "ETHUSDT"]
+    altcoins: ["SOLUSDT", "LINKUSDT", "BNBUSDT"]
+
+# =============================================================================
+# TRADING SPECS (Reference only for Phase 1B)
+# =============================================================================
+trading_specs:
+  precision:
+    "BTCUSDT": { price_dp: 2, size_dp: 5, tick_size: 0.01, lot_size: 0.00001, min_notional: 10.0 }
+    "ETHUSDT": { price_dp: 2, size_dp: 4, tick_size: 0.01, lot_size: 0.0001, min_notional: 10.0 }
+    "SOLUSDT": { price_dp: 2, size_dp: 2, tick_size: 0.01, lot_size: 0.01, min_notional: 10.0 }
+    "LINKUSDT": { price_dp: 2, size_dp: 2, tick_size: 0.01, lot_size: 0.01, min_notional: 10.0 }
+    "BNBUSDT": { price_dp: 2, size_dp: 3, tick_size: 0.01, lot_size: 0.001, min_notional: 10.0 }
+
+  fees:
+    maker_bps_default: 10
+    taker_bps_default: 10
+    # BNB discount available
+
+# =============================================================================
+# DATA STREAMS & FEEDS
+# =============================================================================
+streams:
+  redis:
+    url: "${REDIS_URL:redis://localhost:6379/0}"
+    ssl: "${REDIS_SSL:false}"
+    decode_responses: true
+
+  naming:
+    prefix: "binance"
+    separator: ":"
+
+  publish:
+    trades: "binance:trades:{symbol}"
+    orderbook: "binance:orderbook:{symbol}"
+    ticker: "binance:ticker:{symbol}"
+    ohlcv: "binance:ohlc:{timeframe}:{symbol}"
+    heartbeat: "binance:health"
+    status: "binance:status"
+    errors: "binance:errors"
+
+  websocket:
+    public:
+      # Binance kline (OHLC) streams
+      kline:
+        enabled: true
+        timeframes: ["1m", "5m", "15m", "1h", "4h", "1d"]
+        symbols: ["BTCUSDT", "ETHUSDT"]
+      # Trade streams
+      trade:
+        enabled: true
+        symbols: ["BTCUSDT", "ETHUSDT"]
+      # Ticker streams
+      ticker:
+        enabled: false
+        symbols: []
+      # Depth (orderbook) streams
+      depth:
+        enabled: false
+        levels: 20
+        symbols: []
+
+  # Binance timeframe mapping (internal -> Binance WS format)
+  timeframe_map:
+    "1m": "1m"
+    "3m": "3m"
+    "5m": "5m"
+    "15m": "15m"
+    "30m": "30m"
+    "1h": "1h"
+    "2h": "2h"
+    "4h": "4h"
+    "6h": "6h"
+    "8h": "8h"
+    "12h": "12h"
+    "1d": "1d"
+    "3d": "3d"
+    "1w": "1w"
+    "1M": "1M"
+
+  processing:
+    batch_size: 100
+    batch_timeout_ms: 100
+    buffer_size: 10000
+    max_retries: 5
+    retry_delay_ms: 1000
+
+# =============================================================================
+# INGESTION SETTINGS
+# =============================================================================
+ingestion:
+  # Symbols to ingest (can override via env)
+  default_symbols:
+    - "BTC/USD"
+    - "ETH/USD"
+
+  # Timeframes to subscribe
+  default_timeframes:
+    - "1m"
+    - "5m"
+    - "15m"
+    - "1h"
+
+  # Health heartbeat interval (seconds)
+  health_interval: 30
+
+  # REST fallback polling interval (seconds) - used if WS unavailable
+  rest_poll_interval: 60
+
+  # Reconnection settings
+  reconnect:
+    enabled: true
+    max_attempts: 10
+    base_delay_seconds: 1
+    max_delay_seconds: 60
+    backoff_multiplier: 2
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    collection_interval_seconds: 60
+  health_checks:
+    connection: { interval_seconds: 30, timeout_seconds: 10 }
+    data_freshness: { max_age_seconds: 120, check_interval_seconds: 30 }
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+logging:
+  level: "${LOG_LEVEL:INFO}"
+  format: "json"
+  components:
+    websocket: "DEBUG"
+    rest: "INFO"
+    streams: "INFO"
+
+# =============================================================================
+# REGIONAL RESTRICTIONS
+# =============================================================================
+regional_restrictions:
+  - "US"
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  version: "1.0.0"
+  schema_version: "1.0"
+  phase: "1B"
+  created_by: "crypto-ai-bot-system"
+  docs:
+    api_docs: "https://binance-docs.github.io/apidocs/spot/en/"
+    ws_docs: "https://binance-docs.github.io/apidocs/spot/en/#websocket-market-streams"

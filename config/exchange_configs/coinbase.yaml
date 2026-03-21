@@ -1,0 +1,231 @@
+# =============================================================================
+# CRYPTO-AI-BOT: Coinbase Exchange Configuration (Phase 1C - Data Only)
+# =============================================================================
+# Market data ingestion only. No trading operations in this phase.
+# Uses:
+# - Coinbase Exchange API (public, no auth) for OHLC candles
+# - Coinbase Advanced Trade WebSocket for real-time trades
+# =============================================================================
+
+exchange:
+  name: "coinbase"
+  display_name: "Coinbase"
+  exchange_id: "CBSE"
+  api_version: "v3"
+  region: "us"
+
+  environment:
+    environment_var: "${ENVIRONMENT:prod}"
+    sandbox: "${COINBASE_SANDBOX:false}"
+
+  endpoints:
+    rest:
+      # Advanced Trade API (requires auth for most endpoints)
+      base_url: "${COINBASE_API_URL:https://api.coinbase.com}"
+      sandbox_url: "${COINBASE_API_SANDBOX:https://api-public.sandbox.exchange.coinbase.com}"
+      # Exchange API (public market data, NO auth required)
+      exchange_url: "https://api.exchange.coinbase.com"
+      timeout_seconds: 30
+      max_retries: 3
+    websocket:
+      # Coinbase Advanced Trade WebSocket (public trades channel)
+      public_url: "wss://advanced-trade-ws.coinbase.com"
+      sandbox_public_url: "${COINBASE_WS_SANDBOX:wss://advanced-trade-ws-sandbox.coinbase.com}"
+      heartbeat_interval: 30
+      reconnect_delay: 5
+      max_reconnects: 10
+
+  timing:
+    clock_skew_tolerance_ms: 1000
+    sync_check_interval_seconds: 3600
+
+  health_check:
+    # Use Exchange API time endpoint (public, no auth)
+    time_path: "/time"
+    interval_seconds: 60
+    timeout_seconds: 10
+
+# =============================================================================
+# AUTH & SECURITY (Data-only - keys optional for public endpoints)
+# =============================================================================
+auth:
+  credentials:
+    key_env: "COINBASE_API_KEY"
+    secret_env: "COINBASE_API_SECRET"
+
+  rate_limits:
+    # Coinbase rate limits
+    requests_per_second: 10
+    requests_per_minute: 600
+
+# =============================================================================
+# SYMBOLS (MAPPING & NORMALIZATION)
+# =============================================================================
+symbols:
+  delimiter_internal: "/"
+  delimiter_stream: "-"
+
+  # Internal format -> Coinbase format
+  # Coinbase uses hyphen format (BTC-USD)
+  normalize:
+    "BTC/USD": "BTC-USD"
+    "ETH/USD": "ETH-USD"
+    "SOL/USD": "SOL-USD"
+    "LINK/USD": "LINK-USD"
+    "AVAX/USD": "AVAX-USD"
+
+  # Coinbase format -> Internal format
+  denormalize:
+    "BTC-USD": "BTC/USD"
+    "ETH-USD": "ETH/USD"
+    "SOL-USD": "SOL/USD"
+    "LINK-USD": "LINK/USD"
+    "AVAX-USD": "AVAX/USD"
+
+  # WebSocket subscription format
+  ws_format: "uppercase"  # BTC-USD
+
+  categories:
+    majors: ["BTC-USD", "ETH-USD"]
+    altcoins: ["SOL-USD", "LINK-USD", "AVAX-USD"]
+
+# =============================================================================
+# TRADING SPECS (Reference only for Phase 1C)
+# =============================================================================
+trading_specs:
+  precision:
+    "BTC-USD": { price_dp: 2, size_dp: 8, tick_size: 0.01, min_size: 0.00001, min_notional: 1.0 }
+    "ETH-USD": { price_dp: 2, size_dp: 8, tick_size: 0.01, min_size: 0.0001, min_notional: 1.0 }
+    "SOL-USD": { price_dp: 2, size_dp: 8, tick_size: 0.01, min_size: 0.01, min_notional: 1.0 }
+    "LINK-USD": { price_dp: 2, size_dp: 8, tick_size: 0.01, min_size: 0.01, min_notional: 1.0 }
+    "AVAX-USD": { price_dp: 2, size_dp: 8, tick_size: 0.01, min_size: 0.01, min_notional: 1.0 }
+
+  fees:
+    maker_bps_default: 40
+    taker_bps_default: 60
+
+# =============================================================================
+# DATA STREAMS & FEEDS
+# =============================================================================
+streams:
+  redis:
+    url: "${REDIS_URL:redis://localhost:6379/0}"
+    ssl: "${REDIS_SSL:false}"
+    decode_responses: true
+
+  naming:
+    prefix: "coinbase"
+    separator: ":"
+
+  publish:
+    trades: "coinbase:trades:{symbol}"
+    orderbook: "coinbase:orderbook:{symbol}"
+    ticker: "coinbase:ticker:{symbol}"
+    ohlcv: "coinbase:ohlc:{timeframe}:{symbol}"
+    heartbeat: "coinbase:health"
+    status: "coinbase:status"
+    errors: "coinbase:errors"
+
+  websocket:
+    public:
+      # Coinbase market_trades channel
+      trades:
+        enabled: true
+        channel: "market_trades"
+        symbols: ["BTC-USD", "ETH-USD"]
+      # Coinbase candles channel (if available) - fallback to REST polling
+      candles:
+        enabled: true
+        channel: "candles"
+        symbols: ["BTC-USD", "ETH-USD"]
+      # Ticker channel
+      ticker:
+        enabled: false
+        channel: "ticker"
+        symbols: []
+
+  # Coinbase Exchange API granularity in seconds
+  # Used for public OHLC endpoint: /products/{product_id}/candles?granularity=60
+  granularity_seconds:
+    "1m": 60
+    "5m": 300
+    "15m": 900
+    "30m": 1800
+    "1h": 3600
+    "2h": 7200
+    "6h": 21600
+    "1d": 86400
+
+  processing:
+    batch_size: 100
+    batch_timeout_ms: 100
+    buffer_size: 10000
+    max_retries: 5
+    retry_delay_ms: 1000
+
+# =============================================================================
+# INGESTION SETTINGS
+# =============================================================================
+ingestion:
+  # Symbols to ingest (can override via env)
+  default_symbols:
+    - "BTC/USD"
+    - "ETH/USD"
+
+  # Timeframes to subscribe
+  default_timeframes:
+    - "1m"
+    - "5m"
+    - "15m"
+    - "1h"
+
+  # Health heartbeat interval (seconds)
+  health_interval: 30
+
+  # REST OHLC polling interval (seconds) - used since WS candles may not be reliable
+  ohlc_poll_interval: 60
+
+  # Reconnection settings
+  reconnect:
+    enabled: true
+    max_attempts: 10
+    base_delay_seconds: 1
+    max_delay_seconds: 60
+    backoff_multiplier: 2
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    collection_interval_seconds: 60
+  health_checks:
+    connection: { interval_seconds: 30, timeout_seconds: 10 }
+    data_freshness: { max_age_seconds: 120, check_interval_seconds: 30 }
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+logging:
+  level: "${LOG_LEVEL:INFO}"
+  format: "json"
+  components:
+    websocket: "DEBUG"
+    rest: "INFO"
+    streams: "INFO"
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  version: "1.0.1"
+  schema_version: "1.0"
+  phase: "1C"
+  created_by: "crypto-ai-bot-system"
+  docs:
+    # Exchange API (public market data - OHLC candles)
+    exchange_api_docs: "https://docs.cdp.coinbase.com/exchange/reference/exchangerestapi_getproductcandles"
+    # Advanced Trade API (WebSocket trades)
+    advanced_trade_docs: "https://docs.cdp.coinbase.com/advanced-trade/docs/welcome"
+    ws_docs: "https://docs.cdp.coinbase.com/advanced-trade/docs/ws-overview"

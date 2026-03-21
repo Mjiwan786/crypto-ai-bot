@@ -136,9 +136,13 @@ class ExchangeRegistry:
         # Derive exchange_id from filename (e.g. kraken.yaml -> kraken)
         exchange_id = path.stem.lower()
 
-        # Skip non-exchange configs (like kraken_ohlcv.yaml)
-        # Heuristic: must have at least an "exchange" or "auth" top-level key,
-        # OR be one of the known simple formats (like the original kraken.yaml).
+        # Skip non-exchange configs (like kraken_ohlcv.yaml, kraken_rate_limits.py)
+        # Heuristic: must have an "exchange" top-level key with at least a name or status.
+        # Files with underscores in the stem (e.g. kraken_ohlcv) are auxiliary configs.
+        if "_" in exchange_id:
+            logger.debug("Skipping auxiliary config: %s", path.name)
+            return
+
         exchange_section = data.get("exchange", {})
         auth_section = data.get("auth", {})
         symbols_section = data.get("symbols", {})

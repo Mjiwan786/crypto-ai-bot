@@ -1,30 +1,29 @@
 # =============================================================================
-# CRYPTO-AI-BOT: Kraken Exchange Configuration
+# CRYPTO-AI-BOT: Bitfinex Exchange Configuration
 # =============================================================================
-# PRIMARY EXCHANGE — live trading enabled. Deployed from iad region.
-# Uses USD quote asset. Kraken WS uses XBT not BTC in some contexts.
+# Paper-only. Geo-restricted from US IPs — deploy from ams region.
+# No testnet available. Uses USD quote (not USDT).
 # =============================================================================
 
 exchange:
-  name: "kraken"
-  display_name: "Kraken"
-  exchange_id: "KRKN"
-  api_version: "v0"
-  region: "us"
-  status: "live"
+  name: "bitfinex"
+  display_name: "Bitfinex"
+  exchange_id: "BFNX"
+  api_version: "v2"
+  region: "global"
+  status: "paper_only"
 
   environment:
     environment_var: "${ENVIRONMENT:prod}"
-    sandbox: false  # Kraken has no official testnet in CCXT
+    sandbox: false
 
   endpoints:
     rest:
-      base_url: "${KRAKEN_API_URL:https://api.kraken.com}"
+      base_url: "${BITFINEX_API_URL:https://api-pub.bitfinex.com}"
       timeout_seconds: 30
       max_retries: 3
     websocket:
-      public_url: "wss://ws.kraken.com"
-      private_url: "wss://ws-auth.kraken.com"
+      public_url: "wss://api-pub.bitfinex.com/ws/2"
       heartbeat_interval: 30
       reconnect_delay: 5
       max_reconnects: 10
@@ -34,7 +33,7 @@ exchange:
     sync_check_interval_seconds: 3600
 
   health_check:
-    time_path: "/0/public/Time"
+    time_path: "/v2/platform/status"
     interval_seconds: 60
     timeout_seconds: 10
 
@@ -43,14 +42,12 @@ exchange:
 # =============================================================================
 auth:
   credentials:
-    key_env: "KRAKEN_API_KEY"
-    secret_env: "KRAKEN_API_SECRET"
+    key_env: "BITFINEX_API_KEY"
+    secret_env: "BITFINEX_API_SECRET"
 
   rate_limits:
-    # Kraken rate limits are per-endpoint tier
-    requests_per_minute: 60
-    # Public endpoints: 1 req/s, private: different tiers
-    counter_decay_per_second: 1
+    requests_per_minute: 90
+    # Bitfinex rate limits are per-endpoint category
 
 # =============================================================================
 # SYMBOLS (MAPPING & NORMALIZATION)
@@ -59,57 +56,42 @@ symbols:
   delimiter_internal: "/"
   delimiter_stream: "-"
 
-  # Kraken quirk: uses XXBTZUSD for BTC/USD in some REST endpoints
-  # CCXT normalizes this, but raw API calls need awareness
+  # Bitfinex native format: tBTCUSD (with 't' prefix for trading pairs)
   normalize:
-    "BTC/USD": "XXBTZUSD"
-    "ETH/USD": "XETHZUSD"
-    "SOL/USD": "SOLUSD"
-    "LINK/USD": "LINKUSD"
-    "DOT/USD": "DOTUSD"
-    "AVAX/USD": "AVAXUSD"
-    "ALGO/USD": "ALGOUSD"
-    "AAVE/USD": "AAVEUSD"
-    "ADA/USD": "ADAUSD"
-    "ATOM/USD": "ATOMUSD"
+    "BTC/USD": "tBTCUSD"
+    "ETH/USD": "tETHUSD"
+    "SOL/USD": "tSOLUSD"
+    "LINK/USD": "tLINKUSD"
 
   denormalize:
-    "XXBTZUSD": "BTC/USD"
-    "XETHZUSD": "ETH/USD"
-    "SOLUSD": "SOL/USD"
-    "LINKUSD": "LINK/USD"
-    "DOTUSD": "DOT/USD"
-    "AVAXUSD": "AVAX/USD"
-    "ALGOUSD": "ALGO/USD"
-    "AAVEUSD": "AAVE/USD"
-    "ADAUSD": "ADA/USD"
-    "ATOMUSD": "ATOM/USD"
+    "tBTCUSD": "BTC/USD"
+    "tETHUSD": "ETH/USD"
+    "tSOLUSD": "SOL/USD"
+    "tLINKUSD": "LINK/USD"
 
-  ws_format: "uppercase"  # XBT/USD on WS v1
+  ws_format: "uppercase"  # tBTCUSD
 
   categories:
-    majors: ["XXBTZUSD", "XETHZUSD"]
-    altcoins: ["SOLUSD", "LINKUSD", "DOTUSD", "AVAXUSD"]
+    majors: ["tBTCUSD", "tETHUSD"]
+    altcoins: ["tSOLUSD", "tLINKUSD"]
 
 # =============================================================================
 # TRADING SPECS
 # =============================================================================
 trading_specs:
   precision:
-    "XXBTZUSD": { price_dp: 1, size_dp: 8, tick_size: 0.1, lot_size: 0.0001, min_notional: 10.0 }
-    "XETHZUSD": { price_dp: 2, size_dp: 8, tick_size: 0.01, lot_size: 0.005, min_notional: 10.0 }
-    "SOLUSD": { price_dp: 2, size_dp: 8, tick_size: 0.01, lot_size: 0.05, min_notional: 10.0 }
-    "LINKUSD": { price_dp: 3, size_dp: 8, tick_size: 0.001, lot_size: 0.5, min_notional: 10.0 }
-    "DOTUSD": { price_dp: 3, size_dp: 8, tick_size: 0.001, lot_size: 0.5, min_notional: 10.0 }
-    "AVAXUSD": { price_dp: 3, size_dp: 8, tick_size: 0.001, lot_size: 0.2, min_notional: 10.0 }
+    "tBTCUSD": { price_dp: 1, size_dp: 8, tick_size: 0.1, min_size: 0.00006, min_notional: 5.0 }
+    "tETHUSD": { price_dp: 1, size_dp: 8, tick_size: 0.1, min_size: 0.001, min_notional: 5.0 }
+    "tSOLUSD": { price_dp: 2, size_dp: 4, tick_size: 0.01, min_size: 0.04, min_notional: 5.0 }
+    "tLINKUSD": { price_dp: 2, size_dp: 4, tick_size: 0.01, min_size: 0.2, min_notional: 5.0 }
 
   fees:
-    maker_bps_default: 16
-    taker_bps_default: 26
+    maker_bps_default: 10
+    taker_bps_default: 20
 
   capabilities:
     spot: true
-    futures: true  # Kraken Futures is a separate product
+    futures: false
     limit_orders: true
     market_orders: true
     post_only: true
@@ -125,38 +107,41 @@ streams:
     decode_responses: true
 
   naming:
-    prefix: "kraken"
+    prefix: "bitfinex"
     separator: ":"
 
   publish:
-    trades: "kraken:trades:{symbol}"
-    orderbook: "kraken:orderbook:{symbol}"
-    ticker: "kraken:ticker:{symbol}"
-    ohlcv: "kraken:ohlc:{timeframe}:{symbol}"
-    heartbeat: "kraken:health"
-    status: "kraken:status"
-    errors: "kraken:errors"
+    trades: "bitfinex:trades:{symbol}"
+    orderbook: "bitfinex:orderbook:{symbol}"
+    ticker: "bitfinex:ticker:{symbol}"
+    ohlcv: "bitfinex:ohlc:{timeframe}:{symbol}"
+    heartbeat: "bitfinex:health"
+    status: "bitfinex:status"
+    errors: "bitfinex:errors"
 
   websocket:
     public:
-      ohlc:
+      candles:
         enabled: true
-        timeframes: [1, 5, 15, 30, 60, 240, 1440]
-        symbols: ["XBT/USD", "ETH/USD"]
-      trade:
+        # Bitfinex candle key format: trade:{timeframe}:{symbol}
+        timeframes: ["1m", "5m", "15m", "1h", "1D"]
+        symbols: ["tBTCUSD", "tETHUSD"]
+      trades:
         enabled: true
-        symbols: ["XBT/USD", "ETH/USD"]
+        symbols: ["tBTCUSD", "tETHUSD"]
 
-  # Kraken WS uses integer minutes for timeframes
   timeframe_map:
-    "1m": 1
-    "5m": 5
-    "15m": 15
-    "30m": 30
-    "1h": 60
-    "4h": 240
-    "1d": 1440
-    "1w": 10080
+    "1m": "1m"
+    "5m": "5m"
+    "15m": "15m"
+    "30m": "30m"
+    "1h": "1h"
+    "3h": "3h"
+    "6h": "6h"
+    "12h": "12h"
+    "1d": "1D"
+    "1w": "7D"
+    "1M": "1M"
 
   processing:
     batch_size: 100
@@ -172,14 +157,6 @@ ingestion:
   default_symbols:
     - "BTC/USD"
     - "ETH/USD"
-    - "SOL/USD"
-    - "LINK/USD"
-    - "DOT/USD"
-    - "AVAX/USD"
-    - "ALGO/USD"
-    - "AAVE/USD"
-    - "ADA/USD"
-    - "ATOM/USD"
   default_timeframes:
     - "1m"
     - "5m"
@@ -193,6 +170,12 @@ ingestion:
     base_delay_seconds: 1
     max_delay_seconds: 60
     backoff_multiplier: 2
+
+# =============================================================================
+# REGIONAL RESTRICTIONS
+# =============================================================================
+regional_restrictions:
+  - "US"
 
 # =============================================================================
 # MONITORING
@@ -209,9 +192,9 @@ monitoring:
 # METADATA
 # =============================================================================
 metadata:
-  version: "2.0.0"
+  version: "1.0.0"
   schema_version: "1.0"
   created_by: "crypto-ai-bot-system"
   docs:
-    api_docs: "https://docs.kraken.com/rest/"
-    ws_docs: "https://docs.kraken.com/websockets-v2/"
+    api_docs: "https://docs.bitfinex.com/reference/rest-public-candles"
+    ws_docs: "https://docs.bitfinex.com/reference/ws-public-candles"

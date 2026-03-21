@@ -1,0 +1,205 @@
+# =============================================================================
+# CRYPTO-AI-BOT: KuCoin Exchange Configuration
+# =============================================================================
+# Paper-only. Requires passphrase in addition to key/secret.
+# Uses USDT quote asset.
+# =============================================================================
+
+exchange:
+  name: "kucoin"
+  display_name: "KuCoin"
+  exchange_id: "KUCN"
+  api_version: "v1"
+  region: "global"
+  status: "paper_only"
+
+  environment:
+    environment_var: "${ENVIRONMENT:prod}"
+    sandbox: "${KUCOIN_SANDBOX:true}"
+
+  endpoints:
+    rest:
+      base_url: "${KUCOIN_API_URL:https://api.kucoin.com}"
+      sandbox_url: "https://openapi-sandbox.kucoin.com"
+      timeout_seconds: 30
+      max_retries: 3
+    websocket:
+      # KuCoin requires a POST to /api/v1/bullet-public to get WS endpoint
+      bullet_public: "/api/v1/bullet-public"
+      heartbeat_interval: 30
+      reconnect_delay: 5
+      max_reconnects: 10
+      ping_interval: 30  # KuCoin requires ping every 30s
+
+  timing:
+    clock_skew_tolerance_ms: 5000  # KuCoin recommends higher tolerance
+    sync_check_interval_seconds: 3600
+
+  health_check:
+    time_path: "/api/v1/timestamp"
+    interval_seconds: 60
+    timeout_seconds: 10
+
+# =============================================================================
+# AUTH & SECURITY
+# =============================================================================
+auth:
+  credentials:
+    key_env: "KUCOIN_API_KEY"
+    secret_env: "KUCOIN_API_SECRET"
+    passphrase_env: "KUCOIN_API_PASSPHRASE"
+
+  rate_limits:
+    requests_per_second: 10
+    requests_per_minute: 600
+
+# =============================================================================
+# SYMBOLS (MAPPING & NORMALIZATION)
+# =============================================================================
+symbols:
+  delimiter_internal: "/"
+  delimiter_stream: "-"
+
+  # KuCoin native format: BTC-USDT (hyphen-delimited)
+  normalize:
+    "BTC/USDT": "BTC-USDT"
+    "BTC/USD": "BTC-USDT"
+    "ETH/USDT": "ETH-USDT"
+    "ETH/USD": "ETH-USDT"
+    "SOL/USDT": "SOL-USDT"
+    "SOL/USD": "SOL-USDT"
+    "LINK/USDT": "LINK-USDT"
+    "LINK/USD": "LINK-USDT"
+
+  denormalize:
+    "BTC-USDT": "BTC/USDT"
+    "ETH-USDT": "ETH/USDT"
+    "SOL-USDT": "SOL/USDT"
+    "LINK-USDT": "LINK/USDT"
+
+  ws_format: "uppercase"  # BTC-USDT
+
+  categories:
+    majors: ["BTC-USDT", "ETH-USDT"]
+    altcoins: ["SOL-USDT", "LINK-USDT"]
+
+# =============================================================================
+# TRADING SPECS
+# =============================================================================
+trading_specs:
+  precision:
+    "BTC-USDT": { price_dp: 1, size_dp: 8, tick_size: 0.1, lot_size: 0.00001, min_notional: 0.1 }
+    "ETH-USDT": { price_dp: 2, size_dp: 8, tick_size: 0.01, lot_size: 0.0001, min_notional: 0.1 }
+    "SOL-USDT": { price_dp: 2, size_dp: 4, tick_size: 0.01, lot_size: 0.01, min_notional: 0.1 }
+    "LINK-USDT": { price_dp: 4, size_dp: 4, tick_size: 0.0001, lot_size: 0.01, min_notional: 0.1 }
+
+  fees:
+    maker_bps_default: 10
+    taker_bps_default: 10
+
+  capabilities:
+    spot: true
+    futures: true
+    limit_orders: true
+    market_orders: true
+    post_only: true
+    websocket_ohlcv: true
+
+# =============================================================================
+# DATA STREAMS & FEEDS
+# =============================================================================
+streams:
+  redis:
+    url: "${REDIS_URL:redis://localhost:6379/0}"
+    ssl: "${REDIS_SSL:false}"
+    decode_responses: true
+
+  naming:
+    prefix: "kucoin"
+    separator: ":"
+
+  publish:
+    trades: "kucoin:trades:{symbol}"
+    orderbook: "kucoin:orderbook:{symbol}"
+    ticker: "kucoin:ticker:{symbol}"
+    ohlcv: "kucoin:ohlc:{timeframe}:{symbol}"
+    heartbeat: "kucoin:health"
+    status: "kucoin:status"
+    errors: "kucoin:errors"
+
+  websocket:
+    public:
+      candles:
+        enabled: true
+        # KuCoin kline topic: /market/candles:{symbol}_{timeframe}
+        timeframes: ["1min", "5min", "15min", "1hour", "4hour", "1day"]
+        symbols: ["BTC-USDT", "ETH-USDT"]
+      trades:
+        enabled: true
+        # KuCoin trade topic: /market/match:{symbol}
+        symbols: ["BTC-USDT", "ETH-USDT"]
+
+  timeframe_map:
+    "1m": "1min"
+    "3m": "3min"
+    "5m": "5min"
+    "15m": "15min"
+    "30m": "30min"
+    "1h": "1hour"
+    "2h": "2hour"
+    "4h": "4hour"
+    "6h": "6hour"
+    "8h": "8hour"
+    "12h": "12hour"
+    "1d": "1day"
+    "1w": "1week"
+
+  processing:
+    batch_size: 100
+    batch_timeout_ms: 100
+    buffer_size: 10000
+    max_retries: 5
+    retry_delay_ms: 1000
+
+# =============================================================================
+# INGESTION SETTINGS
+# =============================================================================
+ingestion:
+  default_symbols:
+    - "BTC/USDT"
+    - "ETH/USDT"
+  default_timeframes:
+    - "1m"
+    - "5m"
+    - "15m"
+    - "1h"
+  health_interval: 30
+  rest_poll_interval: 60
+  reconnect:
+    enabled: true
+    max_attempts: 10
+    base_delay_seconds: 1
+    max_delay_seconds: 60
+    backoff_multiplier: 2
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    collection_interval_seconds: 60
+  health_checks:
+    connection: { interval_seconds: 30, timeout_seconds: 10 }
+    data_freshness: { max_age_seconds: 120, check_interval_seconds: 30 }
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  version: "1.0.0"
+  schema_version: "1.0"
+  created_by: "crypto-ai-bot-system"
+  docs:
+    api_docs: "https://www.kucoin.com/docs/rest/spot-trading/market-data/get-klines"
+    ws_docs: "https://www.kucoin.com/docs/websocket/spot-trading/public-channels/klines"

@@ -1,0 +1,218 @@
+# =============================================================================
+# CRYPTO-AI-BOT: OKX Exchange Configuration
+# =============================================================================
+# Paper-only. Unified account model — different position modes.
+# Uses USDT quote asset. Geo-restricted from US IPs — deploy from ams region.
+# =============================================================================
+
+exchange:
+  name: "okx"
+  display_name: "OKX"
+  exchange_id: "OKX"
+  api_version: "v5"
+  region: "global"
+  status: "paper_only"
+
+  environment:
+    environment_var: "${ENVIRONMENT:prod}"
+    sandbox: "${OKX_SANDBOX:true}"
+
+  endpoints:
+    rest:
+      base_url: "${OKX_API_URL:https://www.okx.com}"
+      sandbox_url: "https://www.okx.com"  # OKX uses simulated trading via header, not separate URL
+      timeout_seconds: 30
+      max_retries: 3
+    websocket:
+      public_url: "wss://ws.okx.com:8443/ws/v5/public"
+      private_url: "wss://ws.okx.com:8443/ws/v5/private"
+      sandbox_public_url: "wss://wspap.okx.com:8443/ws/v5/public?brokerId=9999"
+      heartbeat_interval: 30
+      reconnect_delay: 5
+      max_reconnects: 10
+      ping_interval: 25  # OKX auto-disconnects after 30s without ping
+
+  timing:
+    clock_skew_tolerance_ms: 5000
+    sync_check_interval_seconds: 3600
+
+  health_check:
+    time_path: "/api/v5/public/time"
+    interval_seconds: 60
+    timeout_seconds: 10
+
+# =============================================================================
+# AUTH & SECURITY
+# =============================================================================
+auth:
+  credentials:
+    key_env: "OKX_API_KEY"
+    secret_env: "OKX_API_SECRET"
+    passphrase_env: "OKX_API_PASSPHRASE"
+
+  rate_limits:
+    requests_per_second: 20
+    requests_per_minute: 1200
+
+  # OKX simulated trading uses x-simulated-trading header
+  simulated_trading_header: "x-simulated-trading"
+
+# =============================================================================
+# SYMBOLS (MAPPING & NORMALIZATION)
+# =============================================================================
+symbols:
+  delimiter_internal: "/"
+  delimiter_stream: "-"
+
+  # OKX native format: BTC-USDT (hyphen-delimited)
+  normalize:
+    "BTC/USDT": "BTC-USDT"
+    "BTC/USD": "BTC-USDT"
+    "ETH/USDT": "ETH-USDT"
+    "ETH/USD": "ETH-USDT"
+    "SOL/USDT": "SOL-USDT"
+    "SOL/USD": "SOL-USDT"
+    "LINK/USDT": "LINK-USDT"
+    "LINK/USD": "LINK-USDT"
+
+  denormalize:
+    "BTC-USDT": "BTC/USDT"
+    "ETH-USDT": "ETH/USDT"
+    "SOL-USDT": "SOL/USDT"
+    "LINK-USDT": "LINK/USDT"
+
+  ws_format: "uppercase"  # BTC-USDT
+
+  categories:
+    majors: ["BTC-USDT", "ETH-USDT"]
+    altcoins: ["SOL-USDT", "LINK-USDT"]
+
+# =============================================================================
+# TRADING SPECS
+# =============================================================================
+trading_specs:
+  precision:
+    "BTC-USDT": { price_dp: 1, size_dp: 8, tick_size: 0.1, lot_size: 0.00001, min_notional: 10.0 }
+    "ETH-USDT": { price_dp: 2, size_dp: 6, tick_size: 0.01, lot_size: 0.000001, min_notional: 10.0 }
+    "SOL-USDT": { price_dp: 2, size_dp: 4, tick_size: 0.01, lot_size: 0.01, min_notional: 10.0 }
+    "LINK-USDT": { price_dp: 3, size_dp: 4, tick_size: 0.001, lot_size: 0.01, min_notional: 10.0 }
+
+  fees:
+    maker_bps_default: 8
+    taker_bps_default: 10
+
+  capabilities:
+    spot: true
+    futures: true
+    limit_orders: true
+    market_orders: true
+    post_only: true
+    websocket_ohlcv: true
+
+  # OKX-specific: unified account with multiple position modes
+  account_mode: "unified"
+  position_modes: ["net_mode", "long_short_mode"]
+
+# =============================================================================
+# DATA STREAMS & FEEDS
+# =============================================================================
+streams:
+  redis:
+    url: "${REDIS_URL:redis://localhost:6379/0}"
+    ssl: "${REDIS_SSL:false}"
+    decode_responses: true
+
+  naming:
+    prefix: "okx"
+    separator: ":"
+
+  publish:
+    trades: "okx:trades:{symbol}"
+    orderbook: "okx:orderbook:{symbol}"
+    ticker: "okx:ticker:{symbol}"
+    ohlcv: "okx:ohlc:{timeframe}:{symbol}"
+    heartbeat: "okx:health"
+    status: "okx:status"
+    errors: "okx:errors"
+
+  websocket:
+    public:
+      candles:
+        enabled: true
+        # OKX candle channel: candle{period} e.g. candle1m
+        timeframes: ["1m", "5m", "15m", "1H", "4H", "1D"]
+        symbols: ["BTC-USDT", "ETH-USDT"]
+      trades:
+        enabled: true
+        symbols: ["BTC-USDT", "ETH-USDT"]
+
+  timeframe_map:
+    "1m": "1m"
+    "3m": "3m"
+    "5m": "5m"
+    "15m": "15m"
+    "30m": "30m"
+    "1h": "1H"
+    "2h": "2H"
+    "4h": "4H"
+    "6h": "6H"
+    "12h": "12H"
+    "1d": "1D"
+    "1w": "1W"
+    "1M": "1M"
+
+  processing:
+    batch_size: 100
+    batch_timeout_ms: 100
+    buffer_size: 10000
+    max_retries: 5
+    retry_delay_ms: 1000
+
+# =============================================================================
+# INGESTION SETTINGS
+# =============================================================================
+ingestion:
+  default_symbols:
+    - "BTC/USDT"
+    - "ETH/USDT"
+  default_timeframes:
+    - "1m"
+    - "5m"
+    - "15m"
+    - "1h"
+  health_interval: 30
+  rest_poll_interval: 60
+  reconnect:
+    enabled: true
+    max_attempts: 10
+    base_delay_seconds: 1
+    max_delay_seconds: 60
+    backoff_multiplier: 2
+
+# =============================================================================
+# REGIONAL RESTRICTIONS
+# =============================================================================
+regional_restrictions:
+  - "US"
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    collection_interval_seconds: 60
+  health_checks:
+    connection: { interval_seconds: 30, timeout_seconds: 10 }
+    data_freshness: { max_age_seconds: 120, check_interval_seconds: 30 }
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  version: "1.0.0"
+  schema_version: "1.0"
+  created_by: "crypto-ai-bot-system"
+  docs:
+    api_docs: "https://www.okx.com/docs-v5/en/"
+    ws_docs: "https://www.okx.com/docs-v5/en/#order-book-trading-market-data-ws-candlesticks-channel"

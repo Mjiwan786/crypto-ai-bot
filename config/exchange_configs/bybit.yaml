@@ -1,40 +1,41 @@
 # =============================================================================
-# CRYPTO-AI-BOT: Kraken Exchange Configuration
+# CRYPTO-AI-BOT: Bybit Exchange Configuration
 # =============================================================================
-# PRIMARY EXCHANGE — live trading enabled. Deployed from iad region.
-# Uses USD quote asset. Kraken WS uses XBT not BTC in some contexts.
+# Paper-only. Geo-restricted from US IPs — deploy from ams region.
 # =============================================================================
 
 exchange:
-  name: "kraken"
-  display_name: "Kraken"
-  exchange_id: "KRKN"
-  api_version: "v0"
-  region: "us"
-  status: "live"
+  name: "bybit"
+  display_name: "Bybit"
+  exchange_id: "BYBT"
+  api_version: "v5"
+  region: "global"
+  status: "paper_only"
 
   environment:
     environment_var: "${ENVIRONMENT:prod}"
-    sandbox: false  # Kraken has no official testnet in CCXT
+    sandbox: "${BYBIT_SANDBOX:true}"
 
   endpoints:
     rest:
-      base_url: "${KRAKEN_API_URL:https://api.kraken.com}"
+      base_url: "${BYBIT_API_URL:https://api.bybit.com}"
+      sandbox_url: "https://api-testnet.bybit.com"
       timeout_seconds: 30
       max_retries: 3
     websocket:
-      public_url: "wss://ws.kraken.com"
-      private_url: "wss://ws-auth.kraken.com"
-      heartbeat_interval: 30
+      public_url: "wss://stream.bybit.com/v5/public/spot"
+      sandbox_public_url: "wss://stream-testnet.bybit.com/v5/public/spot"
+      heartbeat_interval: 20
       reconnect_delay: 5
       max_reconnects: 10
+      ping_interval: 20  # Bybit requires ping every 20s
 
   timing:
     clock_skew_tolerance_ms: 1000
     sync_check_interval_seconds: 3600
 
   health_check:
-    time_path: "/0/public/Time"
+    time_path: "/v5/market/time"
     interval_seconds: 60
     timeout_seconds: 10
 
@@ -43,14 +44,12 @@ exchange:
 # =============================================================================
 auth:
   credentials:
-    key_env: "KRAKEN_API_KEY"
-    secret_env: "KRAKEN_API_SECRET"
+    key_env: "BYBIT_API_KEY"
+    secret_env: "BYBIT_API_SECRET"
 
   rate_limits:
-    # Kraken rate limits are per-endpoint tier
-    requests_per_minute: 60
-    # Public endpoints: 1 req/s, private: different tiers
-    counter_decay_per_second: 1
+    requests_per_second: 10
+    requests_per_minute: 600
 
 # =============================================================================
 # SYMBOLS (MAPPING & NORMALIZATION)
@@ -59,57 +58,45 @@ symbols:
   delimiter_internal: "/"
   delimiter_stream: "-"
 
-  # Kraken quirk: uses XXBTZUSD for BTC/USD in some REST endpoints
-  # CCXT normalizes this, but raw API calls need awareness
   normalize:
-    "BTC/USD": "XXBTZUSD"
-    "ETH/USD": "XETHZUSD"
-    "SOL/USD": "SOLUSD"
-    "LINK/USD": "LINKUSD"
-    "DOT/USD": "DOTUSD"
-    "AVAX/USD": "AVAXUSD"
-    "ALGO/USD": "ALGOUSD"
-    "AAVE/USD": "AAVEUSD"
-    "ADA/USD": "ADAUSD"
-    "ATOM/USD": "ATOMUSD"
+    "BTC/USDT": "BTCUSDT"
+    "BTC/USD": "BTCUSDT"
+    "ETH/USDT": "ETHUSDT"
+    "ETH/USD": "ETHUSDT"
+    "SOL/USDT": "SOLUSDT"
+    "SOL/USD": "SOLUSDT"
+    "LINK/USDT": "LINKUSDT"
+    "LINK/USD": "LINKUSDT"
 
   denormalize:
-    "XXBTZUSD": "BTC/USD"
-    "XETHZUSD": "ETH/USD"
-    "SOLUSD": "SOL/USD"
-    "LINKUSD": "LINK/USD"
-    "DOTUSD": "DOT/USD"
-    "AVAXUSD": "AVAX/USD"
-    "ALGOUSD": "ALGO/USD"
-    "AAVEUSD": "AAVE/USD"
-    "ADAUSD": "ADA/USD"
-    "ATOMUSD": "ATOM/USD"
+    "BTCUSDT": "BTC/USDT"
+    "ETHUSDT": "ETH/USDT"
+    "SOLUSDT": "SOL/USDT"
+    "LINKUSDT": "LINK/USDT"
 
-  ws_format: "uppercase"  # XBT/USD on WS v1
+  ws_format: "uppercase"  # BTCUSDT
 
   categories:
-    majors: ["XXBTZUSD", "XETHZUSD"]
-    altcoins: ["SOLUSD", "LINKUSD", "DOTUSD", "AVAXUSD"]
+    majors: ["BTCUSDT", "ETHUSDT"]
+    altcoins: ["SOLUSDT", "LINKUSDT"]
 
 # =============================================================================
 # TRADING SPECS
 # =============================================================================
 trading_specs:
   precision:
-    "XXBTZUSD": { price_dp: 1, size_dp: 8, tick_size: 0.1, lot_size: 0.0001, min_notional: 10.0 }
-    "XETHZUSD": { price_dp: 2, size_dp: 8, tick_size: 0.01, lot_size: 0.005, min_notional: 10.0 }
-    "SOLUSD": { price_dp: 2, size_dp: 8, tick_size: 0.01, lot_size: 0.05, min_notional: 10.0 }
-    "LINKUSD": { price_dp: 3, size_dp: 8, tick_size: 0.001, lot_size: 0.5, min_notional: 10.0 }
-    "DOTUSD": { price_dp: 3, size_dp: 8, tick_size: 0.001, lot_size: 0.5, min_notional: 10.0 }
-    "AVAXUSD": { price_dp: 3, size_dp: 8, tick_size: 0.001, lot_size: 0.2, min_notional: 10.0 }
+    "BTCUSDT": { price_dp: 1, size_dp: 3, tick_size: 0.1, lot_size: 0.001, min_notional: 1.0 }
+    "ETHUSDT": { price_dp: 2, size_dp: 3, tick_size: 0.01, lot_size: 0.001, min_notional: 1.0 }
+    "SOLUSDT": { price_dp: 2, size_dp: 1, tick_size: 0.01, lot_size: 0.1, min_notional: 1.0 }
+    "LINKUSDT": { price_dp: 2, size_dp: 2, tick_size: 0.01, lot_size: 0.01, min_notional: 1.0 }
 
   fees:
-    maker_bps_default: 16
-    taker_bps_default: 26
+    maker_bps_default: 10
+    taker_bps_default: 10
 
   capabilities:
     spot: true
-    futures: true  # Kraken Futures is a separate product
+    futures: true
     limit_orders: true
     market_orders: true
     post_only: true
@@ -125,38 +112,37 @@ streams:
     decode_responses: true
 
   naming:
-    prefix: "kraken"
+    prefix: "bybit"
     separator: ":"
 
   publish:
-    trades: "kraken:trades:{symbol}"
-    orderbook: "kraken:orderbook:{symbol}"
-    ticker: "kraken:ticker:{symbol}"
-    ohlcv: "kraken:ohlc:{timeframe}:{symbol}"
-    heartbeat: "kraken:health"
-    status: "kraken:status"
-    errors: "kraken:errors"
+    trades: "bybit:trades:{symbol}"
+    orderbook: "bybit:orderbook:{symbol}"
+    ticker: "bybit:ticker:{symbol}"
+    ohlcv: "bybit:ohlc:{timeframe}:{symbol}"
+    heartbeat: "bybit:health"
+    status: "bybit:status"
+    errors: "bybit:errors"
 
   websocket:
     public:
-      ohlc:
+      kline:
         enabled: true
-        timeframes: [1, 5, 15, 30, 60, 240, 1440]
-        symbols: ["XBT/USD", "ETH/USD"]
+        timeframes: ["1", "5", "15", "60", "240", "D"]
+        symbols: ["BTCUSDT", "ETHUSDT"]
       trade:
         enabled: true
-        symbols: ["XBT/USD", "ETH/USD"]
+        symbols: ["BTCUSDT", "ETHUSDT"]
 
-  # Kraken WS uses integer minutes for timeframes
   timeframe_map:
-    "1m": 1
-    "5m": 5
-    "15m": 15
-    "30m": 30
-    "1h": 60
-    "4h": 240
-    "1d": 1440
-    "1w": 10080
+    "1m": "1"
+    "5m": "5"
+    "15m": "15"
+    "30m": "30"
+    "1h": "60"
+    "4h": "240"
+    "1d": "D"
+    "1w": "W"
 
   processing:
     batch_size: 100
@@ -170,16 +156,8 @@ streams:
 # =============================================================================
 ingestion:
   default_symbols:
-    - "BTC/USD"
-    - "ETH/USD"
-    - "SOL/USD"
-    - "LINK/USD"
-    - "DOT/USD"
-    - "AVAX/USD"
-    - "ALGO/USD"
-    - "AAVE/USD"
-    - "ADA/USD"
-    - "ATOM/USD"
+    - "BTC/USDT"
+    - "ETH/USDT"
   default_timeframes:
     - "1m"
     - "5m"
@@ -193,6 +171,12 @@ ingestion:
     base_delay_seconds: 1
     max_delay_seconds: 60
     backoff_multiplier: 2
+
+# =============================================================================
+# REGIONAL RESTRICTIONS
+# =============================================================================
+regional_restrictions:
+  - "US"
 
 # =============================================================================
 # MONITORING
@@ -209,9 +193,8 @@ monitoring:
 # METADATA
 # =============================================================================
 metadata:
-  version: "2.0.0"
+  version: "1.0.0"
   schema_version: "1.0"
   created_by: "crypto-ai-bot-system"
   docs:
-    api_docs: "https://docs.kraken.com/rest/"
-    ws_docs: "https://docs.kraken.com/websockets-v2/"
+    api_docs: "https://bybit-exchange.github.io/docs/v5/intro"

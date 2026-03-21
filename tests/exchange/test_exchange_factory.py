@@ -33,6 +33,22 @@ class TestExchangeFactoryCreate:
         adapter = ExchangeFactory.create("bybit")
         assert adapter.exchange_id == "bybit"
 
+    def test_create_okx(self) -> None:
+        adapter = ExchangeFactory.create("okx")
+        assert adapter.exchange_id == "okx"
+
+    def test_create_kucoin(self) -> None:
+        adapter = ExchangeFactory.create("kucoin")
+        assert adapter.exchange_id == "kucoin"
+
+    def test_create_gateio(self) -> None:
+        adapter = ExchangeFactory.create("gateio")
+        assert adapter.exchange_id == "gateio"
+
+    def test_create_bitfinex(self) -> None:
+        adapter = ExchangeFactory.create("bitfinex")
+        assert adapter.exchange_id == "bitfinex"
+
     def test_create_with_credentials(self) -> None:
         adapter = ExchangeFactory.create(
             "kraken",
@@ -95,6 +111,22 @@ class TestExchangeFactoryCreatePublic:
         adapter = ExchangeFactory.create_public("bybit")
         assert adapter._api_key == ""
 
+    def test_create_public_okx(self) -> None:
+        adapter = ExchangeFactory.create_public("okx")
+        assert adapter._api_key == ""
+
+    def test_create_public_kucoin(self) -> None:
+        adapter = ExchangeFactory.create_public("kucoin")
+        assert adapter._api_key == ""
+
+    def test_create_public_gateio(self) -> None:
+        adapter = ExchangeFactory.create_public("gateio")
+        assert adapter._api_key == ""
+
+    def test_create_public_bitfinex(self) -> None:
+        adapter = ExchangeFactory.create_public("bitfinex")
+        assert adapter._api_key == ""
+
     def test_create_public_sandbox_disabled(self) -> None:
         """Public adapters don't need sandbox — sandbox is False."""
         adapter = ExchangeFactory.create_public("binance")
@@ -116,12 +148,13 @@ class TestExchangeFactorySupportedExchanges:
         result = ExchangeFactory.supported_exchanges()
         assert isinstance(result, list)
 
-    def test_contains_all_four(self) -> None:
+    def test_contains_all_eight(self) -> None:
         result = ExchangeFactory.supported_exchanges()
-        assert "kraken" in result
-        assert "coinbase" in result
-        assert "binance" in result
-        assert "bybit" in result
+        for exchange_id in [
+            "kraken", "coinbase", "binance", "bybit",
+            "okx", "kucoin", "gateio", "bitfinex",
+        ]:
+            assert exchange_id in result, f"{exchange_id} missing from supported exchanges"
 
     def test_sorted(self) -> None:
         result = ExchangeFactory.supported_exchanges()
@@ -129,7 +162,7 @@ class TestExchangeFactorySupportedExchanges:
 
     def test_length(self) -> None:
         result = ExchangeFactory.supported_exchanges()
-        assert len(result) == 4
+        assert len(result) == 8
 
     def test_all_lowercase(self) -> None:
         for name in ExchangeFactory.supported_exchanges():
