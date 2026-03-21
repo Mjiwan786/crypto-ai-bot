@@ -1242,13 +1242,20 @@ class KrakenWebSocketClient:
             except Exception as e:
                 self.logger.error(f"Error in circuit breaker callback: {e}")
     
+    _spread_alert_last: dict = {}
+
     async def check_spread_circuit_breaker(self, spread_bps: float, pair: str):
-        """Check if spread exceeds maximum allowed"""
+        """Check if spread exceeds maximum allowed (rate-limited logging)."""
         if spread_bps > self.config.max_spread_bps:
-            await self.trigger_circuit_breaker(
-                "spread", 
-                f"{pair} spread {spread_bps:.2f} bps > limit {self.config.max_spread_bps} bps"
-            )
+            now = time.time()
+            last = self._spread_alert_last.get(pair, 0)
+            if now - last >= 60.0:
+                self._spread_alert_last[pair] = now
+                self.stats["circuit_breaker_trips"] += 1
+                self.logger.warning(
+                    "[SPREAD] %s spread %.1f bps > limit %.1f bps (next alert in 60s)",
+                    pair, spread_bps, self.config.max_spread_bps,
+                )
             return True
         return False
     
@@ -1262,21 +1269,26 @@ class KrakenWebSocketClient:
             return True
         return False
     
+    _scalp_alert_last: float = 0
+
     async def check_scalping_rate_limit(self):
-        """Check scalping rate limits"""
+        """Check scalping rate limits (rate-limited logging)."""
         now = time.time()
-        
+
         # Clean old timestamps (older than 1 minute)
         self.trade_timestamps = [ts for ts in self.trade_timestamps if now - ts < 60]
-        
+
         # Check rate limit
         if len(self.trade_timestamps) >= self.config.scalp_max_trades_per_minute:
-            await self.trigger_circuit_breaker(
-                "scalping_rate", 
-                f"Scalping rate limit exceeded: {len(self.trade_timestamps)} trades/min"
-            )
+            if now - self._scalp_alert_last >= 60.0:
+                self._scalp_alert_last = now
+                self.stats["circuit_breaker_trips"] += 1
+                self.logger.warning(
+                    "[SCALP_RATE] %d trades/min > limit %d (next alert in 60s)",
+                    len(self.trade_timestamps), self.config.scalp_max_trades_per_minute,
+                )
             return True
-        
+
         return False
     
     async def setup_subscriptions(self):

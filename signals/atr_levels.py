@@ -137,7 +137,7 @@ def compute_atr_levels(
     if atr_period is None:
         atr_period = int(os.getenv("ATR_PERIOD", "14"))
     if fee_floor_bps is None:
-        fee_floor_bps = float(os.getenv("ATR_FEE_FLOOR_BPS", "60.0"))
+        fee_floor_bps = float(os.getenv("ATR_FEE_FLOOR_BPS", "15.0"))
 
     atr_value = compute_atr(ohlcv, period=atr_period)
     if atr_value is None or atr_value <= 0:
@@ -153,10 +153,10 @@ def compute_atr_levels(
         if tp_multiplier is None:
             tp_multiplier = tier_tp
 
-    # R:R floor and TP floor parameters
+    # Guard parameters
     round_trip_fee_bps = float(os.getenv("ROUND_TRIP_FEE_BPS", "52"))
-    min_rr_ratio = float(os.getenv("MIN_RR_RATIO", "2.5"))
-    tp_floor_bps = float(os.getenv("ATR_TP_FLOOR_BPS", "80"))
+    min_rr_ratio = float(os.getenv("MIN_RR_RATIO", "1.5"))
+    tp_floor_bps = float(os.getenv("ATR_TP_FLOOR_BPS", "55"))
 
     sl_distance = atr_value * sl_multiplier
     tp_distance = atr_value * tp_multiplier
@@ -173,15 +173,7 @@ def compute_atr_levels(
     sl_distance_bps = (sl_distance / entry_price) * 10000
     tp_distance_bps = (tp_distance / entry_price) * 10000
 
-    # Fee-floor guard: reject if SL distance < fee floor (secondary check)
-    if sl_distance_bps < fee_floor_bps:
-        logger.info(
-            "[ATR] %s: SKIP — ATR SL=%.1f bps < fee floor %.0f bps (ATR=%.6f, tier=%s)",
-            pair, sl_distance_bps, fee_floor_bps, atr_value, tier,
-        )
-        return None
-
-    # TP floor guard: reject if TP target is too small
+    # Guard 1 (PRIMARY): TP floor — TP must exceed fee threshold
     if tp_distance_bps < tp_floor_bps:
         logger.info(
             "[ATR] %s: SKIP — TP=%.1f bps < TP floor %.0f bps (ATR=%.6f, tier=%s)",
@@ -189,7 +181,7 @@ def compute_atr_levels(
         )
         return None
 
-    # R:R floor guard: reject if risk-reward ratio after fees is too low
+    # Guard 2 (PRIMARY): R:R floor — net risk-reward after fees must be sufficient
     net_tp = tp_distance_bps - round_trip_fee_bps
     net_sl = sl_distance_bps + round_trip_fee_bps
     rr_ratio = net_tp / net_sl if net_sl > 0 else 0
@@ -197,6 +189,14 @@ def compute_atr_levels(
         logger.info(
             "[ATR] %s: SKIP — R:R floor — net_tp=%.1f bps, net_sl=%.1f bps, R:R=%.2f < %.1f (tier=%s)",
             pair, net_tp, net_sl, rr_ratio, min_rr_ratio, tier,
+        )
+        return None
+
+    # Guard 3 (SAFETY NET): SL floor — very low, catches garbage only
+    if sl_distance_bps < fee_floor_bps:
+        logger.info(
+            "[ATR] %s: SKIP — SL=%.1f bps < safety floor %.0f bps (ATR=%.6f, tier=%s)",
+            pair, sl_distance_bps, fee_floor_bps, atr_value, tier,
         )
         return None
 

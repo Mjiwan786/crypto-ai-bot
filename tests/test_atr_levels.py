@@ -299,37 +299,37 @@ def test_rr_floor_passes_good_rr():
     ohlcv = _make_ohlcv(closes, spread_pct=0.015)  # 1.5% range
 
     env = {
-        "MIN_RR_RATIO": "2.5",
+        "MIN_RR_RATIO": "1.5",
         "ROUND_TRIP_FEE_BPS": "52",
-        "ATR_FEE_FLOOR_BPS": "55",
-        "ATR_TP_FLOOR_BPS": "80",
+        "ATR_FEE_FLOOR_BPS": "15",
+        "ATR_TP_FLOOR_BPS": "55",
     }
     with mock.patch.dict(os.environ, env):
         result = compute_atr_levels(
             ohlcv, entry_price=89800.0, side="buy", pair="BTC/USD",
-            fee_floor_bps=55.0,
+            fee_floor_bps=15.0,
         )
     assert result is not None, "High-vol BTC should pass all guards"
-    assert result["rr_ratio"] >= 2.5, f"R:R={result['rr_ratio']:.2f} should be >= 2.5"
+    assert result["rr_ratio"] >= 1.5, f"R:R={result['rr_ratio']:.2f} should be >= 1.5"
     assert result["net_tp_bps"] > 0, "Net TP should be positive after fees"
 
 
 def test_tp_floor_rejects_low_tp():
     """TP floor guard rejects signals where TP distance is below ATR_TP_FLOOR_BPS."""
-    # Small ATR data → TP will be small
-    closes = [84000 + i * 3 for i in range(30)]
-    ohlcv = _make_ohlcv(closes, spread_pct=0.001)  # Very tight market
+    # Very small ATR data → TP will be small
+    closes = [84000 + i * 1 for i in range(30)]
+    ohlcv = _make_ohlcv(closes, spread_pct=0.0003)  # Ultra-tight market
 
     env = {
-        "ATR_TP_FLOOR_BPS": "80",
-        "ATR_FEE_FLOOR_BPS": "5",    # Disable SL floor
+        "ATR_TP_FLOOR_BPS": "55",
+        "ATR_FEE_FLOOR_BPS": "1",    # Disable SL floor
         "MIN_RR_RATIO": "0.1",       # Disable R:R floor
         "ROUND_TRIP_FEE_BPS": "52",
     }
     with mock.patch.dict(os.environ, env):
         result = compute_atr_levels(
-            ohlcv, entry_price=84087.0, side="buy", pair="BTC/USD",
-            fee_floor_bps=5.0,
+            ohlcv, entry_price=84029.0, side="buy", pair="BTC/USD",
+            fee_floor_bps=1.0,
         )
     assert result is None, "TP floor should reject signal with tiny ATR"
 
@@ -339,10 +339,11 @@ def test_result_includes_net_fields():
     closes = [84000 + i * 200 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.015)
 
-    env = {"ROUND_TRIP_FEE_BPS": "52", "MIN_RR_RATIO": "1.0", "ATR_TP_FLOOR_BPS": "10"}
+    env = {"ROUND_TRIP_FEE_BPS": "52", "MIN_RR_RATIO": "0.1", "ATR_TP_FLOOR_BPS": "10", "ATR_FEE_FLOOR_BPS": "1"}
     with mock.patch.dict(os.environ, env):
         result = compute_atr_levels(
             ohlcv, entry_price=89800.0, side="buy", pair="BTC/USD",
+            fee_floor_bps=1.0,
         )
     assert result is not None
     assert "net_tp_bps" in result, "Result must include net_tp_bps"
@@ -359,14 +360,14 @@ def test_new_multipliers_btc_math():
 
     env = {
         "ROUND_TRIP_FEE_BPS": "52",
-        "MIN_RR_RATIO": "1.0",
+        "MIN_RR_RATIO": "0.1",
         "ATR_TP_FLOOR_BPS": "10",
-        "ATR_FEE_FLOOR_BPS": "10",
+        "ATR_FEE_FLOOR_BPS": "1",
     }
     with mock.patch.dict(os.environ, env):
         result = compute_atr_levels(
             ohlcv, entry_price=89800.0, side="buy", pair="BTC/USD",
-            fee_floor_bps=10.0,
+            fee_floor_bps=1.0,
         )
     assert result is not None
     # TP distance should be exactly 4x SL distance

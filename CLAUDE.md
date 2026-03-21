@@ -94,8 +94,9 @@ conda run -n crypto-bot pytest shared_contracts/tests/ -v
 
 ### Profitability Sprint (R:R + Fee Model)
 - `ROUND_TRIP_FEE_BPS` — round-trip fee in bps (default: 52)
-- `MIN_RR_RATIO` — minimum net R:R ratio after fees (default: 2.5)
-- `ATR_TP_FLOOR_BPS` — minimum TP distance in bps (default: 80)
+- `MIN_RR_RATIO` — minimum net R:R ratio after fees (default: 1.5)
+- `ATR_TP_FLOOR_BPS` — minimum TP distance in bps (default: 55)
+- `ATR_FEE_FLOOR_BPS` — SL safety net floor in bps (default: 15)
 - `ATR_TP_MULT_LOW` / `ATR_SL_MULT_LOW` — low tier multipliers (default: 4.0 / 1.0)
 - `ATR_TP_MULT_MED` / `ATR_SL_MULT_MED` — medium tier multipliers (default: 3.5 / 1.0)
 - `ATR_TP_MULT_HIGH` / `ATR_SL_MULT_HIGH` — high tier multipliers (default: 3.0 / 1.0)
@@ -227,8 +228,8 @@ VM: 2GB RAM, 2 shared CPUs. Two processes: `app` (production_engine) + `streamer
 ExchangeScorer selects best OHLCV source per pair (quality-ranked)
     → OHLCV (15m, best exchange) → Squeeze Filter (features only, filter OFF)
     → Volume Gate → Consensus Gate (1 family) → Confidence (0.55)
-    → Trend Filter (EMA cross) → Fee-Floor Check (55 bps ATR floor)
-    → R:R Floor (net_tp/net_sl >= 2.5) → TP Floor (>80 bps)
+    → Trend Filter (EMA cross) → TP Floor (>55 bps)
+    → R:R Floor (net_tp/net_sl >= 1.5) → SL Safety Net (>15 bps)
     → ML Scorer (if enabled) → ATR TP/SL (asymmetric: SL=1.0x, TP=4.0x low)
     → Publish to Redis stream
 Squeeze features (8) flow into signal indicators for ML feature builder (35 features total)

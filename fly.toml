@@ -65,17 +65,17 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   SQUEEZE_MOMENTUM_ENABLED = "true"
   SQUEEZE_FILTER_ENABLED = "false"
 
-  # Sprint 5: Exchange-agnostic OHLCV + profitability fix
+  # Sprint 5: Exchange-agnostic OHLCV
   EXCHANGE_SCORER_ENABLED = "true"
   EXECUTION_VENUE = "kraken"
-  ATR_FEE_FLOOR_BPS = "55"
   PRIMARY_TIMEFRAME_S = "900"
 
   # Profitability Sprint: asymmetric R:R, TP floor, fee model
   ROUND_TRIP_FEE_BPS = "52"
-  MIN_RR_RATIO = "2.5"
-  ATR_TP_FLOOR_BPS = "80"
-  SPREAD_LIMIT_BPS = "25"
+  MIN_RR_RATIO = "1.5"
+  ATR_TP_FLOOR_BPS = "55"
+  ATR_FEE_FLOOR_BPS = "15"
+  SPREAD_BPS_MAX = "25"
   ATR_TP_MULT_LOW = "4.0"
   ATR_SL_MULT_LOW = "1.0"
   ATR_TP_MULT_MED = "3.5"
