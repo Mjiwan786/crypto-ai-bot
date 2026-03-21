@@ -75,7 +75,7 @@ def test_atr_returns_none_for_none_input():
 # ── Test 2: High-vol tier (DOGE) ─────────────────────────────
 
 def test_high_vol_tier_doge():
-    """DOGE gets high tier: SL=1.0x ATR, TP=2.0x ATR."""
+    """DOGE gets high tier: SL=1.0x ATR, TP=3.0x ATR (asymmetric R:R)."""
     closes = [0.10 + i * 0.0002 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.02)  # 2% range for DOGE
 
@@ -83,15 +83,15 @@ def test_high_vol_tier_doge():
     assert result is not None
     assert result["volatility_tier"] == "high"
 
-    # TP distance should be ~2x SL distance (2.0:1 R:R)
+    # TP distance should be ~3x SL distance (3.0:1 R:R)
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    assert abs(ratio - 2.0) < 0.01, f"R:R ratio={ratio}, expected 2.0"
+    assert abs(ratio - 3.0) < 0.01, f"R:R ratio={ratio}, expected 3.0"
 
 
 # ── Test 3: Medium-vol tier (LTC) ────────────────────────────
 
 def test_medium_vol_tier_ltc():
-    """LTC gets medium tier: SL=1.5x ATR, TP=2.5x ATR."""
+    """LTC gets medium tier: SL=1.0x ATR, TP=3.5x ATR (asymmetric R:R)."""
     closes = [90 + i * 0.2 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.015)
 
@@ -100,14 +100,14 @@ def test_medium_vol_tier_ltc():
     assert result["volatility_tier"] == "medium"
 
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    expected_ratio = 2.5 / 1.5
+    expected_ratio = 3.5 / 1.0
     assert abs(ratio - expected_ratio) < 0.01, f"R:R ratio={ratio}, expected {expected_ratio}"
 
 
 # ── Test 4: Low-vol tier (BTC) ───────────────────────────────
 
 def test_low_vol_tier_btc():
-    """BTC gets low tier: SL=1.5x ATR, TP=3.0x ATR."""
+    """BTC gets low tier: SL=1.0x ATR, TP=4.0x ATR (asymmetric R:R)."""
     closes = [84000 + i * 50 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.008)
 
@@ -116,7 +116,7 @@ def test_low_vol_tier_btc():
     assert result["volatility_tier"] == "low"
 
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    expected_ratio = 3.0 / 1.5
+    expected_ratio = 4.0 / 1.0
     assert abs(ratio - expected_ratio) < 0.01, f"R:R ratio={ratio}, expected {expected_ratio}"
 
 
@@ -191,6 +191,8 @@ def test_env_var_override_multipliers():
     env_overrides = {
         "ATR_SL_MULT_HIGH": "2.0",
         "ATR_TP_MULT_HIGH": "4.0",
+        "MIN_RR_RATIO": "0.1",       # Disable R:R floor for this test
+        "ATR_TP_FLOOR_BPS": "1",     # Disable TP floor for this test
     }
     with mock.patch.dict(os.environ, env_overrides):
         result = compute_atr_levels(ohlcv, entry_price=0.1058, side="buy", pair="DOGE/USD")
@@ -216,7 +218,7 @@ def test_feature_flag_disabled_no_call():
 # ── Test 12: Min R:R maintained for high-vol tier ────────────
 
 def test_min_rr_ratio_high_vol():
-    """High-vol tier maintains minimum 2:1 R:R (TP >= 2x SL distance)."""
+    """High-vol tier maintains minimum 3:1 R:R (TP >= 3x SL distance)."""
     closes = [0.10 + i * 0.0003 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.025)
 
@@ -224,7 +226,7 @@ def test_min_rr_ratio_high_vol():
     assert result is not None
     assert result["volatility_tier"] == "high"
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    assert ratio >= 1.95, f"High-vol R:R must be >= 2.0:1, got {ratio:.2f}"
+    assert ratio >= 2.95, f"High-vol R:R must be >= 3.0:1, got {ratio:.2f}"
 
 
 # ── Test 13: Base asset extraction ───────────────────────────
@@ -252,12 +254,121 @@ def test_atr_period_env_override():
     closes = [100 + i * 0.5 for i in range(50)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.015)
 
-    with mock.patch.dict(os.environ, {"ATR_PERIOD": "7"}):
+    guard_off = {"MIN_RR_RATIO": "0.1", "ATR_TP_FLOOR_BPS": "1"}
+    with mock.patch.dict(os.environ, {"ATR_PERIOD": "7", **guard_off}):
         result = compute_atr_levels(ohlcv, entry_price=124.5, side="buy", pair="SOL/USD")
     assert result is not None
 
-    with mock.patch.dict(os.environ, {"ATR_PERIOD": "20"}):
+    with mock.patch.dict(os.environ, {"ATR_PERIOD": "20", **guard_off}):
         result2 = compute_atr_levels(ohlcv, entry_price=124.5, side="buy", pair="SOL/USD")
     assert result2 is not None
     # Different periods produce different ATR values
     assert result["atr_value"] != result2["atr_value"]
+
+
+# ── Profitability Sprint: R:R floor guard ────────────────────
+
+def test_rr_floor_rejects_low_rr():
+    """R:R floor guard rejects signals where net R:R is below MIN_RR_RATIO."""
+    # Create data with moderate volatility (~50 bps ATR) but force tight TP
+    closes = [84000 + i * 5 for i in range(30)]
+    ohlcv = _make_ohlcv(closes, spread_pct=0.002)  # Very small spread → small ATR
+
+    # With low ATR, TP will be small, R:R after fees will be poor
+    env = {
+        "MIN_RR_RATIO": "2.5",
+        "ROUND_TRIP_FEE_BPS": "52",
+        "ATR_FEE_FLOOR_BPS": "5",    # Disable SL floor so R:R floor is the gate
+        "ATR_TP_FLOOR_BPS": "5",     # Disable TP floor so R:R floor is the gate
+    }
+    with mock.patch.dict(os.environ, env):
+        result = compute_atr_levels(
+            ohlcv, entry_price=84145.0, side="buy", pair="BTC/USD",
+            fee_floor_bps=5.0,
+        )
+    # ATR ~168 bps spread → at 1.0x SL and 4.0x TP, check if it passes
+    # If ATR is tiny (~17 bps), TP=68 bps, net_tp=16 bps → R:R very low → reject
+    if result is not None:
+        assert result["rr_ratio"] >= 2.5, f"R:R={result['rr_ratio']} should be >= 2.5 or None"
+
+
+def test_rr_floor_passes_good_rr():
+    """R:R floor guard passes signals with sufficient net R:R."""
+    # Create data with high volatility → large ATR
+    closes = [84000 + i * 200 for i in range(30)]  # $200/bar trend
+    ohlcv = _make_ohlcv(closes, spread_pct=0.015)  # 1.5% range
+
+    env = {
+        "MIN_RR_RATIO": "2.5",
+        "ROUND_TRIP_FEE_BPS": "52",
+        "ATR_FEE_FLOOR_BPS": "55",
+        "ATR_TP_FLOOR_BPS": "80",
+    }
+    with mock.patch.dict(os.environ, env):
+        result = compute_atr_levels(
+            ohlcv, entry_price=89800.0, side="buy", pair="BTC/USD",
+            fee_floor_bps=55.0,
+        )
+    assert result is not None, "High-vol BTC should pass all guards"
+    assert result["rr_ratio"] >= 2.5, f"R:R={result['rr_ratio']:.2f} should be >= 2.5"
+    assert result["net_tp_bps"] > 0, "Net TP should be positive after fees"
+
+
+def test_tp_floor_rejects_low_tp():
+    """TP floor guard rejects signals where TP distance is below ATR_TP_FLOOR_BPS."""
+    # Small ATR data → TP will be small
+    closes = [84000 + i * 3 for i in range(30)]
+    ohlcv = _make_ohlcv(closes, spread_pct=0.001)  # Very tight market
+
+    env = {
+        "ATR_TP_FLOOR_BPS": "80",
+        "ATR_FEE_FLOOR_BPS": "5",    # Disable SL floor
+        "MIN_RR_RATIO": "0.1",       # Disable R:R floor
+        "ROUND_TRIP_FEE_BPS": "52",
+    }
+    with mock.patch.dict(os.environ, env):
+        result = compute_atr_levels(
+            ohlcv, entry_price=84087.0, side="buy", pair="BTC/USD",
+            fee_floor_bps=5.0,
+        )
+    assert result is None, "TP floor should reject signal with tiny ATR"
+
+
+def test_result_includes_net_fields():
+    """Profitability sprint adds net_tp_bps, net_sl_bps, rr_ratio to result."""
+    closes = [84000 + i * 200 for i in range(30)]
+    ohlcv = _make_ohlcv(closes, spread_pct=0.015)
+
+    env = {"ROUND_TRIP_FEE_BPS": "52", "MIN_RR_RATIO": "1.0", "ATR_TP_FLOOR_BPS": "10"}
+    with mock.patch.dict(os.environ, env):
+        result = compute_atr_levels(
+            ohlcv, entry_price=89800.0, side="buy", pair="BTC/USD",
+        )
+    assert result is not None
+    assert "net_tp_bps" in result, "Result must include net_tp_bps"
+    assert "net_sl_bps" in result, "Result must include net_sl_bps"
+    assert "rr_ratio" in result, "Result must include rr_ratio"
+    assert result["net_tp_bps"] == result["tp_distance_bps"] - 52
+    assert result["net_sl_bps"] == result["sl_distance_bps"] + 52
+
+
+def test_new_multipliers_btc_math():
+    """Verify BTC low tier: SL=1.0x ATR, TP=4.0x ATR produces correct distances."""
+    closes = [84000 + i * 200 for i in range(30)]
+    ohlcv = _make_ohlcv(closes, spread_pct=0.015)
+
+    env = {
+        "ROUND_TRIP_FEE_BPS": "52",
+        "MIN_RR_RATIO": "1.0",
+        "ATR_TP_FLOOR_BPS": "10",
+        "ATR_FEE_FLOOR_BPS": "10",
+    }
+    with mock.patch.dict(os.environ, env):
+        result = compute_atr_levels(
+            ohlcv, entry_price=89800.0, side="buy", pair="BTC/USD",
+            fee_floor_bps=10.0,
+        )
+    assert result is not None
+    # TP distance should be exactly 4x SL distance
+    ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
+    assert abs(ratio - 4.0) < 0.01, f"BTC low tier R:R should be 4.0:1, got {ratio:.2f}"

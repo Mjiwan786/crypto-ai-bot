@@ -1125,7 +1125,7 @@ class ProductionEngine:
                 ),
             },
             metadata={
-                "model_version": "v5.1.0-phase1-squeeze",
+                "model_version": "v6.0.0-profitability-sprint",
                 "ml_score": analysis.get("ml_score", -1.0),
                 "source": analysis.get("source", "ohlcv_8strategy"),
                 "latency_ms": int((time.time() - now) * 1000),

@@ -88,9 +88,17 @@ conda run -n crypto-bot pytest shared_contracts/tests/ -v
 - `USE_OHLCV_FOR_SIGNALS` — `true`/`false` (default: true) — use OHLCV for signal generation
 - `CONSENSUS_GATE_ENABLED` — `true`/`false` (default: true) — 3-family consensus filter
 - `VOLUME_CONFIRMATION_ENABLED` — `true`/`false` (default: true) — volume ratio gate
-- `PRIMARY_TIMEFRAME_S` — signal interval seconds (default: 60)
+- `PRIMARY_TIMEFRAME_S` — signal interval seconds (default: 900)
 - `TP_BPS` — take-profit basis points (default: 220)
 - `SL_BPS` — stop-loss basis points (default: 75)
+
+### Profitability Sprint (R:R + Fee Model)
+- `ROUND_TRIP_FEE_BPS` — round-trip fee in bps (default: 52)
+- `MIN_RR_RATIO` — minimum net R:R ratio after fees (default: 2.5)
+- `ATR_TP_FLOOR_BPS` — minimum TP distance in bps (default: 80)
+- `ATR_TP_MULT_LOW` / `ATR_SL_MULT_LOW` — low tier multipliers (default: 4.0 / 1.0)
+- `ATR_TP_MULT_MED` / `ATR_SL_MULT_MED` — medium tier multipliers (default: 3.5 / 1.0)
+- `ATR_TP_MULT_HIGH` / `ATR_SL_MULT_HIGH` — high tier multipliers (default: 3.0 / 1.0)
 
 ### Risk & Regime (Sprint 3+)
 - `REGIME_FILTER_ENABLED` — `true`/`false` (default: true) — regime-based trade blocking
@@ -205,14 +213,24 @@ VM: 2GB RAM, 2 shared CPUs. Two processes: `app` (production_engine) + `streamer
 - [x] `PRIMARY_TIMEFRAME_S=300` — 5-min candles for better ATR stability
 - [x] `model_version=v5.0.0-sprint5`
 
+### Profitability Sprint — COMPLETE (Asymmetric R:R + Fee Guards)
+- [x] `signals/atr_levels.py` — R:R floor guard (net_tp/net_sl >= 2.5), TP floor (>80 bps)
+- [x] `signals/atr_levels.py` — Asymmetric multipliers: low SL=1.0x/TP=4.0x, med 1.0x/3.5x, high 1.0x/3.0x
+- [x] `production_engine.py` — `model_version=v6.0.0-profitability-sprint`
+- [x] `fly.toml` — PRIMARY_TIMEFRAME_S=900 (15m candles), SIGNAL_COOLDOWN_SECONDS=900
+- [x] `fly.toml` — SQUEEZE_FILTER_ENABLED=false (features still flow to ML)
+- [x] Breakeven WR drops from 56.4% → 34.9% at ATR=70 bps on Kraken
+
 ## Signal Pipeline (production_engine.py → `_generate_signal_v2()`)
 
 ```
 ExchangeScorer selects best OHLCV source per pair (quality-ranked)
-    → OHLCV (Redis) → Squeeze Filter (skip during compression)
-    → Volume Gate → Consensus Gate → Confidence Check
+    → OHLCV (15m, best exchange) → Squeeze Filter (features only, filter OFF)
+    → Volume Gate → Consensus Gate (1 family) → Confidence (0.55)
     → Trend Filter (EMA cross) → Fee-Floor Check (55 bps ATR floor)
-    → ML Scorer (if enabled) → ATR TP/SL → Publish to Redis stream
+    → R:R Floor (net_tp/net_sl >= 2.5) → TP Floor (>80 bps)
+    → ML Scorer (if enabled) → ATR TP/SL (asymmetric: SL=1.0x, TP=4.0x low)
+    → Publish to Redis stream
 Squeeze features (8) flow into signal indicators for ML feature builder (35 features total)
 PriceProvider: execution venue for live, cross-exchange median for paper
 ```

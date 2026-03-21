@@ -31,9 +31,9 @@ VOLATILITY_TIERS = {
 
 # Default multipliers per tier — overridable via env vars
 _TIER_DEFAULTS = {
-    "high":  {"sl_mult": 1.0, "tp_mult": 2.0},
-    "medium": {"sl_mult": 1.5, "tp_mult": 2.5},
-    "low":   {"sl_mult": 1.5, "tp_mult": 3.0},
+    "high":  {"sl_mult": 1.0, "tp_mult": 3.0},
+    "medium": {"sl_mult": 1.0, "tp_mult": 3.5},
+    "low":   {"sl_mult": 1.0, "tp_mult": 4.0},
 }
 
 
@@ -153,6 +153,11 @@ def compute_atr_levels(
         if tp_multiplier is None:
             tp_multiplier = tier_tp
 
+    # R:R floor and TP floor parameters
+    round_trip_fee_bps = float(os.getenv("ROUND_TRIP_FEE_BPS", "52"))
+    min_rr_ratio = float(os.getenv("MIN_RR_RATIO", "2.5"))
+    tp_floor_bps = float(os.getenv("ATR_TP_FLOOR_BPS", "80"))
+
     sl_distance = atr_value * sl_multiplier
     tp_distance = atr_value * tp_multiplier
 
@@ -168,11 +173,30 @@ def compute_atr_levels(
     sl_distance_bps = (sl_distance / entry_price) * 10000
     tp_distance_bps = (tp_distance / entry_price) * 10000
 
-    # Fee-floor guard: reject if SL distance < fee floor
+    # Fee-floor guard: reject if SL distance < fee floor (secondary check)
     if sl_distance_bps < fee_floor_bps:
         logger.info(
             "[ATR] %s: SKIP — ATR SL=%.1f bps < fee floor %.0f bps (ATR=%.6f, tier=%s)",
             pair, sl_distance_bps, fee_floor_bps, atr_value, tier,
+        )
+        return None
+
+    # TP floor guard: reject if TP target is too small
+    if tp_distance_bps < tp_floor_bps:
+        logger.info(
+            "[ATR] %s: SKIP — TP=%.1f bps < TP floor %.0f bps (ATR=%.6f, tier=%s)",
+            pair, tp_distance_bps, tp_floor_bps, atr_value, tier,
+        )
+        return None
+
+    # R:R floor guard: reject if risk-reward ratio after fees is too low
+    net_tp = tp_distance_bps - round_trip_fee_bps
+    net_sl = sl_distance_bps + round_trip_fee_bps
+    rr_ratio = net_tp / net_sl if net_sl > 0 else 0
+    if net_tp <= 0 or rr_ratio < min_rr_ratio:
+        logger.info(
+            "[ATR] %s: SKIP — R:R floor — net_tp=%.1f bps, net_sl=%.1f bps, R:R=%.2f < %.1f (tier=%s)",
+            pair, net_tp, net_sl, rr_ratio, min_rr_ratio, tier,
         )
         return None
 
@@ -186,4 +210,7 @@ def compute_atr_levels(
         "tp_distance_bps": tp_distance_bps,
         "fee_floor_passed": fee_floor_passed,
         "volatility_tier": tier,
+        "net_tp_bps": net_tp,
+        "net_sl_bps": net_sl,
+        "rr_ratio": rr_ratio,
     }

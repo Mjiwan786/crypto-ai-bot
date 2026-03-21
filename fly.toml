@@ -54,7 +54,7 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   # Sprint 2: Strategy Orchestrator + Paper Trader
   STRATEGY_ORCHESTRATOR_ENABLED = "true"
   REGIME_WRITER_ENABLED = "true"
-  SIGNAL_COOLDOWN_SECONDS = "180"
+  SIGNAL_COOLDOWN_SECONDS = "900"
   MIN_SIGNAL_CONFIDENCE = "0.55"
   MIN_CONSENSUS_FAMILIES = "1"
   PAPER_TRADER_ENABLED = "true"
@@ -63,13 +63,25 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
 
   # Phase 1: Squeeze Momentum (ML feature generator)
   SQUEEZE_MOMENTUM_ENABLED = "true"
-  SQUEEZE_FILTER_ENABLED = "true"
+  SQUEEZE_FILTER_ENABLED = "false"
 
   # Sprint 5: Exchange-agnostic OHLCV + profitability fix
   EXCHANGE_SCORER_ENABLED = "true"
   EXECUTION_VENUE = "kraken"
   ATR_FEE_FLOOR_BPS = "55"
-  PRIMARY_TIMEFRAME_S = "300"
+  PRIMARY_TIMEFRAME_S = "900"
+
+  # Profitability Sprint: asymmetric R:R, TP floor, fee model
+  ROUND_TRIP_FEE_BPS = "52"
+  MIN_RR_RATIO = "2.5"
+  ATR_TP_FLOOR_BPS = "80"
+  SPREAD_LIMIT_BPS = "25"
+  ATR_TP_MULT_LOW = "4.0"
+  ATR_SL_MULT_LOW = "1.0"
+  ATR_TP_MULT_MED = "3.5"
+  ATR_SL_MULT_MED = "1.0"
+  ATR_TP_MULT_HIGH = "3.0"
+  ATR_SL_MULT_HIGH = "1.0"
 
   # Sprint 3: On-chain data (free APIs)
   ONCHAIN_FETCH_ENABLED = "true"
