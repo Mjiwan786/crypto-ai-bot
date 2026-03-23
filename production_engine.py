@@ -401,6 +401,8 @@ class ProductionEngine:
         }
         self._last_signal_time: Dict[str, float] = {}
         self._signal_cooldown_seconds = self.config.signal_cooldown_seconds
+        self._last_signal_stale_check = 0.0
+        self._signal_stale_threshold = int(os.getenv("SIGNAL_STALE_THRESHOLD_S", "3600"))
 
         # Sprint 2: Strategy Orchestrator (Tier 2)
         self._orchestrator = StrategyOrchestrator(
@@ -1175,6 +1177,18 @@ class ProductionEngine:
                 # PnL update
                 if current_time - self._last_pnl_update >= self.config.pnl_update_interval_sec:
                     await self.update_pnl()
+
+                # Signal staleness watchdog (every 5 min)
+                if current_time - self._last_signal_stale_check >= 300:
+                    self._last_signal_stale_check = current_time
+                    for pair in self.config.trading_pairs:
+                        last_sig = self._last_signal_time.get(pair, self._start_time)
+                        age = current_time - last_sig
+                        if age > self._signal_stale_threshold:
+                            logger.warning(
+                                "[WATCHDOG] %s has not signaled in %.0fs (threshold %ds) — data pipeline may be stale",
+                                pair, age, self._signal_stale_threshold,
+                            )
 
                 # Collect prices and analyze for signals at candle interval
                 if current_time - last_signal_check >= signal_interval:

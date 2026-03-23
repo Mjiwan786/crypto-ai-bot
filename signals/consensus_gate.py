@@ -252,11 +252,11 @@ def _evaluate_momentum(closes: np.ndarray) -> Optional[StrategyVote]:
     elif rsi > 60 and roc < 0.3:
         direction = "short"
         confidence = 0.52 + (rsi - 60) / 200  # 0.52-0.57
-    # ── Strong ROC (original) ──
-    elif roc > 0.8:
+    # ── Strong ROC (tightened from 0.8 to 1.5 — 0.8% fired constantly on 15m candles) ──
+    elif roc > 1.5:
         direction = "long"
         confidence = 0.55 + min(roc / 10, 0.2)
-    elif roc < -0.8:
+    elif roc < -1.5:
         direction = "short"
         confidence = 0.55 + min(abs(roc) / 10, 0.2)
     # ── Moderate ROC (new relaxed band) ──

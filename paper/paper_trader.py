@@ -363,17 +363,32 @@ class PaperTrader:
             position_size_usd = float(signal.get("position_size_usd", 100.0))
             quantity = position_size_usd / entry_price
 
-            # Extract ATR from signal indicators (Sprint 3A populates this)
-            atr_value = 0.0
-            indicators_raw = signal.get("indicators", "")
-            if isinstance(indicators_raw, str) and indicators_raw:
-                try:
-                    ind = json.loads(indicators_raw)
-                    atr_value = float(ind.get("atr_14", 0))
-                except (json.JSONDecodeError, TypeError, ValueError):
-                    pass
-            elif isinstance(indicators_raw, dict):
-                atr_value = float(indicators_raw.get("atr_14", 0))
+            # Extract ATR value for ExitManager (trailing stop + breakeven activation).
+            # _parse_signal() already resolved indicators_atr_14 from the flat Redis
+            # fields written by PRDPublisher.to_redis_dict() and stored it as atr_value.
+            # Fall back to JSON-blob parsing for any legacy publishers that serialize
+            # indicators as a JSON string in a single "indicators" field.
+            atr_value = float(signal.get("atr_value", 0.0))
+            if atr_value == 0.0:
+                indicators_raw = signal.get("indicators", "")
+                if isinstance(indicators_raw, str) and indicators_raw:
+                    try:
+                        ind = json.loads(indicators_raw)
+                        atr_value = float(ind.get("atr_14", 0))
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        pass
+                elif isinstance(indicators_raw, dict):
+                    atr_value = float(indicators_raw.get("atr_14", 0))
+
+            if atr_value == 0.0:
+                logger.warning(
+                    "[PAPER_TRADER] %s: atr_value=0 — trailing stop and breakeven "
+                    "will be inactive for this position. Check that indicators_atr_14 "
+                    "is present in the signal stream.",
+                    pair,
+                )
+            else:
+                logger.debug("[PAPER_TRADER] %s: atr_value=%.6f from signal", pair, atr_value)
 
             pos = OpenPosition(
                 signal_id=signal_id,
@@ -401,9 +416,9 @@ class PaperTrader:
                 )
 
             logger.info(
-                "[PAPER_TRADER] OPENED %s %s @ $%.2f (qty=%.6f, TP=$%.2f, SL=$%.2f)",
+                "[PAPER_TRADER] OPENED %s %s @ $%.2f (qty=%.6f, TP=$%.2f, SL=$%.2f, ATR=%.6f)",
                 pair, side, entry_price, quantity,
-                pos.take_profit, pos.stop_loss,
+                pos.take_profit, pos.stop_loss, atr_value,
             )
             await self._ack(stream_key, msg_id)
 
@@ -415,6 +430,16 @@ class PaperTrader:
         """Parse signal from Redis stream fields."""
         # PRDPublisher stores signals as individual flat fields
         if "pair" in fields and "side" in fields:
+            # PRDPublisher.to_redis_dict() flattens nested objects with a prefix, so
+            # indicators.atr_14 is stored as the flat field "indicators_atr_14" —
+            # there is NO "indicators" JSON blob field in the stream.
+            # Read the flat field directly; fall back to 0.0 if absent.
+            atr_value_raw = fields.get("indicators_atr_14", "0")
+            try:
+                atr_value = float(atr_value_raw)
+            except (TypeError, ValueError):
+                atr_value = 0.0
+
             return {
                 "signal_id": fields.get("signal_id", str(uuid.uuid4())),
                 "pair": fields["pair"].replace("-", "/"),
@@ -426,7 +451,8 @@ class PaperTrader:
                 "position_size_usd": fields.get("position_size_usd", "100.0"),
                 "timestamp": fields.get("timestamp", datetime.now(timezone.utc).isoformat()),
                 "strategy": fields.get("strategy", "SCALPER"),
-                "indicators": fields.get("indicators", ""),
+                "indicators": fields.get("indicators", ""),  # kept for legacy publishers
+                "atr_value": atr_value,
             }
 
         # Some publishers store as a JSON blob in "data" field

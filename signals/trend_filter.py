@@ -84,9 +84,10 @@ def check_trend_alignment(
 
     current_hist = float(histogram[-1])
 
-    # Neutral threshold: default to 0.01% of price
+    # Neutral threshold: default to 0.05% of price (configurable via env var)
     if neutral_threshold is None:
-        neutral_threshold = closes[-1] * 0.0001
+        neutral_pct = float(os.getenv("TREND_FILTER_NEUTRAL_PCT", "0.0005"))
+        neutral_threshold = closes[-1] * neutral_pct
 
     # Classify higher-timeframe direction
     if abs(current_hist) < neutral_threshold:

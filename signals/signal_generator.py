@@ -9,6 +9,7 @@ Central coordination point for the signal pipeline.
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import logging
+import os
 
 import numpy as np
 
@@ -42,9 +43,10 @@ class TradingSignal:
 class SignalGenerator:
     """Generates trading signals from market data using 8 TA strategies."""
 
-    def __init__(self, strategies: list = None, scorer: object = None) -> None:
+    def __init__(self, strategies: list = None, scorer: object = None, min_families: int = None) -> None:
         self._strategies = strategies or ALL_STRATEGIES
         self._scorer = scorer
+        self._min_families = min_families if min_families is not None else int(os.getenv("MIN_CONSENSUS_FAMILIES", "2"))
 
     async def generate(
         self, exchange: str, pair: str, ohlcv: np.ndarray
@@ -99,11 +101,12 @@ class SignalGenerator:
         n_long = len(long_families)
         n_short = len(short_families)
 
-        # Need 2+ families agreeing
-        if n_long >= 2 and n_long > n_short:
+        # Need min_families+ families agreeing (configurable via MIN_CONSENSUS_FAMILIES)
+        min_fam = self._min_families
+        if n_long >= min_fam and n_long > n_short:
             direction = "long"
             agreeing = [r for r in active if r.direction == "long"]
-        elif n_short >= 2 and n_short > n_long:
+        elif n_short >= min_fam and n_short > n_long:
             direction = "short"
             agreeing = [r for r in active if r.direction == "short"]
         else:
@@ -128,6 +131,15 @@ class SignalGenerator:
             logger.debug(
                 "Confidence %.1f below threshold %.1f",
                 avg_confidence, MIN_SIGNAL_CONFIDENCE,
+            )
+            return None
+
+        # Configurable consensus confidence floor (0-100 scale, e.g. 60 = 0.60 normalized)
+        min_consensus_conf = float(os.getenv("MIN_CONSENSUS_CONFIDENCE", "0")) * 100
+        if min_consensus_conf > 0 and avg_confidence < min_consensus_conf:
+            logger.info(
+                "Consensus confidence %.1f below floor %.1f (MIN_CONSENSUS_CONFIDENCE)",
+                avg_confidence, min_consensus_conf,
             )
             return None
 
