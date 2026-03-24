@@ -1056,8 +1056,7 @@ class ProductionEngine:
                         pair=pair,
                     )
                     if atr_result is None:
-                        logger.info(f"{pair}: Fee-floor guard vetoed signal (insufficient volatility)")
-                        return
+                        logger.info(f"{pair}: ATR fee-floor guard: insufficient volatility, using static TP/SL fallback")
             except Exception as e:
                 logger.warning(f"{pair}: ATR computation failed, falling back to static: {e}")
 
