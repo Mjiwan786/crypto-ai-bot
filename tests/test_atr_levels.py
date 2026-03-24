@@ -75,7 +75,7 @@ def test_atr_returns_none_for_none_input():
 # ── Test 2: High-vol tier (DOGE) ─────────────────────────────
 
 def test_high_vol_tier_doge():
-    """DOGE gets high tier: SL=1.0x ATR, TP=3.0x ATR (asymmetric R:R)."""
+    """DOGE gets high tier: SL=1.0x ATR, TP=2.0x ATR (asymmetric R:R)."""
     closes = [0.10 + i * 0.0002 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.02)  # 2% range for DOGE
 
@@ -83,15 +83,15 @@ def test_high_vol_tier_doge():
     assert result is not None
     assert result["volatility_tier"] == "high"
 
-    # TP distance should be ~3x SL distance (3.0:1 R:R)
+    # TP distance should be ~2x SL distance (2.0:1 R:R)
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    assert abs(ratio - 3.0) < 0.01, f"R:R ratio={ratio}, expected 3.0"
+    assert abs(ratio - 2.0) < 0.01, f"R:R ratio={ratio}, expected 2.0"
 
 
 # ── Test 3: Medium-vol tier (LTC) ────────────────────────────
 
 def test_medium_vol_tier_ltc():
-    """LTC gets medium tier: SL=1.0x ATR, TP=3.5x ATR (asymmetric R:R)."""
+    """LTC gets medium tier: SL=1.0x ATR, TP=2.5x ATR (asymmetric R:R)."""
     closes = [90 + i * 0.2 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.015)
 
@@ -100,14 +100,14 @@ def test_medium_vol_tier_ltc():
     assert result["volatility_tier"] == "medium"
 
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    expected_ratio = 3.5 / 1.0
+    expected_ratio = 2.5 / 1.0
     assert abs(ratio - expected_ratio) < 0.01, f"R:R ratio={ratio}, expected {expected_ratio}"
 
 
 # ── Test 4: Low-vol tier (BTC) ───────────────────────────────
 
 def test_low_vol_tier_btc():
-    """BTC gets low tier: SL=1.0x ATR, TP=4.0x ATR (asymmetric R:R)."""
+    """BTC gets low tier: SL=1.0x ATR, TP=3.0x ATR (asymmetric R:R)."""
     closes = [84000 + i * 50 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.008)
 
@@ -116,7 +116,7 @@ def test_low_vol_tier_btc():
     assert result["volatility_tier"] == "low"
 
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    expected_ratio = 4.0 / 1.0
+    expected_ratio = 3.0 / 1.0
     assert abs(ratio - expected_ratio) < 0.01, f"R:R ratio={ratio}, expected {expected_ratio}"
 
 
@@ -226,7 +226,7 @@ def test_min_rr_ratio_high_vol():
     assert result is not None
     assert result["volatility_tier"] == "high"
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    assert ratio >= 2.95, f"High-vol R:R must be >= 3.0:1, got {ratio:.2f}"
+    assert ratio >= 1.95, f"High-vol R:R must be >= 2.0:1, got {ratio:.2f}"
 
 
 # ── Test 13: Base asset extraction ───────────────────────────
@@ -354,7 +354,7 @@ def test_result_includes_net_fields():
 
 
 def test_new_multipliers_btc_math():
-    """Verify BTC low tier: SL=1.0x ATR, TP=4.0x ATR produces correct distances."""
+    """Verify BTC low tier: SL=1.0x ATR, TP=3.0x ATR produces correct distances."""
     closes = [84000 + i * 200 for i in range(30)]
     ohlcv = _make_ohlcv(closes, spread_pct=0.015)
 
@@ -370,6 +370,6 @@ def test_new_multipliers_btc_math():
             fee_floor_bps=1.0,
         )
     assert result is not None
-    # TP distance should be exactly 4x SL distance
+    # TP distance should be exactly 3x SL distance (low tier: 3.0:1)
     ratio = result["tp_distance_bps"] / result["sl_distance_bps"]
-    assert abs(ratio - 4.0) < 0.01, f"BTC low tier R:R should be 4.0:1, got {ratio:.2f}"
+    assert abs(ratio - 3.0) < 0.01, f"BTC low tier R:R should be 3.0:1, got {ratio:.2f}"

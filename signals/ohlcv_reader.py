@@ -3,7 +3,7 @@ Read OHLCV candles from Redis streams for signal generation.
 
 Supports two modes:
   1. Scorer-driven: ExchangeScorer ranks exchanges, reader fetches from best.
-  2. Legacy fallback: tries hardcoded key patterns (for backward compat).
+  2. Legacy fallback: tries ALL known exchange key formats (USDT variants, multiple tf formats).
 """
 from __future__ import annotations
 
@@ -20,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 # Timeframe seconds → CCXT-style label
 _TF_LABEL: dict = {15: "15s", 60: "1m", 300: "5m", 900: "15m", 3600: "1h"}
+
+# All exchanges the streamer publishes data for
+_ALL_EXCHANGES = ["binance", "bybit", "okx", "kucoin", "gateio", "coinbase", "bitfinex", "kraken"]
+_USDT_EXCHANGES = frozenset({"binance", "bybit", "okx", "kucoin", "gateio"})
+_USD_EXCHANGES = frozenset({"kraken", "coinbase", "bitfinex"})
+
+# Multiple timeframe format variants per CCXT label
+_TF_VARIANTS: dict = {
+    "15s": ["15s", "15"],
+    "1m": ["1m", "1", "60"],
+    "5m": ["5m", "5", "300"],
+    "15m": ["15m", "15", "900"],
+    "1h": ["1h", "60", "3600"],
+}
+
+# Minimum candles required (reduced from 50 for faster warmup)
+_MIN_CANDLES = 20
 
 
 async def read_ohlcv_candles(
@@ -61,9 +78,9 @@ async def read_ohlcv_candles(
             for key in keys:
                 try:
                     raw = await _read_stream(redis_client, key, lookback)
-                    if raw and len(raw) >= 20:
+                    if raw and len(raw) >= _MIN_CANDLES:
                         arr = _parse_ohlcv(raw)
-                        if arr is not None and len(arr) >= 20:
+                        if arr is not None and len(arr) >= _MIN_CANDLES:
                             logger.info(
                                 "OHLCV read: exchange=%s pair=%s tf=%s key=%s candles=%d (score=%.2f)",
                                 ex, pair, tf_label, key, len(arr), score.total_score,
@@ -75,51 +92,84 @@ async def read_ohlcv_candles(
         return None
 
     # ── Legacy fallback (scorer=None) ──
-    dash_pair = pair.replace("/", "-")
-
-    keys_to_try = [
-        # Aggregator format (ohlcv_aggregator.py) — per-exchange and cross-exchange
-        f"ohlc:{timeframe_s}:{exchange}:{pair}",
-        f"ohlc:{timeframe_s}:any:{pair}",
-    ]
-
-    if tf_label:
-        # Streamer format: {exchange}:ohlc:{label}:{dash_pair}
-        keys_to_try.append(f"{exchange}:ohlc:{tf_label}:{dash_pair}")
-        # Cross-exchange aggregator with label
-        keys_to_try.append(f"ohlc:{tf_label}:any:{dash_pair}")
-
-    # Legacy fallback: integer-minutes format
-    legacy_tf = timeframe_s // 60 if timeframe_s >= 60 else timeframe_s
-    keys_to_try.append(f"{exchange}:ohlc:{legacy_tf}:{dash_pair}")
-
-    # Cross-exchange fallback
-    _USD_FALLBACKS = ["coinbase", "bitfinex"]
-    _USDT_FALLBACKS = ["binance", "okx", "bybit"]
-    is_usd = dash_pair.endswith("-USD")
-    fallback_exchanges = _USD_FALLBACKS if is_usd else _USDT_FALLBACKS
-    for fb_ex in fallback_exchanges:
-        if fb_ex != exchange:
-            if tf_label:
-                keys_to_try.append(f"{fb_ex}:ohlc:{tf_label}:{dash_pair}")
+    # Build comprehensive list of key candidates across ALL exchanges and formats
+    keys_to_try = _build_all_candidates(exchange, pair, tf_label, timeframe_s)
 
     for key in keys_to_try:
         try:
             raw = await _read_stream(redis_client, key, lookback)
-            if raw and len(raw) >= 20:
+            if raw and len(raw) >= _MIN_CANDLES:
                 arr = _parse_ohlcv(raw)
-                if arr is not None and len(arr) >= 20:
+                if arr is not None and len(arr) >= _MIN_CANDLES:
                     logger.info(
-                        "OHLCV read: exchange=%s pair=%s tf=%ds key=%s candles=%d",
-                        exchange, pair, timeframe_s, key, len(arr),
+                        "OHLCV hit: pair=%s tf=%s key=%s candles=%d",
+                        pair, tf_label, key, len(arr),
                     )
                     return arr
         except Exception as e:
             logger.debug("OHLCV read failed key=%s: %s", key, e)
             continue
 
-    logger.debug("No OHLCV data for %s:%s tf=%ds (tried %d keys)", exchange, pair, timeframe_s, len(keys_to_try))
+    logger.warning(
+        "OHLCV miss: pair=%s tf=%s tried %d keys (no data >= %d candles)",
+        pair, tf_label, len(keys_to_try), _MIN_CANDLES,
+    )
     return None
+
+
+def _build_all_candidates(
+    exchange: str, pair: str, tf_label: str, timeframe_s: int
+) -> List[str]:
+    """
+    Build ALL possible Redis key format candidates.
+
+    Tries every exchange × every timeframe format × both USD and USDT pair variants.
+    This ensures we find data regardless of which exchange/format the streamer used.
+    """
+    keys: List[str] = []
+    dash_pair = pair.replace("/", "-")
+
+    # Determine pair variants: if pair is BTC-USD, also try BTC-USDT and vice versa
+    is_usd = dash_pair.endswith("-USD") and not dash_pair.endswith("-USDT")
+    usdt_pair = dash_pair + "T" if is_usd else dash_pair
+    usd_pair = dash_pair[:-1] if dash_pair.endswith("-USDT") else dash_pair
+
+    # Get all timeframe format variants for the requested timeframe
+    tf_variants = _TF_VARIANTS.get(tf_label, [tf_label])
+    # Also include the raw seconds value as a variant
+    sec_str = str(timeframe_s)
+    if sec_str not in tf_variants:
+        tf_variants = list(tf_variants) + [sec_str]
+
+    # Determine exchange priority order: requested exchange first, then all others
+    exchanges_ordered = []
+    if exchange and exchange != "any" and exchange in _ALL_EXCHANGES:
+        exchanges_ordered.append(exchange)
+    for ex in _ALL_EXCHANGES:
+        if ex not in exchanges_ordered:
+            exchanges_ordered.append(ex)
+
+    # For each exchange, generate key candidates with correct pair format
+    for ex in exchanges_ordered:
+        if ex in _USDT_EXCHANGES:
+            pair_to_use = usdt_pair
+        else:
+            pair_to_use = usd_pair
+
+        for tf in tf_variants:
+            keys.append(f"{ex}:ohlc:{tf}:{pair_to_use}")
+
+    # Aggregator format candidates (cross-exchange)
+    slash_pair = pair if "/" in pair else pair.replace("-", "/")
+    for tf in tf_variants:
+        keys.append(f"ohlc:{tf}:any:{dash_pair}")
+        keys.append(f"ohlc:{tf}:any:{slash_pair}")
+
+    # Legacy Kraken integer-minutes format
+    legacy_tf = timeframe_s // 60 if timeframe_s >= 60 else timeframe_s
+    keys.append(f"kraken:ohlc:{legacy_tf}:{usd_pair}")
+
+    return keys
 
 
 async def _read_stream(

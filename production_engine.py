@@ -196,7 +196,7 @@ class EngineConfig:
     )
 
     # Timeframe: 1-minute candles (was 15s / 10s spot polling)
-    primary_timeframe_s: int = int(os.getenv("PRIMARY_TIMEFRAME_S", "60"))
+    primary_timeframe_s: int = int(os.getenv("PRIMARY_TIMEFRAME_S", "300"))
     signal_candle_lookback: int = int(os.getenv("SIGNAL_CANDLE_LOOKBACK", "50"))
 
     # TP/SL recalibrated for real Kraken fees (52 bps fee + 5 bps slippage = 57 bps RT)
@@ -206,16 +206,16 @@ class EngineConfig:
     breakeven_cost_bps: float = float(os.getenv("BREAKEVEN_COST_BPS", "57.0"))
 
     # Consensus gate
-    min_consensus_families: int = int(os.getenv("MIN_CONSENSUS_FAMILIES", "2"))
+    min_consensus_families: int = int(os.getenv("MIN_CONSENSUS_FAMILIES", "1"))
 
     # Volume gate
-    min_volume_ratio: float = float(os.getenv("MIN_VOLUME_RATIO", "0.5"))
+    min_volume_ratio: float = float(os.getenv("MIN_VOLUME_RATIO", "0.3"))
 
     # Minimum confidence to publish (was 0.65, lowered for Sprint 2 orchestrator)
-    min_signal_confidence: float = float(os.getenv("MIN_SIGNAL_CONFIDENCE", "0.55"))
+    min_signal_confidence: float = float(os.getenv("MIN_SIGNAL_CONFIDENCE", "0.50"))
 
     # Signal cooldown (was hardcoded 300, now configurable; 180s prevents within-candle flips)
-    signal_cooldown_seconds: int = int(os.getenv("SIGNAL_COOLDOWN_SECONDS", "180"))
+    signal_cooldown_seconds: int = int(os.getenv("SIGNAL_COOLDOWN_SECONDS", "300"))
 
     # ── Sprint 3A: ATR-based TP/SL ──────────────────────────
     atr_tp_sl_enabled: bool = field(
@@ -402,7 +402,7 @@ class ProductionEngine:
         self._last_signal_time: Dict[str, float] = {}
         self._signal_cooldown_seconds = self.config.signal_cooldown_seconds
         self._last_signal_stale_check = 0.0
-        self._signal_stale_threshold = int(os.getenv("SIGNAL_STALE_THRESHOLD_S", "3600"))
+        self._signal_stale_threshold = int(os.getenv("SIGNAL_STALE_THRESHOLD_S", "600"))
 
         # Sprint 2: Strategy Orchestrator (Tier 2)
         self._orchestrator = StrategyOrchestrator(

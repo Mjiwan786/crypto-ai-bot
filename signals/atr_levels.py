@@ -31,9 +31,9 @@ VOLATILITY_TIERS = {
 
 # Default multipliers per tier — overridable via env vars
 _TIER_DEFAULTS = {
-    "high":  {"sl_mult": 1.0, "tp_mult": 3.0},
-    "medium": {"sl_mult": 1.0, "tp_mult": 3.5},
-    "low":   {"sl_mult": 1.0, "tp_mult": 4.0},
+    "high":  {"sl_mult": 1.0, "tp_mult": 2.0},
+    "medium": {"sl_mult": 1.0, "tp_mult": 2.5},
+    "low":   {"sl_mult": 1.0, "tp_mult": 3.0},
 }
 
 
@@ -137,7 +137,7 @@ def compute_atr_levels(
     if atr_period is None:
         atr_period = int(os.getenv("ATR_PERIOD", "14"))
     if fee_floor_bps is None:
-        fee_floor_bps = float(os.getenv("ATR_FEE_FLOOR_BPS", "15.0"))
+        fee_floor_bps = float(os.getenv("ATR_FEE_FLOOR_BPS", "10.0"))
 
     atr_value = compute_atr(ohlcv, period=atr_period)
     if atr_value is None or atr_value <= 0:
@@ -155,8 +155,8 @@ def compute_atr_levels(
 
     # Guard parameters
     round_trip_fee_bps = float(os.getenv("ROUND_TRIP_FEE_BPS", "52"))
-    min_rr_ratio = float(os.getenv("MIN_RR_RATIO", "1.5"))
-    tp_floor_bps = float(os.getenv("ATR_TP_FLOOR_BPS", "55"))
+    min_rr_ratio = float(os.getenv("MIN_RR_RATIO", "1.2"))
+    tp_floor_bps = float(os.getenv("ATR_TP_FLOOR_BPS", "30"))
 
     sl_distance = atr_value * sl_multiplier
     tp_distance = atr_value * tp_multiplier

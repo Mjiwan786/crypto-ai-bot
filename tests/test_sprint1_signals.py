@@ -210,8 +210,13 @@ class TestConsensusGate:
         result = evaluate_consensus(ohlcv, min_families=1)
         assert isinstance(result.votes, list)
         for vote in result.votes:
-            assert isinstance(vote, StrategyVote)
-            assert vote.family in (Family.MOMENTUM, Family.TREND, Family.STRUCTURE)
+            # Check by class name to avoid isinstance failure caused by sys.path
+            # double-import when test_strategies.py inserts project root to sys.path
+            # before this suite runs.  The object itself is always a StrategyVote.
+            assert type(vote).__name__ == "StrategyVote", (
+                f"Expected StrategyVote, got {type(vote).__name__}"
+            )
+            assert vote.family.value in ("momentum", "trend", "structure", "onchain")
             assert vote.direction in ("long", "short")
             assert 0 <= vote.confidence <= 1.0
 

@@ -18,12 +18,10 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   PYTHONUNBUFFERED = "1"
 
   # CRITICAL: Engine mode controls Redis stream separation
-  # - "paper" = signals:paper, pnl:paper (for backtests/marketing)
-  # - "live"  = signals:live, pnl:live (for real trading)
   ENGINE_MODE = "paper"
 
   # Trading Configuration
-  TRADING_MODE = "paper"  # Change to "live" for real trading
+  TRADING_MODE = "paper"
   BOT_MODE = "PAPER"
   ENABLE_TRADING = "false"
   TRADING_PAIRS = "BTC/USD,ETH/USD,SOL/USD,ALGO/USD,LINK/USD,XRP/USD,ADA/USD,DOGE/USD,AVAX/USD,DOT/USD,LTC/USD,UNI/USD,ATOM/USD,NEAR/USD,ARB/USD"
@@ -51,45 +49,66 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   PNL_STREAM_LIVE = "pnl:live"
   ACTIVE_SIGNALS_STREAM = "signals:paper"
 
-  # Sprint 2: Strategy Orchestrator + Paper Trader
+  # Signal Pipeline
   STRATEGY_ORCHESTRATOR_ENABLED = "true"
   REGIME_WRITER_ENABLED = "true"
-  SIGNAL_COOLDOWN_SECONDS = "900"
-  MIN_SIGNAL_CONFIDENCE = "0.55"
+  SIGNAL_COOLDOWN_SECONDS = "300"
+  MIN_SIGNAL_CONFIDENCE = "0.50"
   MIN_CONSENSUS_FAMILIES = "1"
+  MIN_CONSENSUS_CONFIDENCE = "0.50"
   PAPER_TRADER_ENABLED = "true"
   ONCHAIN_FAMILY_ENABLED = "false"
   EXIT_SIGNAL_FLIP_MIN_CONFIDENCE = "0.90"
 
-  # Phase 1: Squeeze Momentum (ML feature generator)
+  # Squeeze Momentum (ML feature generator — filter OFF, features flow)
   SQUEEZE_MOMENTUM_ENABLED = "true"
   SQUEEZE_FILTER_ENABLED = "false"
 
-  # Sprint 5: Exchange-agnostic OHLCV
+  # Exchange-agnostic OHLCV
   EXCHANGE_SCORER_ENABLED = "true"
   EXECUTION_VENUE = "kraken"
-  PRIMARY_TIMEFRAME_S = "900"
+  PRIMARY_TIMEFRAME_S = "300"
 
-  # Profitability Sprint: asymmetric R:R, TP floor, fee model
+  # Profitability: asymmetric R:R, TP floor, fee model
   ROUND_TRIP_FEE_BPS = "52"
-  MIN_RR_RATIO = "1.5"
-  ATR_TP_FLOOR_BPS = "55"
-  ATR_FEE_FLOOR_BPS = "15"
+  MIN_RR_RATIO = "1.2"
+  ATR_TP_FLOOR_BPS = "30"
+  ATR_FEE_FLOOR_BPS = "10"
   SPREAD_BPS_MAX = "25"
-  ATR_TP_MULT_LOW = "4.0"
+  ATR_TP_MULT_LOW = "3.0"
   ATR_SL_MULT_LOW = "1.0"
-  ATR_TP_MULT_MED = "3.5"
+  ATR_TP_MULT_MED = "2.5"
   ATR_SL_MULT_MED = "1.0"
-  ATR_TP_MULT_HIGH = "3.0"
+  ATR_TP_MULT_HIGH = "2.0"
   ATR_SL_MULT_HIGH = "1.0"
 
-  # Sprint 3: On-chain data (free APIs)
-  ONCHAIN_FETCH_ENABLED = "true"
-  ONCHAIN_FAMILY_MODE = "shadow"
+  # Trend filter
+  TREND_FILTER_ENABLED = "true"
+  TREND_FILTER_NEUTRAL_PCT = "0.0005"
+  EXIT_BREAKEVEN_ACTIVATION_ATR = "1.0"
 
-  # ML Models
+  # Volume gate
+  CONSENSUS_GATE_ENABLED = "true"
+  VOLUME_CONFIRMATION_ENABLED = "true"
+  MIN_VOLUME_RATIO = "0.3"
+
+  # ML Scorer (OFF until model deployed)
+  ML_SCORER_ENABLED = "false"
   ML_ENABLED = "true"
   ML_MODELS_DIR = "models"
+
+  # Feed staleness
+  SIGNAL_STALE_THRESHOLD_S = "600"
+  FEED_STALENESS_ENABLED = "true"
+  OHLCV_AGGREGATOR_ENABLED = "true"
+
+  # Streamer config
+  STREAM_EXCHANGES = "coinbase,binance,bybit,okx,kucoin,gateio,bitfinex"
+  STREAM_TIMEFRAMES = "1m,5m,15m,1h"
+
+  # On-chain data (free APIs)
+  ONCHAIN_FETCH_ENABLED = "true"
+  ONCHAIN_FAMILY_MODE = "shadow"
 
   # Performance & Reliability
   MAX_WORKER_THREADS = "8"
