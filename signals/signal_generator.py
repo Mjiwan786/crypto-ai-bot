@@ -26,7 +26,7 @@ from strategies.trend_following_strategy import compute_adx
 
 logger = logging.getLogger(__name__)
 
-MIN_SIGNAL_CONFIDENCE = 65.0  # 0-100 scale
+MIN_SIGNAL_CONFIDENCE = float(os.getenv("MIN_SIGNAL_CONFIDENCE", "0.50")) * 100  # 0-100 scale
 
 
 @dataclass
