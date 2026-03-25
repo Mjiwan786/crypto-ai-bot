@@ -153,8 +153,9 @@ def compute_atr_levels(
         if tp_multiplier is None:
             tp_multiplier = tier_tp
 
-    # Guard parameters
-    round_trip_fee_bps = float(os.getenv("ROUND_TRIP_FEE_BPS", "52"))
+    # Guard parameters — use per-exchange fee model (default 20 bps)
+    from signals.fee_model import get_fee_for_venue
+    round_trip_fee_bps = get_fee_for_venue()
     min_rr_ratio = float(os.getenv("MIN_RR_RATIO", "1.2"))
     tp_floor_bps = float(os.getenv("ATR_TP_FLOOR_BPS", "30"))
 

@@ -233,7 +233,7 @@ class TestFeeCalculation:
 
         assert abs(actual_fees - expected_fees) < 0.001
         assert abs(actual_pnl - expected_net) < 0.001
-        assert int(t["fee_bps"]) == ROUND_TRIP_FEE_BPS
+        assert float(t["fee_bps"]) == ROUND_TRIP_FEE_BPS
 
 
 class TestStaleSignalGate:

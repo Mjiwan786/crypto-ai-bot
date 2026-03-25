@@ -62,7 +62,9 @@ logger = logging.getLogger("paper_trader")
 # ── Constants ────────────────────────────────────────────────────────
 CONSUMER_GROUP = "paper-trader-group"
 CONSUMER_NAME = "paper-trader-1"
-ROUND_TRIP_FEE_BPS = 52  # 26 bps per leg * 2
+from signals.fee_model import get_fee_for_venue
+
+ROUND_TRIP_FEE_BPS = get_fee_for_venue()  # Per-exchange fee model (default 20 bps)
 STALE_SIGNAL_SECONDS = 60
 MONITOR_INTERVAL_S = 5
 KRAKEN_API_URL = "https://api.kraken.com/0/public/Ticker"
@@ -839,7 +841,7 @@ async def run_self_test() -> None:
     print("\nTest 4: Fee math verification")
     expected_qty = 100.0 / 68000.0
     expected_raw = (69496.0 - 68000.0) * expected_qty
-    expected_fees = 68000.0 * expected_qty * (52 / 10000)
+    expected_fees = 68000.0 * expected_qty * (ROUND_TRIP_FEE_BPS / 10000)
     expected_net = expected_raw - expected_fees
     assert abs(realized_pnl - expected_net) < 0.01, f"PnL mismatch: {realized_pnl} vs {expected_net}"
     assert abs(fees - expected_fees) < 0.01, f"Fee mismatch: {fees} vs {expected_fees}"

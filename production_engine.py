@@ -199,11 +199,10 @@ class EngineConfig:
     primary_timeframe_s: int = int(os.getenv("PRIMARY_TIMEFRAME_S", "300"))
     signal_candle_lookback: int = int(os.getenv("SIGNAL_CANDLE_LOOKBACK", "50"))
 
-    # TP/SL recalibrated for real Kraken fees (52 bps fee + 5 bps slippage = 57 bps RT)
-    # Math: at 45% WR with 3:1 ratio -> EV = 0.45*(220-57) + 0.55*(-75-57) = +0.75 bps
+    # TP/SL with per-exchange fee model (default 20 bps + 5 bps slippage = 25 bps RT)
     default_tp_bps: float = float(os.getenv("DEFAULT_TP_BPS", "220.0"))
     default_sl_bps: float = float(os.getenv("DEFAULT_SL_BPS", "75.0"))
-    breakeven_cost_bps: float = float(os.getenv("BREAKEVEN_COST_BPS", "57.0"))
+    breakeven_cost_bps: float = float(os.getenv("BREAKEVEN_COST_BPS", "25.0"))
 
     # Consensus gate
     min_consensus_families: int = int(os.getenv("MIN_CONSENSUS_FAMILIES", "1"))
