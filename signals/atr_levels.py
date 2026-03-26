@@ -31,9 +31,9 @@ VOLATILITY_TIERS = {
 
 # Default multipliers per tier — overridable via env vars
 _TIER_DEFAULTS = {
-    "high":  {"sl_mult": 1.0, "tp_mult": 2.0},
-    "medium": {"sl_mult": 1.0, "tp_mult": 2.5},
-    "low":   {"sl_mult": 1.0, "tp_mult": 3.0},
+    "high":  {"sl_mult": 1.2, "tp_mult": 2.0},
+    "medium": {"sl_mult": 1.3, "tp_mult": 2.5},
+    "low":   {"sl_mult": 1.5, "tp_mult": 3.0},
 }
 
 

@@ -201,7 +201,7 @@ class EngineConfig:
 
     # TP/SL with per-exchange fee model (default 20 bps + 5 bps slippage = 25 bps RT)
     default_tp_bps: float = float(os.getenv("DEFAULT_TP_BPS", "220.0"))
-    default_sl_bps: float = float(os.getenv("DEFAULT_SL_BPS", "75.0"))
+    default_sl_bps: float = float(os.getenv("DEFAULT_SL_BPS", "150.0"))
     breakeven_cost_bps: float = float(os.getenv("BREAKEVEN_COST_BPS", "25.0"))
 
     # Consensus gate

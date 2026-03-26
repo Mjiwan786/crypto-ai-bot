@@ -44,15 +44,15 @@ class ExitManager:
         self.signal_flip_min_confidence = signal_flip_min_confidence
 
         if trailing_activation_atr is None:
-            trailing_activation_atr = float(os.getenv("EXIT_TRAILING_ACTIVATION_ATR", "1.0"))
+            trailing_activation_atr = float(os.getenv("EXIT_TRAILING_ACTIVATION_ATR", "1.5"))
         self.trailing_activation_atr = trailing_activation_atr
 
         if trailing_distance_atr is None:
-            trailing_distance_atr = float(os.getenv("EXIT_TRAILING_DISTANCE_ATR", "0.75"))
+            trailing_distance_atr = float(os.getenv("EXIT_TRAILING_DISTANCE_ATR", "1.0"))
         self.trailing_distance_atr = trailing_distance_atr
 
         if breakeven_activation_atr is None:
-            breakeven_activation_atr = float(os.getenv("EXIT_BREAKEVEN_ACTIVATION_ATR", "0.5"))
+            breakeven_activation_atr = float(os.getenv("EXIT_BREAKEVEN_ACTIVATION_ATR", "2.0"))
         self.breakeven_activation_atr = breakeven_activation_atr
 
         if trailing_enabled is None:
