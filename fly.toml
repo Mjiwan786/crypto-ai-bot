@@ -88,6 +88,8 @@ primary_region = 'iad'  # US East (closest to Redis Cloud us-east-1)
   EXIT_BREAKEVEN_ACTIVATION_ATR = "2.0"
   EXIT_TRAILING_ACTIVATION_ATR = "1.5"
   EXIT_TRAILING_DISTANCE_ATR = "1.0"
+  EXIT_MAX_HOLD_SECONDS = "7200"
+  DEFAULT_SL_BPS = "120"
 
   # Volume gate
   CONSENSUS_GATE_ENABLED = "true"

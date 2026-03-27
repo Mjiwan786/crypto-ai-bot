@@ -36,7 +36,7 @@ class ExitManager:
         self.fee_bps = fee_bps
 
         if max_hold_seconds is None:
-            max_hold_seconds = int(os.getenv("EXIT_MAX_HOLD_SECONDS", "14400"))
+            max_hold_seconds = int(os.getenv("EXIT_MAX_HOLD_SECONDS", "7200"))
         self.max_hold_seconds = max_hold_seconds
 
         if signal_flip_min_confidence is None:
